@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyGHDL.dom.Sequential &mdash; GHDL 3.0.0-dev documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/theme_overrides.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/icon.png"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="../about.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="pyGHDL.dom.Subprogram" href="pyGHDL.dom.Subprogram.html" />
+    <link rel="prev" title="pyGHDL.dom.Range" href="pyGHDL.dom.Range.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html">
+            <img src="../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                3.0
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Introduction</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting.html">Getting | Installing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribute.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../licenses.html">Copyrights | Licenses</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GHDL usage</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quick_start/index.html">Quick Start Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../using/InvokingGHDL.html">Invoking GHDL</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../using/Simulation.html">Simulation (runtime)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../using/Synthesis.html">Synthesis</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../using/CommandReference.html">Additional Command Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../using/ImplementationOfVHDL.html">Implementation of VHDL</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../using/ImplementationOfVITAL.html">Implementation of VITAL</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../development/Directories.html">Directory structure</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../development/building/index.html">Building GHDL</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="pyGHDL.html">Python Interfaces</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="pyGHDL.cli.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.cli</span></code></a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="pyGHDL.dom.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom</span></code></a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Aggregates.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Aggregates</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Attribute.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Attribute</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Concurrent.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Concurrent</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.DesignUnit.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.DesignUnit</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Expression.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Expression</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.InterfaceItem.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.InterfaceItem</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Literal.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Literal</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Misc.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Misc</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Names.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Names</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.NonStandard.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.NonStandard</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Object.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Object</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.PSL.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.PSL</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Range.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Range</span></code></a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Sequential</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.IfBranch"><code class="docutils literal notranslate"><span class="pre">IfBranch</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.ElsifBranch"><code class="docutils literal notranslate"><span class="pre">ElsifBranch</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.ElseBranch"><code class="docutils literal notranslate"><span class="pre">ElseBranch</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.IfStatement"><code class="docutils literal notranslate"><span class="pre">IfStatement</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.IndexedChoice"><code class="docutils literal notranslate"><span class="pre">IndexedChoice</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.RangedChoice"><code class="docutils literal notranslate"><span class="pre">RangedChoice</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.Case"><code class="docutils literal notranslate"><span class="pre">Case</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.OthersCase"><code class="docutils literal notranslate"><span class="pre">OthersCase</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.CaseStatement"><code class="docutils literal notranslate"><span class="pre">CaseStatement</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.ForLoopStatement"><code class="docutils literal notranslate"><span class="pre">ForLoopStatement</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment"><code class="docutils literal notranslate"><span class="pre">SequentialSimpleSignalAssignment</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.SequentialProcedureCall"><code class="docutils literal notranslate"><span class="pre">SequentialProcedureCall</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.SequentialAssertStatement"><code class="docutils literal notranslate"><span class="pre">SequentialAssertStatement</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.SequentialReportStatement"><code class="docutils literal notranslate"><span class="pre">SequentialReportStatement</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.NullStatement"><code class="docutils literal notranslate"><span class="pre">NullStatement</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Sequential.WaitStatement"><code class="docutils literal notranslate"><span class="pre">WaitStatement</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Subprogram.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Subprogram</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Symbol.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Symbol</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Type.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Type</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom._Translate.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom._Translate</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom._Utils.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom._Utils</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.formatting.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.formatting</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.html#pyGHDL.dom.DOMException"><code class="docutils literal notranslate"><span class="pre">DOMException</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.html#pyGHDL.dom.Position"><code class="docutils literal notranslate"><span class="pre">Position</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.html#pyGHDL.dom.DOMMixin"><code class="docutils literal notranslate"><span class="pre">DOMMixin</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="pyGHDL.libghdl.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.libghdl</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyGHDL.lsp.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.lsp</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyGHDL.html#pyGHDL.GHDLBaseException"><code class="docutils literal notranslate"><span class="pre">GHDLBaseException</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../ghw/index.html">GHDL Waveform (GHW)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../development/Debugging.html">Debugging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../development/CodingStyle.html">Coding Style</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../development/Scripts.html">Scripts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../internals/index.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../internals/Frontend.html">Front-end</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../internals/AST.html">AST</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../internals/RTI.html">Run Time Information (RTI)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gnatdoc/index.html">GNATdoc</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Index</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py-modindex.html">Python Module Index</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">GHDL</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+        
+          
+            <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="pyGHDL.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL</span></code></a> &raquo;</li>
+          <li><a href="pyGHDL.dom.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom</span></code></a> &raquo;</li>
+      <li><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Sequential</span></code></li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/HendrikMennen/ghdl/blob/master/doc/pyGHDL/pyGHDL.dom.Sequential.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-pyGHDL.dom.Sequential">
+<span id="pyghdl-dom-sequential"></span><h1><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Sequential</span></code><a class="headerlink" href="#module-pyGHDL.dom.Sequential" title="Permalink to this heading">¶</a></h1>
+<p><strong>Classes</strong></p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.IfBranch" title="pyGHDL.dom.Sequential.IfBranch"><code class="xref py py-class docutils literal notranslate"><span class="pre">IfBranch</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">Branch</span></code> is a base-class for all branches in a if statement.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.ElsifBranch" title="pyGHDL.dom.Sequential.ElsifBranch"><code class="xref py py-class docutils literal notranslate"><span class="pre">ElsifBranch</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">Branch</span></code> is a base-class for all branches in a if statement.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.ElseBranch" title="pyGHDL.dom.Sequential.ElseBranch"><code class="xref py py-class docutils literal notranslate"><span class="pre">ElseBranch</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">Branch</span></code> is a base-class for all branches in a if statement.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.IfStatement" title="pyGHDL.dom.Sequential.IfStatement"><code class="xref py py-class docutils literal notranslate"><span class="pre">IfStatement</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">CompoundStatement</span></code> is a base-class for all compound statements.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.IndexedChoice" title="pyGHDL.dom.Sequential.IndexedChoice"><code class="xref py py-class docutils literal notranslate"><span class="pre">IndexedChoice</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">SequentialChoice</span></code> is a base-class for all sequential choices (in case statements).</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.RangedChoice" title="pyGHDL.dom.Sequential.RangedChoice"><code class="xref py py-class docutils literal notranslate"><span class="pre">RangedChoice</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">SequentialChoice</span></code> is a base-class for all sequential choices (in case statements).</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.Case" title="pyGHDL.dom.Sequential.Case"><code class="xref py py-class docutils literal notranslate"><span class="pre">Case</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">Case</span></code> is a base-class for all cases.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.OthersCase" title="pyGHDL.dom.Sequential.OthersCase"><code class="xref py py-class docutils literal notranslate"><span class="pre">OthersCase</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">Case</span></code> is a base-class for all cases.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.CaseStatement" title="pyGHDL.dom.Sequential.CaseStatement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CaseStatement</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">CompoundStatement</span></code> is a base-class for all compound statements.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.ForLoopStatement" title="pyGHDL.dom.Sequential.ForLoopStatement"><code class="xref py py-class docutils literal notranslate"><span class="pre">ForLoopStatement</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">LoopStatement</span></code> is a base-class for all loop statements.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment" title="pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment"><code class="xref py py-class docutils literal notranslate"><span class="pre">SequentialSimpleSignalAssignment</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">SequentialStatement</span></code> is a base-class for all sequential statements.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.SequentialProcedureCall" title="pyGHDL.dom.Sequential.SequentialProcedureCall"><code class="xref py py-class docutils literal notranslate"><span class="pre">SequentialProcedureCall</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">SequentialStatement</span></code> is a base-class for all sequential statements.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.SequentialAssertStatement" title="pyGHDL.dom.Sequential.SequentialAssertStatement"><code class="xref py py-class docutils literal notranslate"><span class="pre">SequentialAssertStatement</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">SequentialStatement</span></code> is a base-class for all sequential statements.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.SequentialReportStatement" title="pyGHDL.dom.Sequential.SequentialReportStatement"><code class="xref py py-class docutils literal notranslate"><span class="pre">SequentialReportStatement</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">SequentialStatement</span></code> is a base-class for all sequential statements.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.NullStatement" title="pyGHDL.dom.Sequential.NullStatement"><code class="xref py py-class docutils literal notranslate"><span class="pre">NullStatement</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">SequentialStatement</span></code> is a base-class for all sequential statements.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Sequential.WaitStatement" title="pyGHDL.dom.Sequential.WaitStatement"><code class="xref py py-class docutils literal notranslate"><span class="pre">WaitStatement</span></code></a>:
+A <code class="docutils literal notranslate"><span class="pre">SequentialStatement</span></code> is a base-class for all sequential statements.</p></li>
+</ul>
+<hr class="docutils" />
+<p><strong>Classes</strong></p>
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IfBranch">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">IfBranch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">branchNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statements</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#IfBranch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.IfBranch" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-b6c05ef1e0897c9f828cbe6dbef37a85b2697d1e.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of IfBranch</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>branchNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>condition</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>statements</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialStatement</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IfBranch.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">branchNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statements</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#IfBranch.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.IfBranch.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>branchNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>condition</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>statements</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialStatement</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IfBranch.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.IfBranch.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IfBranch._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.IfBranch._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ElsifBranch">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">ElsifBranch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">branchNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statements</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#ElsifBranch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.ElsifBranch" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-a6f4bff5eccae7bdd758f1cb56c2b47fb10b763a.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of ElsifBranch</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>branchNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>condition</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>statements</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialStatement</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ElsifBranch.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">branchNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statements</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#ElsifBranch.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.ElsifBranch.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>branchNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>condition</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>statements</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialStatement</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ElsifBranch.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.ElsifBranch.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ElsifBranch._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.ElsifBranch._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ElseBranch">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">ElseBranch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">branchNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statements</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#ElseBranch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.ElseBranch" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-b96c47f813c26ee4ea90a46f59eee87a179a99c0.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of ElseBranch</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>branchNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>statements</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialStatement</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ElseBranch.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">branchNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statements</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#ElseBranch.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.ElseBranch.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>branchNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>statements</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><em>Optional</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialStatement</em><em>]</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ElseBranch.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.ElseBranch.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ElseBranch._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.ElseBranch._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IfStatement">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">IfStatement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ifNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ifBranch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">elsifBranches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">elseBranch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#IfStatement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.IfStatement" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-8c69ebd9e11a1076b15f9e1dca26396b2e6e1058.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of IfStatement</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ifNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>ifBranch</strong> (<a class="reference internal" href="#pyGHDL.dom.Sequential.IfBranch" title="pyGHDL.dom.Sequential.IfBranch"><em>IfBranch</em></a>) – </p></li>
+<li><p><strong>elsifBranches</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><a class="reference internal" href="#pyGHDL.dom.Sequential.ElsifBranch" title="pyGHDL.dom.Sequential.ElsifBranch"><em>ElsifBranch</em></a><em>]</em>) – </p></li>
+<li><p><strong>elseBranch</strong> (<a class="reference internal" href="#pyGHDL.dom.Sequential.ElseBranch" title="pyGHDL.dom.Sequential.ElseBranch"><em>ElseBranch</em></a>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IfStatement.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ifNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ifBranch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">elsifBranches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">elseBranch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#IfStatement.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.IfStatement.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ifNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>ifBranch</strong> (<a class="reference internal" href="#pyGHDL.dom.Sequential.IfBranch" title="pyGHDL.dom.Sequential.IfBranch"><em>IfBranch</em></a>) – </p></li>
+<li><p><strong>elsifBranches</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><em>Optional</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><a class="reference internal" href="#pyGHDL.dom.Sequential.ElsifBranch" title="pyGHDL.dom.Sequential.ElsifBranch"><em>ElsifBranch</em></a><em>]</em><em>]</em>) – </p></li>
+<li><p><strong>elseBranch</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><em>Optional</em></a><em>[</em><a class="reference internal" href="#pyGHDL.dom.Sequential.ElseBranch" title="pyGHDL.dom.Sequential.ElseBranch"><em>ElseBranch</em></a><em>]</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><em>Optional</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IfStatement.Label">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.IfStatement.Label" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IfStatement.NormalizedLabel">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">NormalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.IfStatement.NormalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s normalized (lower case) label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Normalized label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IfStatement.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.IfStatement.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IfStatement._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.IfStatement._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IfStatement._label">
+<span class="sig-name descname"><span class="pre">_label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.IfStatement._label" title="Permalink to this definition">¶</a></dt>
+<dd><p>The label of a model entity.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IfStatement._normalizedLabel">
+<span class="sig-name descname"><span class="pre">_normalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.IfStatement._normalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>The normalized (lower case) label of a model entity.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IndexedChoice">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">IndexedChoice</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expression</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#IndexedChoice"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.IndexedChoice" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-6dac15a9337da1331059bb96d4d034628d4e3c53.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of IndexedChoice</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>expression</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IndexedChoice.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expression</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#IndexedChoice.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.IndexedChoice.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>expression</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IndexedChoice.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.IndexedChoice.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IndexedChoice.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyVHDLModel/SyntaxModel.html#IndexedChoice.__str__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.IndexedChoice.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.IndexedChoice._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.IndexedChoice._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.RangedChoice">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">RangedChoice</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rng</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#RangedChoice"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.RangedChoice" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-fc46b3eab3b9d6e7147fbacde73d4b86a9f161b1.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of RangedChoice</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>rng</strong> (<a class="reference internal" href="pyGHDL.dom.Range.html#pyGHDL.dom.Range.Range" title="pyGHDL.dom.Range.Range"><em>Range</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.RangedChoice.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rng</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#RangedChoice.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.RangedChoice.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>rng</strong> (<a class="reference internal" href="pyGHDL.dom.Range.html#pyGHDL.dom.Range.Range" title="pyGHDL.dom.Range.Range"><em>Range</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.RangedChoice.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.RangedChoice.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.RangedChoice.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyVHDLModel/SyntaxModel.html#RangedChoice.__str__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.RangedChoice.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.RangedChoice._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.RangedChoice._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.Case">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">Case</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">choices</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statements</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#Case"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.Case" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-79e3c75d32f9063a1eb567f9e0cc3c7b4e25ddb4.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of Case</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>choices</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialChoice</em><em>]</em>) – </p></li>
+<li><p><strong>statements</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialStatement</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.Case.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">choices</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statements</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#Case.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.Case.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>choices</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialChoice</em><em>]</em>) – </p></li>
+<li><p><strong>statements</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><em>Optional</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialStatement</em><em>]</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.Case.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.Case.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.Case.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyVHDLModel/SyntaxModel.html#Case.__str__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.Case.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.Case._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.Case._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.OthersCase">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">OthersCase</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">caseNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statements</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#OthersCase"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.OthersCase" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-ca3877afadff045a17f70855436aacab7b3d182b.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of OthersCase</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>caseNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>statements</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialStatement</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.OthersCase.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">caseNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statements</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#OthersCase.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.OthersCase.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>caseNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>statements</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><em>Optional</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialStatement</em><em>]</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.OthersCase.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.OthersCase.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.OthersCase.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyVHDLModel/SyntaxModel.html#OthersCase.__str__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.OthersCase.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.OthersCase._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.OthersCase._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.CaseStatement">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">CaseStatement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">caseNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expression</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cases</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#CaseStatement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.CaseStatement" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-24916424a2f96227953c0ec6c3a28aec3dca6605.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of CaseStatement</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>caseNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+<li><p><strong>expression</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>cases</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialCase</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.CaseStatement.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">caseNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expression</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cases</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#CaseStatement.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.CaseStatement.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>caseNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+<li><p><strong>expression</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>cases</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialCase</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.CaseStatement.Label">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.CaseStatement.Label" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.CaseStatement.NormalizedLabel">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">NormalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.CaseStatement.NormalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s normalized (lower case) label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Normalized label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.CaseStatement.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.CaseStatement.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.CaseStatement._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.CaseStatement._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.CaseStatement._label">
+<span class="sig-name descname"><span class="pre">_label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.CaseStatement._label" title="Permalink to this definition">¶</a></dt>
+<dd><p>The label of a model entity.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.CaseStatement._normalizedLabel">
+<span class="sig-name descname"><span class="pre">_normalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.CaseStatement._normalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>The normalized (lower case) label of a model entity.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ForLoopStatement">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">ForLoopStatement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loopNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loopIndex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rng</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statements</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#ForLoopStatement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.ForLoopStatement" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-99926e2e3d2f5870dee92544d90b540ed3df441d.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of ForLoopStatement</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>loopNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>loopIndex</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+<li><p><strong>rng</strong> (<a class="reference internal" href="pyGHDL.dom.Range.html#pyGHDL.dom.Range.Range" title="pyGHDL.dom.Range.Range"><em>Range</em></a>) – </p></li>
+<li><p><strong>statements</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialStatement</em><em>]</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ForLoopStatement.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loopNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loopIndex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rng</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statements</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#ForLoopStatement.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.ForLoopStatement.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>loopNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>loopIndex</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+<li><p><strong>rng</strong> (<a class="reference internal" href="pyGHDL.dom.Range.html#pyGHDL.dom.Range.Range" title="pyGHDL.dom.Range.Range"><em>Range</em></a>) – </p></li>
+<li><p><strong>statements</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><em>Optional</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>SequentialStatement</em><em>]</em><em>]</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><em>Optional</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ForLoopStatement.Label">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.ForLoopStatement.Label" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ForLoopStatement.NormalizedLabel">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">NormalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.ForLoopStatement.NormalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s normalized (lower case) label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Normalized label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ForLoopStatement.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.ForLoopStatement.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ForLoopStatement._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.ForLoopStatement._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ForLoopStatement._label">
+<span class="sig-name descname"><span class="pre">_label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.ForLoopStatement._label" title="Permalink to this definition">¶</a></dt>
+<dd><p>The label of a model entity.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.ForLoopStatement._normalizedLabel">
+<span class="sig-name descname"><span class="pre">_normalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.ForLoopStatement._normalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>The normalized (lower case) label of a model entity.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">SequentialSimpleSignalAssignment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">assignmentNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">waveform</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#SequentialSimpleSignalAssignment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-190c457bb19d443dcd7f7620af9b3d3a7b94bd21.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of SequentialSimpleSignalAssignment</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>assignmentNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>target</strong> (<em>Name</em>) – </p></li>
+<li><p><strong>waveform</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><a class="reference internal" href="pyGHDL.dom.Concurrent.html#pyGHDL.dom.Concurrent.WaveformElement" title="pyGHDL.dom.Concurrent.WaveformElement"><em>WaveformElement</em></a><em>]</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">assignmentNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">waveform</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#SequentialSimpleSignalAssignment.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>assignmentNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>target</strong> (<em>Name</em>) – </p></li>
+<li><p><strong>waveform</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><a class="reference internal" href="pyGHDL.dom.Concurrent.html#pyGHDL.dom.Concurrent.WaveformElement" title="pyGHDL.dom.Concurrent.WaveformElement"><em>WaveformElement</em></a><em>]</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><em>Optional</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment.Label">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment.Label" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment.NormalizedLabel">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">NormalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment.NormalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s normalized (lower case) label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Normalized label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment._label">
+<span class="sig-name descname"><span class="pre">_label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment._label" title="Permalink to this definition">¶</a></dt>
+<dd><p>The label of a model entity.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment._normalizedLabel">
+<span class="sig-name descname"><span class="pre">_normalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialSimpleSignalAssignment._normalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>The normalized (lower case) label of a model entity.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialProcedureCall">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">SequentialProcedureCall</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">procedureName</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameterMappings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#SequentialProcedureCall"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialProcedureCall" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-198d0d2da4572a9201e1b07102baa51f58612cc1.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of SequentialProcedureCall</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>callNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>procedureName</strong> (<em>Name</em>) – </p></li>
+<li><p><strong>parameterMappings</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><a class="reference internal" href="pyGHDL.dom.Concurrent.html#pyGHDL.dom.Concurrent.ParameterAssociationItem" title="pyGHDL.dom.Concurrent.ParameterAssociationItem"><em>ParameterAssociationItem</em></a><em>]</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialProcedureCall.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">procedureName</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parameterMappings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#SequentialProcedureCall.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialProcedureCall.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>callNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>procedureName</strong> (<em>Name</em>) – </p></li>
+<li><p><strong>parameterMappings</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><a class="reference internal" href="pyGHDL.dom.Concurrent.html#pyGHDL.dom.Concurrent.ParameterAssociationItem" title="pyGHDL.dom.Concurrent.ParameterAssociationItem"><em>ParameterAssociationItem</em></a><em>]</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><em>Optional</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialProcedureCall.Label">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialProcedureCall.Label" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialProcedureCall.NormalizedLabel">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">NormalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialProcedureCall.NormalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s normalized (lower case) label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Normalized label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialProcedureCall.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialProcedureCall.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialProcedureCall._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialProcedureCall._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialProcedureCall._label">
+<span class="sig-name descname"><span class="pre">_label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialProcedureCall._label" title="Permalink to this definition">¶</a></dt>
+<dd><p>The label of a model entity.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialProcedureCall._normalizedLabel">
+<span class="sig-name descname"><span class="pre">_normalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialProcedureCall._normalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>The normalized (lower case) label of a model entity.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialAssertStatement">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">SequentialAssertStatement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">assertNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">severity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#SequentialAssertStatement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialAssertStatement" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-5d8b77b482acb9b7926a7c19f8ef1fc323d5d6f1.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of SequentialAssertStatement</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>assertNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>condition</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>severity</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialAssertStatement.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">assertNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">severity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#SequentialAssertStatement.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialAssertStatement.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>assertNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>condition</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>severity</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialAssertStatement.Label">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialAssertStatement.Label" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialAssertStatement.NormalizedLabel">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">NormalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialAssertStatement.NormalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s normalized (lower case) label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Normalized label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialAssertStatement.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialAssertStatement.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialAssertStatement._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialAssertStatement._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialAssertStatement._label">
+<span class="sig-name descname"><span class="pre">_label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialAssertStatement._label" title="Permalink to this definition">¶</a></dt>
+<dd><p>The label of a model entity.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialAssertStatement._normalizedLabel">
+<span class="sig-name descname"><span class="pre">_normalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialAssertStatement._normalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>The normalized (lower case) label of a model entity.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialReportStatement">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">SequentialReportStatement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reportNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">severity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#SequentialReportStatement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialReportStatement" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-d965412ae3b3f47836b56e44f544148b1462f76e.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of SequentialReportStatement</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>reportNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>severity</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialReportStatement.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reportNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">severity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#SequentialReportStatement.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialReportStatement.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>reportNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>severity</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialReportStatement.Label">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialReportStatement.Label" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialReportStatement.NormalizedLabel">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">NormalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialReportStatement.NormalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s normalized (lower case) label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Normalized label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialReportStatement.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialReportStatement.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialReportStatement._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialReportStatement._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialReportStatement._label">
+<span class="sig-name descname"><span class="pre">_label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialReportStatement._label" title="Permalink to this definition">¶</a></dt>
+<dd><p>The label of a model entity.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.SequentialReportStatement._normalizedLabel">
+<span class="sig-name descname"><span class="pre">_normalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.SequentialReportStatement._normalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>The normalized (lower case) label of a model entity.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.NullStatement">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">NullStatement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">waitNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#NullStatement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.NullStatement" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-7d35b40e438a1c906f12d77c4f379feb5cf56b06.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of NullStatement</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>waitNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.NullStatement.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">waitNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#NullStatement.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.NullStatement.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>waitNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><em>Optional</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.NullStatement.Label">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.NullStatement.Label" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.NullStatement.NormalizedLabel">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">NormalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.NullStatement.NormalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s normalized (lower case) label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Normalized label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.NullStatement.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.NullStatement.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.NullStatement._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.NullStatement._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.NullStatement._label">
+<span class="sig-name descname"><span class="pre">_label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.NullStatement._label" title="Permalink to this definition">¶</a></dt>
+<dd><p>The label of a model entity.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.NullStatement._normalizedLabel">
+<span class="sig-name descname"><span class="pre">_normalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.NullStatement._normalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>The normalized (lower case) label of a model entity.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.WaitStatement">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Sequential.</span></span><span class="sig-name descname"><span class="pre">WaitStatement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">waitNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sensitivityList</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#WaitStatement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.WaitStatement" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-140cbfb6cb3e94af0089b8e4c52535d548093e01.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of WaitStatement</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>waitNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>sensitivityList</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>Name</em><em>]</em>) – </p></li>
+<li><p><strong>condition</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>timeout</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.WaitStatement.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">waitNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sensitivityList</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Sequential.html#WaitStatement.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Sequential.WaitStatement.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>waitNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>sensitivityList</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterable" title="(in Python v3.11)"><em>Iterable</em></a><em>[</em><em>Name</em><em>]</em>) – </p></li>
+<li><p><strong>condition</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>timeout</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>BaseExpression</em><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.QualifiedExpression" title="pyGHDL.dom.Expression.QualifiedExpression"><em>QualifiedExpression</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.FunctionCall" title="pyGHDL.dom.Expression.FunctionCall"><em>FunctionCall</em></a><em>, </em><a class="reference internal" href="pyGHDL.dom.Expression.html#pyGHDL.dom.Expression.TypeConversion" title="pyGHDL.dom.Expression.TypeConversion"><em>TypeConversion</em></a><em>, </em><em>Literal</em><em>]</em>) – </p></li>
+<li><p><strong>label</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.WaitStatement.Label">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.WaitStatement.Label" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.WaitStatement.NormalizedLabel">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">NormalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><span class="pre">Optional</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.WaitStatement.NormalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a model entity’s normalized (lower case) label.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Normalized label of a model entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.WaitStatement.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Sequential.WaitStatement.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.WaitStatement._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.WaitStatement._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.WaitStatement._label">
+<span class="sig-name descname"><span class="pre">_label</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.WaitStatement._label" title="Permalink to this definition">¶</a></dt>
+<dd><p>The label of a model entity.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Sequential.WaitStatement._normalizedLabel">
+<span class="sig-name descname"><span class="pre">_normalizedLabel</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Nullable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#pyGHDL.dom.Sequential.WaitStatement._normalizedLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>The normalized (lower case) label of a model entity.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="pyGHDL.dom.Range.html" class="btn btn-neutral float-left" title="pyGHDL.dom.Range" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="pyGHDL.dom.Subprogram.html" class="btn btn-neutral float-right" title="pyGHDL.dom.Subprogram" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2002-2021, Tristan Gingold and contributors.</p>
+  </div>Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/buildthedocs/sphinx.theme">theme</a>
+    provided by <a href="https://buildthedocs.github.io">Build the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

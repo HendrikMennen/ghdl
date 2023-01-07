@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyGHDL.dom.Symbol &mdash; GHDL 3.0.0-dev documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/theme_overrides.css" type="text/css" />
+    <link rel="shortcut icon" href="../_static/icon.png"/>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="../about.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="pyGHDL.dom.Type" href="pyGHDL.dom.Type.html" />
+    <link rel="prev" title="pyGHDL.dom.Subprogram" href="pyGHDL.dom.Subprogram.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html">
+            <img src="../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                3.0
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Introduction</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting.html">Getting | Installing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contribute.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../licenses.html">Copyrights | Licenses</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">GHDL usage</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quick_start/index.html">Quick Start Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../using/InvokingGHDL.html">Invoking GHDL</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../using/Simulation.html">Simulation (runtime)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../using/Synthesis.html">Synthesis</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../using/CommandReference.html">Additional Command Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../using/ImplementationOfVHDL.html">Implementation of VHDL</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../using/ImplementationOfVITAL.html">Implementation of VITAL</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../development/Directories.html">Directory structure</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../development/building/index.html">Building GHDL</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="pyGHDL.html">Python Interfaces</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="pyGHDL.cli.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.cli</span></code></a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="pyGHDL.dom.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom</span></code></a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Aggregates.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Aggregates</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Attribute.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Attribute</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Concurrent.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Concurrent</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.DesignUnit.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.DesignUnit</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Expression.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Expression</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.InterfaceItem.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.InterfaceItem</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Literal.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Literal</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Misc.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Misc</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Names.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Names</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.NonStandard.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.NonStandard</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Object.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Object</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.PSL.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.PSL</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Range.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Range</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Sequential.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Sequential</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Subprogram.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Subprogram</span></code></a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Symbol</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.LibraryReferenceSymbol"><code class="docutils literal notranslate"><span class="pre">LibraryReferenceSymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.PackageReferenceSymbol"><code class="docutils literal notranslate"><span class="pre">PackageReferenceSymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.PackageMembersReferenceSymbol"><code class="docutils literal notranslate"><span class="pre">PackageMembersReferenceSymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.AllPackageMembersReferenceSymbol"><code class="docutils literal notranslate"><span class="pre">AllPackageMembersReferenceSymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.ContextReferenceSymbol"><code class="docutils literal notranslate"><span class="pre">ContextReferenceSymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.EntityInstantiationSymbol"><code class="docutils literal notranslate"><span class="pre">EntityInstantiationSymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.ComponentInstantiationSymbol"><code class="docutils literal notranslate"><span class="pre">ComponentInstantiationSymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.ConfigurationInstantiationSymbol"><code class="docutils literal notranslate"><span class="pre">ConfigurationInstantiationSymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.EntitySymbol"><code class="docutils literal notranslate"><span class="pre">EntitySymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.ArchitectureSymbol"><code class="docutils literal notranslate"><span class="pre">ArchitectureSymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.PackageSymbol"><code class="docutils literal notranslate"><span class="pre">PackageSymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.SimpleSubtypeSymbol"><code class="docutils literal notranslate"><span class="pre">SimpleSubtypeSymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.ConstrainedScalarSubtypeSymbol"><code class="docutils literal notranslate"><span class="pre">ConstrainedScalarSubtypeSymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.ConstrainedCompositeSubtypeSymbol"><code class="docutils literal notranslate"><span class="pre">ConstrainedCompositeSubtypeSymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.SimpleObjectOrFunctionCallSymbol"><code class="docutils literal notranslate"><span class="pre">SimpleObjectOrFunctionCallSymbol</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pyGHDL.dom.Symbol.IndexedObjectOrFunctionCallSymbol"><code class="docutils literal notranslate"><span class="pre">IndexedObjectOrFunctionCallSymbol</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.Type.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Type</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom._Translate.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom._Translate</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom._Utils.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom._Utils</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.formatting.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.formatting</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.html#pyGHDL.dom.DOMException"><code class="docutils literal notranslate"><span class="pre">DOMException</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.html#pyGHDL.dom.Position"><code class="docutils literal notranslate"><span class="pre">Position</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyGHDL.dom.html#pyGHDL.dom.DOMMixin"><code class="docutils literal notranslate"><span class="pre">DOMMixin</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="pyGHDL.libghdl.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.libghdl</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyGHDL.lsp.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.lsp</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyGHDL.html#pyGHDL.GHDLBaseException"><code class="docutils literal notranslate"><span class="pre">GHDLBaseException</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../ghw/index.html">GHDL Waveform (GHW)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../development/Debugging.html">Debugging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../development/CodingStyle.html">Coding Style</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../development/Scripts.html">Scripts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Internals</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../internals/index.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../internals/Frontend.html">Front-end</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../internals/AST.html">AST</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../internals/RTI.html">Run Time Information (RTI)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gnatdoc/index.html">GNATdoc</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Index</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py-modindex.html">Python Module Index</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">GHDL</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+        
+          
+            <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="pyGHDL.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL</span></code></a> &raquo;</li>
+          <li><a href="pyGHDL.dom.html"><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom</span></code></a> &raquo;</li>
+      <li><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Symbol</span></code></li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/HendrikMennen/ghdl/blob/master/doc/pyGHDL/pyGHDL.dom.Symbol.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-pyGHDL.dom.Symbol">
+<span id="pyghdl-dom-symbol"></span><h1><code class="docutils literal notranslate"><span class="pre">pyGHDL.dom.Symbol</span></code><a class="headerlink" href="#module-pyGHDL.dom.Symbol" title="Permalink to this heading">¶</a></h1>
+<p><strong>Classes</strong></p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.LibraryReferenceSymbol" title="pyGHDL.dom.Symbol.LibraryReferenceSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">LibraryReferenceSymbol</span></code></a>:
+A library reference in a library clause.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.PackageReferenceSymbol" title="pyGHDL.dom.Symbol.PackageReferenceSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">PackageReferenceSymbol</span></code></a>:
+A package reference in a use clause.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.PackageMembersReferenceSymbol" title="pyGHDL.dom.Symbol.PackageMembersReferenceSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">PackageMembersReferenceSymbol</span></code></a>:
+A package member reference in a use clause.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.AllPackageMembersReferenceSymbol" title="pyGHDL.dom.Symbol.AllPackageMembersReferenceSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">AllPackageMembersReferenceSymbol</span></code></a>:
+A package reference in a use clause.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.ContextReferenceSymbol" title="pyGHDL.dom.Symbol.ContextReferenceSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">ContextReferenceSymbol</span></code></a>:
+A context reference in a context clause.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.EntityInstantiationSymbol" title="pyGHDL.dom.Symbol.EntityInstantiationSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">EntityInstantiationSymbol</span></code></a>:
+An entity reference in a direct entity instantiation.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.ComponentInstantiationSymbol" title="pyGHDL.dom.Symbol.ComponentInstantiationSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">ComponentInstantiationSymbol</span></code></a>:
+A component reference in a component instantiation.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.ConfigurationInstantiationSymbol" title="pyGHDL.dom.Symbol.ConfigurationInstantiationSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">ConfigurationInstantiationSymbol</span></code></a>:
+A configuration reference in a configuration instantiation.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.EntitySymbol" title="pyGHDL.dom.Symbol.EntitySymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">EntitySymbol</span></code></a>:
+An entity reference in an architecture declaration.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.ArchitectureSymbol" title="pyGHDL.dom.Symbol.ArchitectureSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">ArchitectureSymbol</span></code></a>:
+An entity reference in an entity instantiation with architecture name.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.PackageSymbol" title="pyGHDL.dom.Symbol.PackageSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">PackageSymbol</span></code></a>:
+A package reference in a package body declaration.</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.SimpleSubtypeSymbol" title="pyGHDL.dom.Symbol.SimpleSubtypeSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">SimpleSubtypeSymbol</span></code></a>:
+<code class="docutils literal notranslate"><span class="pre">ModelEntity</span></code> is the base-class for all classes in the VHDL language model, except for mixin classes (see multiple</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.ConstrainedScalarSubtypeSymbol" title="pyGHDL.dom.Symbol.ConstrainedScalarSubtypeSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">ConstrainedScalarSubtypeSymbol</span></code></a>:
+<code class="docutils literal notranslate"><span class="pre">ModelEntity</span></code> is the base-class for all classes in the VHDL language model, except for mixin classes (see multiple</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.ConstrainedCompositeSubtypeSymbol" title="pyGHDL.dom.Symbol.ConstrainedCompositeSubtypeSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">ConstrainedCompositeSubtypeSymbol</span></code></a>:
+<code class="docutils literal notranslate"><span class="pre">ModelEntity</span></code> is the base-class for all classes in the VHDL language model, except for mixin classes (see multiple</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.SimpleObjectOrFunctionCallSymbol" title="pyGHDL.dom.Symbol.SimpleObjectOrFunctionCallSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">SimpleObjectOrFunctionCallSymbol</span></code></a>:
+<code class="docutils literal notranslate"><span class="pre">ModelEntity</span></code> is the base-class for all classes in the VHDL language model, except for mixin classes (see multiple</p></li>
+<li><p><a class="reference internal" href="#pyGHDL.dom.Symbol.IndexedObjectOrFunctionCallSymbol" title="pyGHDL.dom.Symbol.IndexedObjectOrFunctionCallSymbol"><code class="xref py py-class docutils literal notranslate"><span class="pre">IndexedObjectOrFunctionCallSymbol</span></code></a>:
+<code class="docutils literal notranslate"><span class="pre">ModelEntity</span></code> is the base-class for all classes in the VHDL language model, except for mixin classes (see multiple</p></li>
+</ul>
+<hr class="docutils" />
+<p><strong>Classes</strong></p>
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.LibraryReferenceSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">LibraryReferenceSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#LibraryReferenceSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.LibraryReferenceSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-a0ea0928851ffa0f1df0d8b25c026ad18fec5817.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of LibraryReferenceSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.LibraryReferenceSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#LibraryReferenceSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.LibraryReferenceSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.LibraryReferenceSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.LibraryReferenceSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.LibraryReferenceSymbol.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyGHDL.dom.Symbol.LibraryReferenceSymbol.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.LibraryReferenceSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.LibraryReferenceSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageReferenceSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">PackageReferenceSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#PackageReferenceSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageReferenceSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-57e639e1e41ef656efaa9eee3a8d4e684d109b2c.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of PackageReferenceSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+<li><p><strong>prefix</strong> (<a class="reference internal" href="#pyGHDL.dom.Symbol.LibraryReferenceSymbol" title="pyGHDL.dom.Symbol.LibraryReferenceSymbol"><em>LibraryReferenceSymbol</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageReferenceSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#PackageReferenceSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageReferenceSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+<li><p><strong>prefix</strong> (<a class="reference internal" href="#pyGHDL.dom.Symbol.LibraryReferenceSymbol" title="pyGHDL.dom.Symbol.LibraryReferenceSymbol"><em>LibraryReferenceSymbol</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageReferenceSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageReferenceSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageReferenceSymbol.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageReferenceSymbol.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageReferenceSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageReferenceSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageMembersReferenceSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">PackageMembersReferenceSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#PackageMembersReferenceSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageMembersReferenceSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-672d63ae5bac60cf80b3061d9d787e64474ca2ba.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of PackageMembersReferenceSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+<li><p><strong>prefix</strong> (<a class="reference internal" href="#pyGHDL.dom.Symbol.PackageReferenceSymbol" title="pyGHDL.dom.Symbol.PackageReferenceSymbol"><em>PackageReferenceSymbol</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageMembersReferenceSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#PackageMembersReferenceSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageMembersReferenceSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+<li><p><strong>prefix</strong> (<a class="reference internal" href="#pyGHDL.dom.Symbol.PackageReferenceSymbol" title="pyGHDL.dom.Symbol.PackageReferenceSymbol"><em>PackageReferenceSymbol</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageMembersReferenceSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageMembersReferenceSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageMembersReferenceSymbol.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageMembersReferenceSymbol.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageMembersReferenceSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageMembersReferenceSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.AllPackageMembersReferenceSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">AllPackageMembersReferenceSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#AllPackageMembersReferenceSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.AllPackageMembersReferenceSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-45cb3836e626164fbf987ca64bc8f82163a5715e.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of AllPackageMembersReferenceSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>prefix</strong> (<a class="reference internal" href="#pyGHDL.dom.Symbol.PackageReferenceSymbol" title="pyGHDL.dom.Symbol.PackageReferenceSymbol"><em>PackageReferenceSymbol</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.AllPackageMembersReferenceSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#AllPackageMembersReferenceSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.AllPackageMembersReferenceSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>prefix</strong> (<a class="reference internal" href="#pyGHDL.dom.Symbol.PackageReferenceSymbol" title="pyGHDL.dom.Symbol.PackageReferenceSymbol"><em>PackageReferenceSymbol</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.AllPackageMembersReferenceSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.AllPackageMembersReferenceSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.AllPackageMembersReferenceSymbol.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyGHDL.dom.Symbol.AllPackageMembersReferenceSymbol.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.AllPackageMembersReferenceSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.AllPackageMembersReferenceSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ContextReferenceSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">ContextReferenceSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#ContextReferenceSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.ContextReferenceSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-c1b42cc3186ba55de72dbbee92e55e5f5c30c943.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of ContextReferenceSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+<li><p><strong>prefix</strong> (<a class="reference internal" href="#pyGHDL.dom.Symbol.LibraryReferenceSymbol" title="pyGHDL.dom.Symbol.LibraryReferenceSymbol"><em>LibraryReferenceSymbol</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ContextReferenceSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#ContextReferenceSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.ContextReferenceSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+<li><p><strong>prefix</strong> (<a class="reference internal" href="#pyGHDL.dom.Symbol.LibraryReferenceSymbol" title="pyGHDL.dom.Symbol.LibraryReferenceSymbol"><em>LibraryReferenceSymbol</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ContextReferenceSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.ContextReferenceSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ContextReferenceSymbol.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyGHDL.dom.Symbol.ContextReferenceSymbol.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ContextReferenceSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.ContextReferenceSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.EntityInstantiationSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">EntityInstantiationSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#EntityInstantiationSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.EntityInstantiationSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-c695522a1a9a1df85322ff12ec916e615d1c34d1.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of EntityInstantiationSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+<li><p><strong>prefix</strong> (<a class="reference internal" href="#pyGHDL.dom.Symbol.LibraryReferenceSymbol" title="pyGHDL.dom.Symbol.LibraryReferenceSymbol"><em>LibraryReferenceSymbol</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.EntityInstantiationSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#EntityInstantiationSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.EntityInstantiationSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+<li><p><strong>prefix</strong> (<a class="reference internal" href="#pyGHDL.dom.Symbol.LibraryReferenceSymbol" title="pyGHDL.dom.Symbol.LibraryReferenceSymbol"><em>LibraryReferenceSymbol</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.EntityInstantiationSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.EntityInstantiationSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.EntityInstantiationSymbol.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyGHDL.dom.Symbol.EntityInstantiationSymbol.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.EntityInstantiationSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.EntityInstantiationSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ComponentInstantiationSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">ComponentInstantiationSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#ComponentInstantiationSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.ComponentInstantiationSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-29df722f445af00f19eec1278346c722a4d6e792.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of ComponentInstantiationSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ComponentInstantiationSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#ComponentInstantiationSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.ComponentInstantiationSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ComponentInstantiationSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.ComponentInstantiationSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ComponentInstantiationSymbol.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyGHDL.dom.Symbol.ComponentInstantiationSymbol.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ComponentInstantiationSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.ComponentInstantiationSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ConfigurationInstantiationSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">ConfigurationInstantiationSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#ConfigurationInstantiationSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.ConfigurationInstantiationSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-aef5807938b39c82a9b7b2896233a2dfa7d8ad6e.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of ConfigurationInstantiationSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ConfigurationInstantiationSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#ConfigurationInstantiationSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.ConfigurationInstantiationSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ConfigurationInstantiationSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.ConfigurationInstantiationSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ConfigurationInstantiationSymbol.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyGHDL.dom.Symbol.ConfigurationInstantiationSymbol.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ConfigurationInstantiationSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.ConfigurationInstantiationSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.EntitySymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">EntitySymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#EntitySymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.EntitySymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-d2138f61332be374b0b5da90d94c32001926fe7d.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of EntitySymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.EntitySymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#EntitySymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.EntitySymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.EntitySymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.EntitySymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.EntitySymbol.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyGHDL.dom.Symbol.EntitySymbol.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.EntitySymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.EntitySymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ArchitectureSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">ArchitectureSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#ArchitectureSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.ArchitectureSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-629b68c2d8d1a5fc2d5c511ddecec0416bbe03f8.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of ArchitectureSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+<li><p><strong>prefix</strong> (<a class="reference internal" href="#pyGHDL.dom.Symbol.EntitySymbol" title="pyGHDL.dom.Symbol.EntitySymbol"><em>EntitySymbol</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ArchitectureSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#ArchitectureSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.ArchitectureSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+<li><p><strong>prefix</strong> (<a class="reference internal" href="#pyGHDL.dom.Symbol.EntitySymbol" title="pyGHDL.dom.Symbol.EntitySymbol"><em>EntitySymbol</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ArchitectureSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.ArchitectureSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ArchitectureSymbol.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyGHDL.dom.Symbol.ArchitectureSymbol.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ArchitectureSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.ArchitectureSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">PackageSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#PackageSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-dd371724b747fa21fb2ceda96f692b92ee554007.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of PackageSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">identifierNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#PackageSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>identifierNode</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>identifier</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><em>str</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageSymbol.__str__">
+<span class="sig-name descname"><span class="pre">__str__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageSymbol.__str__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return str(self).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.PackageSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.PackageSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.SimpleSubtypeSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">SimpleSubtypeSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subtypeName</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#SimpleSubtypeSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.SimpleSubtypeSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-759878f79da7660d9c98a859e2bf3eb1e7777576.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of SimpleSubtypeSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>subtypeName</strong> (<em>Name</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.SimpleSubtypeSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subtypeName</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#SimpleSubtypeSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.SimpleSubtypeSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>subtypeName</strong> (<em>Name</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.SimpleSubtypeSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.SimpleSubtypeSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.SimpleSubtypeSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.SimpleSubtypeSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ConstrainedScalarSubtypeSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">ConstrainedScalarSubtypeSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subtypeName</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rng</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#ConstrainedScalarSubtypeSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.ConstrainedScalarSubtypeSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-a36d5f6916406ae34cc52098ddc474ad509dccd7.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of ConstrainedScalarSubtypeSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>subtypeName</strong> (<em>Name</em>) – </p></li>
+<li><p><strong>rng</strong> (<a class="reference internal" href="pyGHDL.dom.Range.html#pyGHDL.dom.Range.Range" title="pyGHDL.dom.Range.Range"><em>Range</em></a>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ConstrainedScalarSubtypeSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subtypeName</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rng</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#ConstrainedScalarSubtypeSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.ConstrainedScalarSubtypeSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>subtypeName</strong> (<em>Name</em>) – </p></li>
+<li><p><strong>rng</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><em>Optional</em></a><em>[</em><a class="reference internal" href="pyGHDL.dom.Range.html#pyGHDL.dom.Range.Range" title="pyGHDL.dom.Range.Range"><em>Range</em></a><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ConstrainedScalarSubtypeSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.ConstrainedScalarSubtypeSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ConstrainedScalarSubtypeSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.ConstrainedScalarSubtypeSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ConstrainedCompositeSubtypeSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">ConstrainedCompositeSubtypeSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subtypeName</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">constraints</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#ConstrainedCompositeSubtypeSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.ConstrainedCompositeSubtypeSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-f4868bc05e8937b571814ca6246049d7d672fe52.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of ConstrainedCompositeSubtypeSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>subtypeName</strong> (<em>Name</em>) – </p></li>
+<li><p><strong>constraints</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.11)"><em>List</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>RangeExpression</em><em>, </em><em>RangeAttribute</em><em>, </em><em>RangeSubtype</em><em>]</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ConstrainedCompositeSubtypeSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subtypeName</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">constraints</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#ConstrainedCompositeSubtypeSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.ConstrainedCompositeSubtypeSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>subtypeName</strong> (<em>Name</em>) – </p></li>
+<li><p><strong>constraints</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.11)"><em>List</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><em>Union</em></a><em>[</em><em>RangeExpression</em><em>, </em><em>RangeAttribute</em><em>, </em><em>RangeSubtype</em><em>]</em><em>]</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ConstrainedCompositeSubtypeSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.ConstrainedCompositeSubtypeSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.ConstrainedCompositeSubtypeSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.ConstrainedCompositeSubtypeSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.SimpleObjectOrFunctionCallSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">SimpleObjectOrFunctionCallSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">objectName</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#SimpleObjectOrFunctionCallSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.SimpleObjectOrFunctionCallSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-3435f5b17640f946a30731835a5a78e6eea322f4.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of SimpleObjectOrFunctionCallSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>objectName</strong> (<em>Name</em>) – </p>
+</dd>
+</dl>
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.SimpleObjectOrFunctionCallSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.SimpleObjectOrFunctionCallSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.SimpleObjectOrFunctionCallSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">objectName</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyVHDLModel/SyntaxModel.html#SimpleObjectOrFunctionCallSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.SimpleObjectOrFunctionCallSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>objectName</strong> (<em>Name</em>) – </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.SimpleObjectOrFunctionCallSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.SimpleObjectOrFunctionCallSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.IndexedObjectOrFunctionCallSymbol">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyGHDL.dom.Symbol.</span></span><span class="sig-name descname"><span class="pre">IndexedObjectOrFunctionCallSymbol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#IndexedObjectOrFunctionCallSymbol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.IndexedObjectOrFunctionCallSymbol" title="Permalink to this definition">¶</a></dt>
+<dd><p class="rubric">Inheritance</p>
+<div class="graphviz"><object data="../_images/inheritance-51f3a4d333e8aa650a76425f7439a2b0808b16a4.svg" type="image/svg+xml" class="inheritance graphviz">
+<p class="warning">Inheritance diagram of IndexedObjectOrFunctionCallSymbol</p></object></div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>name</strong> (<em>Name</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.IndexedObjectOrFunctionCallSymbol.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/pyGHDL/dom/Symbol.html#IndexedObjectOrFunctionCallSymbol.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#pyGHDL.dom.Symbol.IndexedObjectOrFunctionCallSymbol.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes a VHDL model entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>node</strong> (<em>Iir</em>) – </p></li>
+<li><p><strong>name</strong> (<em>Name</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.IndexedObjectOrFunctionCallSymbol.Parent">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><span class="pre">ModelEntity</span></a></em><a class="headerlink" href="#pyGHDL.dom.Symbol.IndexedObjectOrFunctionCallSymbol.Parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a reference to the parent entity.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://vhdl.github.io/pyVHDLModel/pyVHDLModel/pyVHDLModel.html#pyVHDLModel.ModelEntity" title="(in pyVHDLModel v0.22)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelEntity</span></code></a></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parent entity.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyGHDL.dom.Symbol.IndexedObjectOrFunctionCallSymbol._parent">
+<span class="sig-name descname"><span class="pre">_parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ModelEntity</span></em><a class="headerlink" href="#pyGHDL.dom.Symbol.IndexedObjectOrFunctionCallSymbol._parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reference to a parent entity in the model.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="pyGHDL.dom.Subprogram.html" class="btn btn-neutral float-left" title="pyGHDL.dom.Subprogram" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="pyGHDL.dom.Type.html" class="btn btn-neutral float-right" title="pyGHDL.dom.Type" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2002-2021, Tristan Gingold and contributors.</p>
+  </div>Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/buildthedocs/sphinx.theme">theme</a>
+    provided by <a href="https://buildthedocs.github.io">Build the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
