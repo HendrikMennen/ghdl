@@ -1,8 +1,6 @@
 name: Test
 
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 
 env:
@@ -155,6 +153,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { os: 18, backend: mcode }
           - { os: 20, backend: mcode }
           - { os: 22, backend: mcode }
           - { os: 20, backend: llvm-10 }
