@@ -118,7 +118,8 @@ package body Elab.Vhdl_Objtypes is
    begin
       case Arr.Kind is
          when Type_Vector
-           | Type_Array =>
+            | Type_Array
+            | Type_Array_Unbounded =>
             return Arr.Alast;
          when Type_Unbounded_Vector =>
             return True;
@@ -215,6 +216,16 @@ package body Elab.Vhdl_Objtypes is
             return V <= Rng.Left and then V >= Rng.Right;
       end case;
    end In_Range;
+
+   function In_Float_Range (Rng : Float_Range_Type; V : Fp64) return Boolean is
+   begin
+      case Rng.Dir is
+         when Dir_To =>
+            return V >= Rng.Left and then V <= Rng.Right;
+         when Dir_Downto =>
+            return V <= Rng.Left and then V >= Rng.Right;
+      end case;
+   end In_Float_Range;
 
    function Build_Discrete_Range_Type
      (L : Int64; R : Int64; Dir : Direction_Type) return Discrete_Range_Type is
@@ -320,6 +331,8 @@ package body Elab.Vhdl_Objtypes is
                                                            Is_Signed => False),
                                                 Al => 0,
                                                 Is_Global => False,
+                                                Is_Static => True,
+                                                Is_Bnd_Static => True,
                                                 Sz => 1,
                                                 W => 1)));
    end Create_Bit_Type;
@@ -337,6 +350,8 @@ package body Elab.Vhdl_Objtypes is
                                                            Is_Signed => False),
                                                 Al => 0,
                                                 Is_Global => False,
+                                                Is_Static => True,
+                                                Is_Bnd_Static => True,
                                                 Sz => 1,
                                                 W => 1)));
    end Create_Logic_Type;
@@ -362,6 +377,8 @@ package body Elab.Vhdl_Objtypes is
                                                 Wkind => Wkind_Net,
                                                 Al => Al,
                                                 Is_Global => False,
+                                                Is_Static => True,
+                                                Is_Bnd_Static => True,
                                                 Sz => Sz,
                                                 W => W,
                                                 Drange => Rng)));
@@ -376,13 +393,16 @@ package body Elab.Vhdl_Objtypes is
                                                 Wkind => Wkind_Net,
                                                 Al => 3,
                                                 Is_Global => False,
+                                                Is_Static => True,
+                                                Is_Bnd_Static => True,
                                                 Sz => 8,
                                                 W => 64,
                                                 Frange => Rng)));
    end Create_Float_Type;
 
-   function Create_Vector_Type (Bnd : Bound_Type; El_Type : Type_Acc)
-                               return Type_Acc
+   function Create_Vector_Type (Bnd : Bound_Type;
+                                Static_Bnd : Boolean;
+                                El_Type : Type_Acc) return Type_Acc
    is
       subtype Vector_Type_Type is Type_Type (Type_Vector);
       function Alloc is new Areapools.Alloc_On_Pool_Addr (Vector_Type_Type);
@@ -393,6 +413,8 @@ package body Elab.Vhdl_Objtypes is
                                Wkind => El_Type.Wkind,
                                Al => El_Type.Al,
                                Is_Global => False,
+                               Is_Static => Static_Bnd,
+                               Is_Bnd_Static => Static_Bnd,
                                Sz => El_Type.Sz * Size_Type (Bnd.Len),
                                W => Bnd.Len,
                                Alast => True,
@@ -400,8 +422,8 @@ package body Elab.Vhdl_Objtypes is
                                Arr_El => El_Type)));
    end Create_Vector_Type;
 
-   function Create_Slice_Type (Len : Uns32; El_Type : Type_Acc)
-                              return Type_Acc
+   function Create_Slice_Type
+     (Base_Type : Type_Acc; Len : Uns32; El_Type : Type_Acc) return Type_Acc
    is
       subtype Slice_Type_Type is Type_Type (Type_Slice);
       function Alloc is new Areapools.Alloc_On_Pool_Addr (Slice_Type_Type);
@@ -411,8 +433,12 @@ package body Elab.Vhdl_Objtypes is
                                   Wkind => El_Type.Wkind,
                                   Al => El_Type.Al,
                                   Is_Global => False,
+                                  Is_Static => False,
+                                  Is_Bnd_Static => False,
                                   Sz => Size_Type (Len) * El_Type.Sz,
                                   W => Len * El_Type.W,
+                                  Slice_Base => Base_Type,
+                                  Slice_Len => Len,
                                   Slice_El => El_Type)));
    end Create_Slice_Type;
 
@@ -423,20 +449,26 @@ package body Elab.Vhdl_Objtypes is
                                   Left => Int32 (Len) - 1,
                                   Right => 0,
                                   Len => Len),
+                                 False,
                                  El);
    end Create_Vec_Type_By_Length;
 
-   function Create_Array_Type
-     (Bnd : Bound_Type; Last : Boolean; El_Type : Type_Acc) return Type_Acc
+   function Create_Array_Type (Bnd : Bound_Type;
+                               Static_Bnd : Boolean;
+                               Last : Boolean;
+                               El_Type : Type_Acc) return Type_Acc
    is
       subtype Array_Type_Type is Type_Type (Type_Array);
       function Alloc is new Areapools.Alloc_On_Pool_Addr (Array_Type_Type);
+      Is_Static : constant Boolean := Static_Bnd and El_Type.Is_Static;
    begin
       return To_Type_Acc (Alloc (Current_Pool,
                                  (Kind => Type_Array,
                                   Wkind => El_Type.Wkind,
                                   Al => El_Type.Al,
                                   Is_Global => False,
+                                  Is_Static => Is_Static,
+                                  Is_Bnd_Static => Static_Bnd,
                                   Sz => El_Type.Sz * Size_Type (Bnd.Len),
                                   W => El_Type.W * Bnd.Len,
                                   Abound => Bnd,
@@ -444,8 +476,10 @@ package body Elab.Vhdl_Objtypes is
                                   Arr_El => El_Type)));
    end Create_Array_Type;
 
-   function Create_Array_Unbounded_Type
-     (Bnd : Bound_Type; Last : Boolean; El_Type : Type_Acc) return Type_Acc
+   function Create_Array_Unbounded_Type (Bnd : Bound_Type;
+                                         Static_Bnd : Boolean;
+                                         Last : Boolean;
+                                         El_Type : Type_Acc) return Type_Acc
    is
       subtype Array_Unbounded_Type_Type is Type_Type (Type_Array_Unbounded);
       function Alloc is
@@ -456,6 +490,8 @@ package body Elab.Vhdl_Objtypes is
                                   Wkind => El_Type.Wkind,
                                   Al => El_Type.Al,
                                   Is_Global => False,
+                                  Is_Static => False,
+                                  Is_Bnd_Static => Static_Bnd,
                                   Sz => 0,
                                   W => 0,
                                   Abound => Bnd,
@@ -473,6 +509,8 @@ package body Elab.Vhdl_Objtypes is
                                                 Wkind => El_Type.Wkind,
                                                 Al => El_Type.Al,
                                                 Is_Global => False,
+                                                Is_Static => False,
+                                                Is_Bnd_Static => False,
                                                 Sz => 0,
                                                 W => 0,
                                                 Ulast => Last,
@@ -484,10 +522,11 @@ package body Elab.Vhdl_Objtypes is
      (Parent : Type_Acc; El : Type_Acc) return Type_Acc is
    begin
       if Parent.Alast then
-         return Create_Array_Type (Parent.Abound, True, El);
+         return Create_Array_Type
+           (Parent.Abound, Parent.Is_Bnd_Static, True, El);
       else
          return Create_Array_Type
-           (Parent.Abound, False,
+           (Parent.Abound, Parent.Is_Bnd_Static, False,
             Create_Array_From_Array_Unbounded (Parent.Arr_El, El));
       end if;
    end Create_Array_From_Array_Unbounded;
@@ -502,6 +541,8 @@ package body Elab.Vhdl_Objtypes is
                                                 Wkind => El_Type.Wkind,
                                                 Al => El_Type.Al,
                                                 Is_Global => False,
+                                                Is_Static => False,
+                                                Is_Bnd_Static => False,
                                                 Sz => 0,
                                                 W => 0,
                                                 Ulast => True,
@@ -559,6 +600,9 @@ package body Elab.Vhdl_Objtypes is
       end case;
       if Len < 0 then
          return 0;
+      elsif Len > Int64 (Uns32'Last) then
+         --  Truncate very large lengths, such objects should not exist.
+         return Uns32'Last;
       else
          return Uns32 (Len);
       end if;
@@ -603,90 +647,311 @@ package body Elab.Vhdl_Objtypes is
       return (Off + Mask) and not Mask;
    end Align;
 
-   function Create_Record_Type (Els : Rec_El_Array_Acc) return Type_Acc
+   procedure Layout_Element_Mem (El : in out Rec_El_Type;
+                                 Sz : in out Size_Type;
+                                 Al : in out Palign_Type) is
+   begin
+      --  For memory.
+      Al := Palign_Type'Max (Al, El.Typ.Al);
+      Sz := Align (Sz, El.Typ.Al);
+      El.Offs.Mem_Off := Sz;
+      Sz := Sz + El.Typ.Sz;
+   end Layout_Element_Mem;
+
+   procedure Layout_Element_Net (El : in out Rec_El_Type;
+                                 W : in out Uns32;
+                                 Wkind : in out Wkind_Type) is
+   begin
+      --  For nets.
+      El.Offs.Net_Off := W;
+      if El.Typ.Wkind /= Wkind_Net then
+         Wkind := Wkind_Undef;
+      end if;
+      W := W + El.Typ.W;
+   end Layout_Element_Net;
+
+   function Create_Record_Type (Parent_Typ : Type_Acc;
+                                Els : Rec_El_Array_Acc) return Type_Acc
    is
       subtype Record_Type_Type is Type_Type (Type_Record);
       function Alloc is new Areapools.Alloc_On_Pool_Addr (Record_Type_Type);
+      Base : Type_Acc;
+      Base_Els : Rec_El_Array_Acc;
       Wkind : Wkind_Type;
       W : Uns32;
       Al : Palign_Type;
       Sz : Size_Type;
+      Res : Type_Acc;
    begin
       --  Layout the record.
-      Wkind := Wkind_Net;
-      Al := 0;
-      Sz := 0;
-      W := 0;
-      for I in Els.E'Range loop
-         declare
-            E : Rec_El_Type renames Els.E (I);
-         begin
-            --  For nets.
-            E.Offs.Net_Off := W;
-            if E.Typ.Wkind /= Wkind_Net then
-               Wkind := Wkind_Undef;
-            end if;
-            W := W + E.Typ.W;
+      if Parent_Typ = null then
+         Al := 0;
+         Sz := 0;
+         --  First elements with static types, then the others.
+         for Static in reverse Boolean loop
+            for I in Els.E'Range loop
+               declare
+                  El : Rec_El_Type renames Els.E (I);
+               begin
+                  if El.Typ.Is_Static = Static then
+                     Layout_Element_Mem (El, Sz, Al);
+                  end if;
+               end;
+            end loop;
+         end loop;
+         Sz := Align (Sz, Al);
 
-            --  For memory.
-            Al := Palign_Type'Max (Al, E.Typ.Al);
-            Sz := Align (Sz, E.Typ.Al);
-            E.Offs.Mem_Off := Sz;
-            Sz := Sz + E.Typ.Sz;
-         end;
-      end loop;
+      else
+         Base := Parent_Typ.Rec_Base;
+         Base_Els := Base.Rec;
+         Al := Base.Al;
+         Sz := Base.Sz;
+         --  Only the non-static types.
+         for I in Els.E'Range loop
+            if Base_Els.E (I).Typ.Is_Static then
+               Els.E (I).Offs.Mem_Off := Base_Els.E (I).Offs.Mem_Off;
+            else
+               Layout_Element_Mem (Els.E (I), Sz, Al);
+            end if;
+         end loop;
+      end if;
       Sz := Align (Sz, Al);
 
-      return To_Type_Acc (Alloc (Current_Pool, (Kind => Type_Record,
+      --  Layout nets.
+      Wkind := Wkind_Net;
+      W := 0;
+      for I in Els.E'Range loop
+         Layout_Element_Net (Els.E (I), W, Wkind);
+      end loop;
+      Res := To_Type_Acc (Alloc (Current_Pool, (Kind => Type_Record,
                                                 Wkind => Wkind,
                                                 Al => Al,
                                                 Is_Global => False,
+                                                Is_Static => False,
+                                                Is_Bnd_Static => False,
                                                 Sz => Sz,
                                                 W => W,
+                                                Rec_Base => null,
                                                 Rec => Els)));
+      if Parent_Typ = null then
+         Res.Rec_Base := Res;
+      else
+         Res.Rec_Base := Base;
+      end if;
+
+      return Res;
    end Create_Record_Type;
 
-   function Create_Unbounded_Record (Els : Rec_El_Array_Acc) return Type_Acc
+   function Create_Unbounded_Record (Parent_Typ : Type_Acc;
+                                     Els : Rec_El_Array_Acc) return Type_Acc
    is
       subtype Unbounded_Record_Type_Type is Type_Type (Type_Unbounded_Record);
       function Alloc is
          new Areapools.Alloc_On_Pool_Addr (Unbounded_Record_Type_Type);
+      Base : Type_Acc;
+      Base_Els : Rec_El_Array_Acc;
+      Wkind : Wkind_Type;
+      W : Uns32;
+      Al : Palign_Type;
+      Sz : Size_Type;
+      Res : Type_Acc;
    begin
-      return To_Type_Acc (Alloc (Current_Pool, (Kind => Type_Unbounded_Record,
-                                                Wkind => Wkind_Net,
-                                                Al => 0,
+      --  Layout the record.
+      Wkind := Wkind_Net;
+      W := 0;
+      if Parent_Typ = null then
+         --  Layout only static elements.
+         Al := 0;
+         Sz := 0;
+         for I in Els.E'Range loop
+            declare
+               El : Rec_El_Type renames Els.E (I);
+            begin
+               if El.Typ.Is_Static then
+                  Layout_Element_Mem (El, Sz, Al);
+                  El.Offs.Net_Off := 0;
+               else
+                  El.Offs := No_Value_Offsets;
+               end if;
+            end;
+         end loop;
+      else
+         --  Copy layout of base type.
+         Base := Parent_Typ.Rec_Base;
+         Base_Els := Base.Rec;
+         Al := Base.Al;
+         Sz := Base.Sz;
+         for I in Els.E'Range loop
+            Els.E (I).Offs := Base_Els.E (I).Offs;
+         end loop;
+      end if;
+
+      Res := To_Type_Acc (Alloc (Current_Pool, (Kind => Type_Unbounded_Record,
+                                                Wkind => Wkind,
+                                                Al => Al,
                                                 Is_Global => False,
-                                                Sz => 0,
-                                                W => 0,
+                                                Is_Static => False,
+                                                Is_Bnd_Static => False,
+                                                Sz => Sz,
+                                                W => W,
+                                                Rec_Base => null,
                                                 Rec => Els)));
+      if Parent_Typ = null then
+         Res.Rec_Base := Res;
+      else
+         Res.Rec_Base := Parent_Typ.Rec_Base;
+      end if;
+      return Res;
    end Create_Unbounded_Record;
+
+   --  Compute size and alignment for bounds of TYP.
+   procedure Update_Bounds_Size (Typ : Type_Acc;
+                                 Sz : in out Size_Type;
+                                 Al : in out Palign_Type);
+
+   procedure Update_Layout_Size (Typ : Type_Acc;
+                                 Sz : in out Size_Type;
+                                 Al : in out Palign_Type) is
+   begin
+      case Typ.Kind is
+         when Type_Scalars
+           | Type_Array
+           | Type_Vector
+           | Type_Record
+           | Type_Access =>
+            null;
+         when Type_Unbounded_Vector
+           | Type_Unbounded_Array =>
+            declare
+               B_Sz : Size_Type;
+               B_Al : Palign_Type;
+            begin
+               --  Layout of an array is sizes + bounds.
+               B_Sz := 2 * Ghdl_Index_Sz;
+               B_Al := Ghdl_Index_Al;
+               Update_Bounds_Size (Typ, B_Sz, B_Al);
+               Sz := Align (Sz, B_Al);
+               Sz := Sz + B_Sz;
+               Al := Palign_Type'Max (Al, B_Al);
+            end;
+         when Type_Unbounded_Record
+           | Type_Array_Unbounded =>
+            --  TODO
+            raise Internal_Error;
+         when Type_Slice
+           | Type_File
+           | Type_Protected =>
+            raise Internal_Error;
+      end case;
+   end Update_Layout_Size;
+
+   procedure Update_Bounds_Size (Typ : Type_Acc;
+                                 Sz : in out Size_Type;
+                                 Al : in out Palign_Type) is
+   begin
+      case Typ.Kind is
+         when Type_Scalars
+           | Type_Array
+           | Type_Vector
+           | Type_Record
+           | Type_Access =>
+            null;
+         when Type_Array_Unbounded =>
+            Update_Bounds_Size (Typ.Arr_El, Sz, Al);
+         when Type_Unbounded_Array
+           | Type_Unbounded_Vector =>
+            declare
+               Idx : constant Type_Acc := Typ.Uarr_Idx;
+               B_Sz : Size_Type;
+               B_Al : Palign_Type;
+            begin
+               --  Compute size of left, right and dir fields.
+               case Idx.Sz is
+                  when 1 =>
+                     B_Sz := 3;
+                     B_Al := 0;
+                  when 4 =>
+                     B_Sz := 9;
+                     B_Al := 2;
+                  when 8 =>
+                     B_Sz := 17;
+                     B_Al := 2;
+                  when others =>
+                     raise Internal_Error;
+               end case;
+               --  Add length field.
+               Sz := Align (Sz, Ghdl_Index_Al);
+               B_Sz := B_Sz + Ghdl_Index_Sz;
+               --  Compute whole alignment.
+               B_Al := Palign_Type'Max (3, Ghdl_Index_Al);
+               B_Sz := Align (B_Sz, B_Al);
+               --  Add to the result.
+               Sz := Align (Sz, B_Al);
+               Sz := Sz + B_Sz;
+
+               if not Typ.Ulast then
+                  --  Continue with next index.
+                  Update_Bounds_Size (Typ.Uarr_El, Sz, Al);
+               else
+                  --  Continue with the element.
+                  Update_Layout_Size (Typ.Uarr_El, Sz, Al);
+               end if;
+
+            end;
+         when Type_Unbounded_Record =>
+            --  TODO
+            raise Internal_Error;
+         when Type_Slice
+           | Type_File
+           | Type_Protected =>
+            raise Internal_Error;
+      end case;
+   end Update_Bounds_Size;
+
+   function Compute_Bounds_Size (Typ : Type_Acc) return Size_Type
+   is
+      Res : Size_Type;
+      Al : Palign_Type;
+   begin
+      Res := 0;
+      Al := 0;
+      Update_Bounds_Size (Typ, Res, Al);
+      return Res;
+   end Compute_Bounds_Size;
 
    function Create_Access_Type (Acc_Type : Type_Acc) return Type_Acc
    is
       subtype Access_Type_Type is Type_Type (Type_Access);
       function Alloc is new Areapools.Alloc_On_Pool_Addr (Access_Type_Type);
+      Type_Sz : Size_Type;
       Bnd_Sz : Size_Type;
    begin
       if Acc_Type = null then
          --  For incomplete type.
+         Type_Sz := 0;
          Bnd_Sz := 0;
       else
-         Bnd_Sz := Compute_Size_Type (Acc_Type);
+         Type_Sz := Compute_Size_Type (Acc_Type);
+         Bnd_Sz := Compute_Bounds_Size (Acc_Type);
       end if;
       return To_Type_Acc (Alloc (Current_Pool, (Kind => Type_Access,
                                                 Wkind => Wkind_Sim,
-                                                Al => 2,
+                                                Al => Heap_Ptr_Al,
                                                 Is_Global => False,
-                                                Sz => 4,
+                                                Is_Static => True,
+                                                Is_Bnd_Static => True,
+                                                Sz => Heap_Ptr_Sz,
                                                 W => 1,
                                                 Acc_Acc => Acc_Type,
+                                                Acc_Type_Sz => Type_Sz,
                                                 Acc_Bnd_Sz => Bnd_Sz)));
    end Create_Access_Type;
 
    procedure Complete_Access_Type (Acc_Type : Type_Acc; Des_Typ : Type_Acc) is
    begin
       Acc_Type.Acc_Acc := Des_Typ;
-      Acc_Type.Acc_Bnd_Sz := Compute_Size_Type (Des_Typ);
+      Acc_Type.Acc_Type_Sz := Compute_Size_Type (Des_Typ);
+      Acc_Type.Acc_Bnd_Sz := Compute_Bounds_Size (Des_Typ);
    end Complete_Access_Type;
 
    function Create_File_Type (File_Type : Type_Acc) return Type_Acc
@@ -698,6 +963,8 @@ package body Elab.Vhdl_Objtypes is
                                                 Wkind => Wkind_Sim,
                                                 Al => 2,
                                                 Is_Global => False,
+                                                Is_Static => True,
+                                                Is_Bnd_Static => True,
                                                 Sz => 4,
                                                 W => 1,
                                                 File_Typ => File_Type,
@@ -713,6 +980,8 @@ package body Elab.Vhdl_Objtypes is
                                                 Wkind => Wkind_Sim,
                                                 Al => 2,
                                                 Is_Global => False,
+                                                Is_Static => True,
+                                                Is_Bnd_Static => True,
                                                 Sz => 4,
                                                 W => 1)));
    end Create_Protected_Type;
@@ -1089,6 +1358,9 @@ package body Elab.Vhdl_Objtypes is
                Res.Rec.E (I) := (Offs => T.Rec.E (I).Offs,
                                  Typ => Unshare (T.Rec.E (I).Typ, Pool));
             end loop;
+            if T.Rec_Base = T then
+               Res.Rec_Base := Res;
+            end if;
          when Type_Access =>
             if T.Acc_Acc /= null then
                Res.Acc_Acc := Unshare (T.Acc_Acc, Pool);
@@ -1111,11 +1383,19 @@ package body Elab.Vhdl_Objtypes is
    is
       Res : Type_Acc;
    begin
-      if Typ = Base or else Typ.Is_Global = Global then
+      if Typ = Base then
          return Typ;
       end if;
-      Res := Raw_Copy (Typ, Pool);
-      Res.Is_Global := Global;
+      if Typ.Is_Global /= Global then
+         Res := Raw_Copy (Typ, Pool);
+         Res.Is_Global := Global;
+      elsif Global then
+         return Typ;
+      else
+         --  We want a local copy, but the original local type can have
+         --  global sub-elements.
+         Res := Typ;
+      end if;
 
       case Res.Kind is
          when Type_Bit
@@ -1138,7 +1418,9 @@ package body Elab.Vhdl_Objtypes is
            | Type_Unbounded_Record =>
             raise Internal_Error;
          when Type_Record =>
-            Res.Rec := Create_Rec_El_Array (Typ.Rec.Len, Pool);
+            if Typ /= Res then
+               Res.Rec := Create_Rec_El_Array (Typ.Rec.Len, Pool);
+            end if;
             for I in Typ.Rec.E'Range loop
                Res.Rec.E (I) := (Offs => Typ.Rec.E (I).Offs,
                                  Typ => Unshare_Type (Typ.Rec.E (I).Typ,

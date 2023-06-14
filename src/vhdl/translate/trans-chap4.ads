@@ -57,6 +57,8 @@ package Trans.Chap4 is
    procedure Translate_Declaration_Chain_Subprograms
      (Parent : Iir; What : Subprg_Translate_Kind);
 
+   procedure Translate_Declaration_Chain_Subprograms_Spec_Body (Parent : Iir);
+
    --  Create subprograms for type/function conversion of signal
    --  associations.
    --  ENTITY is the entity instantiated, which can be either
@@ -87,6 +89,9 @@ package Trans.Chap4 is
    --  Translate port or generic declarations of PARENT.
    procedure Translate_Port_Chain (Parent : Iir);
    procedure Translate_Generic_Chain (Parent : Iir);
+
+   --  Also handle interface type.
+   procedure Translate_Generic_Association_Chain (Parent : Iir);
 
    --  Elaborate signal subtypes and allocate the storage for the object.
    --  If HAS_COPY is true, do not allocate storage for values, as the values

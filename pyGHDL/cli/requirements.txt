@@ -1,5 +1,4 @@
 -r ../dom/requirements.txt
 
-pyTooling>=2.1.0
-pyTooling.TerminalUI>=1.5.9
+pyTooling>=4.0.1, <5.0
 pyAttributes>=2.3.2

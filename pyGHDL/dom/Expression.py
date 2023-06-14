@@ -34,17 +34,17 @@ from typing import List, Union
 
 from pyTooling.Decorators import export
 
-from pyVHDLModel.SyntaxModel import (
+from pyVHDLModel.Base import ExpressionUnion
+from pyVHDLModel.Symbol import Symbol
+from pyVHDLModel.Expression import (
     UnaryExpression as VHDLModel_UnaryExpression,
-    BinaryExpression as VHDLModel_BinaryExpression,
-    InverseExpression as VHDLModel_InverseExpression,
-    IdentityExpression as VHDLModel_IdentityExpression,
     NegationExpression as VHDLModel_NegationExpression,
+    IdentityExpression as VHDLModel_IdentityExpression,
+    InverseExpression as VHDLModel_InverseExpression,
     AbsoluteExpression as VHDLModel_AbsoluteExpression,
-    SubExpression as VHDLModel_ParenthesisExpression,
     TypeConversion as VHDLModel_TypeConversion,
-    FunctionCall as VHDLModel_FunctionCall,
-    QualifiedExpression as VHDLModel_QualifiedExpression,
+    SubExpression as VHDLModel_ParenthesisExpression,
+    BinaryExpression as VHDLModel_BinaryExpression,
     RangeExpression as VHDLModel_RangeExpression,
     AscendingRangeExpression as VHDLModel_AscendingRangeExpression,
     DescendingRangeExpression as VHDLModel_DescendingRangeExpression,
@@ -64,29 +64,28 @@ from pyVHDLModel.SyntaxModel import (
     XnorExpression as VHDLModel_XnorExpression,
     EqualExpression as VHDLModel_EqualExpression,
     UnequalExpression as VHDLModel_UnequalExpression,
-    LessThanExpression as VHDLModel_LessThanExpression,
-    LessEqualExpression as VHDLModel_LessEqualExpression,
     GreaterThanExpression as VHDLModel_GreaterThanExpression,
     GreaterEqualExpression as VHDLModel_GreaterEqualExpression,
+    LessThanExpression as VHDLModel_LessThanExpression,
+    LessEqualExpression as VHDLModel_LessEqualExpression,
     MatchingEqualExpression as VHDLModel_MatchingEqualExpression,
     MatchingUnequalExpression as VHDLModel_MatchingUnequalExpression,
-    MatchingLessThanExpression as VHDLModel_MatchingLessThanExpression,
-    MatchingLessEqualExpression as VHDLModel_MatchingLessEqualExpression,
     MatchingGreaterThanExpression as VHDLModel_MatchingGreaterThanExpression,
     MatchingGreaterEqualExpression as VHDLModel_MatchingGreaterEqualExpression,
+    MatchingLessThanExpression as VHDLModel_MatchingLessThanExpression,
+    MatchingLessEqualExpression as VHDLModel_MatchingLessEqualExpression,
     ShiftRightLogicExpression as VHDLModel_ShiftRightLogicExpression,
     ShiftLeftLogicExpression as VHDLModel_ShiftLeftLogicExpression,
     ShiftRightArithmeticExpression as VHDLModel_ShiftRightArithmeticExpression,
     ShiftLeftArithmeticExpression as VHDLModel_ShiftLeftArithmeticExpression,
     RotateRightExpression as VHDLModel_RotateRightExpression,
     RotateLeftExpression as VHDLModel_RotateLeftExpression,
+    QualifiedExpression as VHDLModel_QualifiedExpression,
+    FunctionCall as VHDLModel_FunctionCall,
     SubtypeAllocation as VHDLModel_SubtypeAllocation,
     QualifiedExpressionAllocation as VHDLModel_QualifiedExpressionAllocation,
-    Aggregate as VHDLModel_Aggregate,
-    ExpressionUnion,
     AggregateElement,
-    SubtypeOrSymbol,
-    Symbol,
+    Aggregate as VHDLModel_Aggregate,
 )
 
 from pyGHDL.libghdl import utils
@@ -434,15 +433,15 @@ class RotateLeftExpression(VHDLModel_RotateLeftExpression, DOMMixin, _ParseBinar
 
 @export
 class QualifiedExpression(VHDLModel_QualifiedExpression, DOMMixin):
-    def __init__(self, node: Iir, subtype: SubtypeOrSymbol, operand: ExpressionUnion):
+    def __init__(self, node: Iir, subtype: Symbol, operand: ExpressionUnion):
         super().__init__(subtype, operand)
         DOMMixin.__init__(self, node)
 
     @classmethod
     def parse(cls, node: Iir) -> "QualifiedExpression":
-        from pyGHDL.dom._Translate import GetExpressionFromNode, GetNameOfNode
+        from pyGHDL.dom._Translate import GetExpressionFromNode, GetName
 
-        typeMarkName = GetNameOfNode(nodes.Get_Type_Mark(node))
+        typeMarkName = GetName(nodes.Get_Type_Mark(node))
         subtype = SimpleSubtypeSymbol(node, typeMarkName)
         operand = GetExpressionFromNode(nodes.Get_Expression(node))
         return cls(node, subtype, operand)
@@ -489,7 +488,7 @@ class Aggregate(VHDLModel_Aggregate, DOMMixin):
         from pyGHDL.dom._Translate import (
             GetExpressionFromNode,
             GetRangeFromNode,
-            GetNameFromNode,
+            GetName,
         )
 
         choices = []
@@ -513,7 +512,7 @@ class Aggregate(VHDLModel_Aggregate, DOMMixin):
                     nodes.Iir_Kind.Attribute_Name,
                     nodes.Iir_Kind.Parenthesis_Name,
                 ):
-                    rng = GetNameFromNode(choiceRange)
+                    rng = GetName(choiceRange)
                 else:
                     pos = Position.parse(item)
                     raise DOMException(
@@ -522,7 +521,7 @@ class Aggregate(VHDLModel_Aggregate, DOMMixin):
 
                 choices.append(RangedAggregateElement(item, rng, value))
             elif kind == nodes.Iir_Kind.Choice_By_Name:
-                name = GetNameFromNode(nodes.Get_Choice_Name(item))
+                name = GetName(nodes.Get_Choice_Name(item))
                 symbol = Symbol(item, name)
                 choices.append(NamedAggregateElement(item, symbol, value))
             elif kind == nodes.Iir_Kind.Choice_By_Others:

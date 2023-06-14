@@ -15,7 +15,7 @@
 --  along with this program.  If not, see <gnu.org/licenses>.
 with System;
 with Interfaces.C_Streams;
-with GNAT.OS_Lib;
+with Filesystem;
 
 with Logging; use Logging;
 with Tables;
@@ -94,8 +94,8 @@ package body Libraries is
 
    function Path_To_Id (Path : String) return Name_Id is
    begin
-      if Path (Path'Last) /= GNAT.OS_Lib.Directory_Separator then
-         return Get_Identifier (Path & GNAT.OS_Lib.Directory_Separator);
+      if Path (Path'Last) /= Filesystem.Get_Directory_Separator then
+         return Get_Identifier (Path & Filesystem.Get_Directory_Separator);
       else
          return Get_Identifier (Path);
       end if;
@@ -155,10 +155,9 @@ package body Libraries is
       for I in Paths.First .. Paths.Last loop
          --  Try PATH/LIBxxx.cf
          declare
-            Path : constant String :=
-              Image (Paths.Table (I)) & File_Name & ASCII.NUL;
+            Path : constant String := Image (Paths.Table (I)) & File_Name;
          begin
-            if GNAT.OS_Lib.Is_Regular_File (Path'Address) then
+            if Filesystem.Is_Regular_File (Path) then
                Set_Library_Directory (Library, Paths.Table (I));
                exit;
             end if;
@@ -169,13 +168,13 @@ package body Libraries is
             Pfx : constant String := Image (Paths.Table (I));
             Pfx_Len : constant Natural := Pfx'Length;
             L : Natural;
-            Path : String (1 .. Pfx_Len + Id_Len + 5 + File_Name'Length + 1);
+            Path : String (1 .. Pfx_Len + Id_Len + 5 + File_Name'Length);
          begin
             L := Pfx_Len;
             Path (1 .. L) := Pfx;
             Path (L + 1 .. L + Id_Len) := Image (Library_Id);
             L := L + Id_Len;
-            Path (L + 1) := GNAT.OS_Lib.Directory_Separator;
+            Path (L + 1) := Filesystem.Get_Directory_Separator;
             case Vhdl_Std is
                when Vhdl_87 =>
                   Path (L + 2 .. L + 4) := "v87";
@@ -187,10 +186,9 @@ package body Libraries is
                   Path (L + 2 .. L + 4) := "v19";
             end case;
             L := L + 5;
-            Path (L) := GNAT.OS_Lib.Directory_Separator;
+            Path (L) := Filesystem.Get_Directory_Separator;
             Path (L + 1 .. L + File_Name'Length) := File_Name;
-            Path (L + File_Name'Length + 1) := Character'Val (0);
-            if GNAT.OS_Lib.Is_Regular_File (Path'Address) then
+            if Filesystem.Is_Regular_File (Path) then
                --  For Get_Identifier: keep only the path part (including the
                --  trailing path separator).
                Set_Library_Directory (Library, Get_Identifier (Path (1 .. L)));
@@ -204,7 +202,7 @@ package body Libraries is
    procedure Set_Work_Library_Path (Path : String) is
    begin
       Work_Directory := Path_To_Id (Path);
-      if not GNAT.OS_Lib.Is_Directory (Get_Address (Work_Directory))
+      if not Filesystem.Is_Directory (Image (Work_Directory))
         and then Is_Warning_Enabled (Warnid_Library)
       then
          --  This is a warning, since 'clean' action should not fail in
@@ -284,13 +282,14 @@ package body Libraries is
 
    procedure Purge_Design_File (Design_File : Iir_Design_File)
    is
+      Library : constant Iir := Get_Library (Design_File);
       Prev, File, Next : Iir_Design_File;
       Unit : Iir_Design_Unit;
 
       File_Name : constant Name_Id := Get_Design_File_Filename (Design_File);
       Dir_Name : constant Name_Id := Get_Design_File_Directory (Design_File);
    begin
-      File := Get_Design_File_Chain (Work_Library);
+      File := Get_Design_File_Chain (Library);
       Prev := Null_Iir;
       loop
          if File = Null_Iir then
@@ -308,7 +307,7 @@ package body Libraries is
 
       --  Remove from library.
       if Prev = Null_Iir then
-         Set_Design_File_Chain (Work_Library, Next);
+         Set_Design_File_Chain (Library, Next);
       else
          Set_Chain (Prev, Next);
       end if;
@@ -757,7 +756,9 @@ package body Libraries is
    end Get_Library_No_Create;
 
    -- Get or create a library from an identifier.
-   function Get_Library (Ident: Name_Id; Loc : Location_Type)
+   function Get_Library (Ident: Name_Id;
+                         Loc : Location_Type;
+                         Force : Boolean := False)
                         return Iir_Library_Declaration
    is
       Library: Iir_Library_Declaration;
@@ -776,7 +777,9 @@ package body Libraries is
       Set_Library_Directory (Library, Null_Identifier);
       Set_Identifier (Library, Ident);
       if Load_Library (Library) = False then
-         Error_Msg_Sem (+Loc, "cannot find resource library %i", +Ident);
+         if not Force then
+            Error_Msg_Sem (+Loc, "cannot find resource library %i", +Ident);
+         end if;
       end if;
       Set_Visible_Flag (Library, True);
 
@@ -1100,7 +1103,7 @@ package body Libraries is
       begin
          New_Lib_Checksum := Files_Map.Get_File_Checksum (File);
          File_Name := Files_Map.Get_File_Name (File);
-         if GNAT.OS_Lib.Is_Absolute_Path (Image (File_Name)) then
+         if Filesystem.Is_Absolute_Path (Image (File_Name)) then
             Dir_Name := Null_Identifier;
          else
             Dir_Name := Files_Map.Get_Home_Directory;
@@ -1243,8 +1246,10 @@ package body Libraries is
 
       if Design_File /= Null_Iir
         and then New_Lib_Checksum /= No_File_Checksum_Id
-        and then not Files_Map.Is_Eq (New_Lib_Checksum,
-                                      Get_File_Checksum (Design_File))
+        and then
+        (Get_File_Checksum (Design_File) = No_File_Checksum_Id
+           or else not Files_Map.Is_Eq (New_Lib_Checksum,
+                                        Get_File_Checksum (Design_File)))
       then
          --  FIXME: this test is not enough: what about reanalyzing
          --   unmodified files (this works only because the order is not
@@ -1332,7 +1337,6 @@ package body Libraries is
    is
       use System;
       use Interfaces.C_Streams;
-      use GNAT.OS_Lib;
       Temp_Name: constant String := Image (Work_Directory)
         & '_' & Library_To_File_Name (Library) & ASCII.NUL;
       Mode : constant String := 'w' & ASCII.NUL;
@@ -1349,7 +1353,7 @@ package body Libraries is
             Error_Lib_Msg
               ("cannot write library file for " & Image_Identifier (Library));
             Close_Res := fclose (Stream);
-            Delete_File (Temp_Name'Address, Success);
+            Filesystem.Delete_File (Temp_Name, Success);
             --  Ignore failure to delete the file.
             raise Option_Error;
          end if;
@@ -1514,22 +1518,20 @@ package body Libraries is
       --  could assume it doesn't happen (humm...)
       declare
          File_Name: constant String := Image (Work_Directory)
-           & Library_To_File_Name (Library) & ASCII.NUL;
+           & Library_To_File_Name (Library);
          Delete_Success : Boolean;
       begin
          --  For windows: renames doesn't overwrite destination; so first
          --  delete it. This can create races condition on Unix: if the
          --  program is killed between delete and rename, the library is lost.
-         Delete_File (File_Name'Address, Delete_Success);
-         Rename_File (Temp_Name'Address, File_Name'Address, Success);
+         Filesystem.Delete_File (File_Name, Delete_Success);
+         Filesystem.Rename_File (Temp_Name, File_Name, Success);
          if not Success then
             --  Renaming may fail if the new filename is in a non-existant
             --  directory.
             Error_Lib_Msg
-              ("cannot update library file """
-                 & File_Name (File_Name'First .. File_Name'Last - 1)
-                 & """");
-            Delete_File (Temp_Name'Address, Success);
+              ("cannot update library file """ & File_Name & """");
+            Filesystem.Delete_File (Temp_Name, Success);
             raise Option_Error;
          end if;
       end;

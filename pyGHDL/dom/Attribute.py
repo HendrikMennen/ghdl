@@ -34,27 +34,25 @@ from typing import List
 
 from pyTooling.Decorators import export
 
-from pyVHDLModel.SyntaxModel import (
-    Attribute as VHDLModel_Attribute,
-    AttributeSpecification as VHDLModel_AttributeSpecification,
-    Name,
-    SubtypeOrSymbol,
-    EntityClass,
-)
+from pyVHDLModel.Name import Name
+from pyVHDLModel.Symbol import Symbol
+from pyVHDLModel.Declaration import EntityClass, Attribute as VHDLModel_Attribute
+from pyVHDLModel.Declaration import AttributeSpecification as VHDLModel_AttributeSpecification
+
 from pyGHDL.libghdl import utils
 from pyGHDL.libghdl._types import Iir
 from pyGHDL.libghdl.vhdl import nodes
 from pyGHDL.libghdl.vhdl.tokens import Tok
 from pyGHDL.dom import DOMMixin, Position, DOMException, Expression
 from pyGHDL.dom._Utils import GetNameOfNode, GetIirKindOfNode, GetDocumentationOfNode
-from pyGHDL.dom._Translate import GetNameFromNode, GetExpressionFromNode
+from pyGHDL.dom._Translate import GetName, GetExpressionFromNode
 from pyGHDL.dom.Names import SimpleName
 from pyGHDL.dom.Symbol import SimpleSubtypeSymbol
 
 
 @export
 class Attribute(VHDLModel_Attribute, DOMMixin):
-    def __init__(self, node: Iir, identifier: str, subtype: SubtypeOrSymbol, documentation: str = None):
+    def __init__(self, node: Iir, identifier: str, subtype: Symbol, documentation: str = None):
         super().__init__(identifier, subtype, documentation)
         DOMMixin.__init__(self, node)
 
@@ -65,7 +63,7 @@ class Attribute(VHDLModel_Attribute, DOMMixin):
         subtypeMark = nodes.Get_Type_Mark(attributeNode)
         subtypeName = GetNameOfNode(subtypeMark)
 
-        subtype = SimpleSubtypeSymbol(subtypeMark, subtypeName)
+        subtype = SimpleSubtypeSymbol(subtypeMark, SimpleName(subtypeMark, subtypeName))
         return cls(attributeNode, name, subtype, documentation)
 
 
@@ -111,7 +109,7 @@ class AttributeSpecification(VHDLModel_AttributeSpecification, DOMMixin):
     @classmethod
     def parse(cls, attributeNode: Iir) -> "AttributeSpecification":
         attributeDesignator = nodes.Get_Attribute_Designator(attributeNode)
-        attributeName = GetNameFromNode(attributeDesignator)
+        attributeName = GetName(attributeDesignator)
         documentation = GetDocumentationOfNode(attributeNode)
 
         names = []

@@ -14,8 +14,6 @@
 --  You should have received a copy of the GNU General Public License
 --  along with this program.  If not, see <gnu.org/licenses>.
 
-with GNAT.OS_Lib; use GNAT.OS_Lib;
-
 with Types; use Types;
 with Name_Table;
 with Files_Map;
@@ -55,6 +53,7 @@ with Synthesis;
 with Synth.Disp_Vhdl;
 with Synth.Vhdl_Context;
 with Synth.Flags; use Synth.Flags;
+with Synth.Vhdl_Foreign;
 
 package body Ghdlsynth is
    type Out_Format is
@@ -94,7 +93,8 @@ package body Ghdlsynth is
                             Arg : String;
                             Res : out Option_State);
    procedure Perform_Action (Cmd : in out Command_Synth;
-                             Args : Argument_List);
+                             Args : String_Acc_Array;
+                             Success : out Boolean);
 
    function Decode_Command (Cmd : Command_Synth; Name : String)
                            return Boolean
@@ -172,6 +172,17 @@ package body Ghdlsynth is
          Cmd.Top_Encoding := Name_Hash;
       elsif Option = "--top-name=asis" then
          Cmd.Top_Encoding := Name_Asis;
+      elsif Option'Last >= 16 and then Option (1 .. 16) = "--keep-hierarchy"
+      then
+         if Option'Last = 16
+           or else Option (17 .. Option'Last) = "=yes"
+         then
+            Synth.Flags.Flag_Keep_Hierarchy := True;
+         elsif Option (17 .. Option'Last) = "=no" then
+            Synth.Flags.Flag_Keep_Hierarchy := False;
+         else
+            Res := Option_Unknown;
+         end if;
       elsif Option'Last > 17
         and then Option (1 .. 17) = "--vendor-library="
       then
@@ -200,20 +211,25 @@ package body Ghdlsynth is
          Cmd.Disp_Inline := False;
       elsif Option = "--disp-noid" then
          Cmd.Disp_Id := False;
-      elsif Option = "--out=raw" then
-         Cmd.Oformat := Format_Raw;
-      elsif Option = "--out=dump" then
-         Cmd.Oformat := Format_Dump;
-      elsif Option = "--out=dot" then
-         Cmd.Oformat := Format_Dot;
-      elsif Option = "--out=none" then
-         Cmd.Oformat := Format_None;
-      elsif Option = "--out=vhdl" then
-         Cmd.Oformat := Format_Vhdl;
-      elsif Option = "--out=raw-vhdl" then
-         Cmd.Oformat := Format_Raw_Vhdl;
-      elsif Option = "--out=verilog" then
-         Cmd.Oformat := Format_Verilog;
+      elsif Option'Length > 6 and then Option (1 .. 6) = "--out=" then
+         if Option (7 .. Option'Last) = "raw" then
+            Cmd.Oformat := Format_Raw;
+         elsif Option (7 .. Option'Last) = "dump" then
+            Cmd.Oformat := Format_Dump;
+         elsif Option (7 .. Option'Last) = "dot" then
+            Cmd.Oformat := Format_Dot;
+         elsif Option (7 .. Option'Last) = "none" then
+            Cmd.Oformat := Format_None;
+         elsif Option (7 .. Option'Last) = "vhdl" then
+            Cmd.Oformat := Format_Vhdl;
+         elsif Option (7 .. Option'Last) = "raw-vhdl" then
+            Cmd.Oformat := Format_Raw_Vhdl;
+         elsif Option (7 .. Option'Last) = "verilog" then
+            Cmd.Oformat := Format_Verilog;
+         else
+            Res := Option_Unknown;
+         end if;
+         return;
       elsif Option = "-di" then
          Flag_Debug_Noinference := True;
       elsif Option = "-dc" then
@@ -250,7 +266,7 @@ package body Ghdlsynth is
    end Decode_Option;
 
    --  Return the position of "-e", or ARGS'FIRST -1 if none.
-   function Find_Dash_E (Args : Argument_List) return Integer is
+   function Find_Dash_E (Args : String_Acc_Array) return Integer is
    begin
       for I in Args'Range loop
          if Args (I).all = "-e" then
@@ -278,6 +294,7 @@ package body Ghdlsynth is
 
       --  Do not canon concurrent statements.
       Vhdl.Canon.Canon_Flag_Concurrent_Stmts := False;
+      Vhdl.Canon.Canon_Flag_Add_Suspend_State := False;
 
       if Ghdlcomp.Init_Verilog_Options /= null then
          Ghdlcomp.Init_Verilog_Options.all (False);
@@ -288,7 +305,7 @@ package body Ghdlsynth is
    --  Return the top configuration.
    function Ghdl_Synth_Configure (Init : Boolean;
                                   Vendor_Libraries : Name_Id_Array;
-                                  Args : Argument_List;
+                                  Args : String_Acc_Array;
                                   Enable_Translate_Off : Boolean) return Node
    is
       use Errorout;
@@ -466,7 +483,7 @@ package body Ghdlsynth is
    is
       use Vhdl.Configuration;
       use Elab.Vhdl_Objtypes;
-      Args : Argument_List (1 .. Argc);
+      Args : String_Acc_Array (1 .. Argc);
       Res : Module;
       Cmd : Command_Synth;
       First_Arg : Natural;
@@ -536,7 +553,8 @@ package body Ghdlsynth is
    end Ghdl_Synth;
 
    procedure Perform_Action (Cmd : in out Command_Synth;
-                             Args : Argument_List)
+                             Args : String_Acc_Array;
+                             Success : out Boolean)
    is
       Res : Module;
       Inst : Synth_Instance_Acc;
@@ -548,11 +566,8 @@ package body Ghdlsynth is
          Args, True);
 
       if Config = Null_Iir then
-         if Cmd.Expect_Failure then
-            return;
-         else
-            raise Errorout.Compilation_Error;
-         end if;
+         Success := Cmd.Expect_Failure;
+         return;
       end if;
 
       Lib_Unit := Get_Library_Unit (Config);
@@ -566,17 +581,16 @@ package body Ghdlsynth is
          Res := No_Module;
       else
          Netlists.Errors.Initialize;
+         Synth.Vhdl_Foreign.Initialize;
          Res := Synthesis.Synth_Design (Config, Inst, Cmd.Top_Encoding);
       end if;
 
       if Res = No_Module then
-         if Cmd.Expect_Failure then
-            return;
-         else
-            raise Errorout.Compilation_Error;
-         end if;
+         Success := Cmd.Expect_Failure;
+         return;
       elsif Cmd.Expect_Failure then
-         raise Errorout.Compilation_Error;
+         Success := False;
+         return;
       end if;
 
       Disp_Design (Cmd, Format_Vhdl, Res, Config, Inst);
@@ -584,6 +598,8 @@ package body Ghdlsynth is
       if Cmd.Flag_Stats then
          Netlists.Disp_Stats;
       end if;
+
+      Success := True;
    end Perform_Action;
 
    procedure Register_Commands is
@@ -597,5 +613,6 @@ package body Ghdlsynth is
       Errorout.Console.Install_Handler;
       Options.Initialize;
       Netlists.Errors.Initialize;
+      Synth.Vhdl_Foreign.Initialize;
    end Init_For_Ghdl_Synth;
 end Ghdlsynth;

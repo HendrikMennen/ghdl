@@ -34,6 +34,12 @@ with Elab.Vhdl_Context.Debug; use Elab.Vhdl_Context.Debug;
 with Elab.Vhdl_Debug; use Elab.Vhdl_Debug;
 
 package body Elab.Debugger is
+   --  TODO:
+   --  * restart
+   --  * step in declarations
+   --  * stop at subprogram entry
+   --  * for step: stop at loop cond/for.
+
    Current_Instance : Synth_Instance_Acc;
    Current_Loc : Node;
 
@@ -45,10 +51,12 @@ package body Elab.Debugger is
       Reason_Error
      );
 
-   function Debug_Current_Instance return Synth_Instance_Acc is
+   procedure Get_Debug_Loc (Inst : out Synth_Instance_Acc;
+                            Loc : out Node) is
    begin
-      return Current_Instance;
-   end Debug_Current_Instance;
+      Inst := Current_Instance;
+      Loc := Current_Loc;
+   end Get_Debug_Loc;
 
    package Breakpoints is new Tables
      (Table_Index_Type => Natural,
@@ -610,6 +618,7 @@ package body Elab.Debugger is
          end if;
       end if;
       Current_Instance := Res;
+      Current_Loc := Null_Node;
    end Change_Hierarchy;
 
    procedure Print_Hierarchy_Path (Line : String)
@@ -1032,9 +1041,9 @@ package body Elab.Debugger is
       Debug (Reason_Break);
    end Debug_Break;
 
-   procedure Debug_Time is
+   procedure Debug_Time (Top : Synth_Instance_Acc) is
    begin
-      Current_Instance := Root_Instance;
+      Current_Instance := Top;
       Current_Loc := Null_Node;
 
       Debug (Reason_Time);

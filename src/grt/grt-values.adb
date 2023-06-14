@@ -26,23 +26,11 @@ with Grt.Strings; use Grt.Strings;
 with Grt.To_Strings; use Grt.To_Strings;
 
 package body Grt.Values is
-   --  Increase POS to skip leading whitespace characters, decrease LEN to
-   --  skip trailing whitespaces in string S.
    procedure Remove_Whitespaces (S     : Std_String_Basep;
                                  Len   : in out Ghdl_Index_Type;
                                  Pos   : in out Ghdl_Index_Type) is
    begin
-      --  GHDL: allow several leading whitespace.
-      while Pos < Len loop
-         exit when not Is_Whitespace (S (Pos));
-         Pos := Pos + 1;
-      end loop;
-
-      --  GHDL: allow several leading whitespace.
-      while Len > Pos loop
-         exit when not Is_Whitespace (S (Len - 1));
-         Len := Len - 1;
-      end loop;
+      Grt.To_Strings.Remove_Whitespaces (S, Len, Pos);
       if Pos = Len then
          Error_E ("'value: empty string");
       end if;
@@ -234,43 +222,6 @@ package body Grt.Values is
       return Value_F64 (S, Len, Pos);
    end Ghdl_Value_F64;
 
-   procedure Ghdl_Value_Physical_Split (Str : Std_String_Ptr;
-                                        Is_Real : out Boolean;
-                                        Lit_Pos : out Ghdl_Index_Type;
-                                        Lit_End : out Ghdl_Index_Type;
-                                        Unit_Pos : out Ghdl_Index_Type)
-   is
-      S        : constant Std_String_Basep := Str.Base;
-      Len      : Ghdl_Index_Type  := Str.Bounds.Dim_1.Length;
-   begin
-      --  LRM 14.1
-      --  Leading and trailing whitespace is allowed and ignored.
-      Lit_Pos := 0;
-      Remove_Whitespaces (S, Len, Lit_Pos);
-
-      --  Split between abstract literal (optionnal) and unit name.
-      Lit_End := Lit_Pos;
-      Is_Real := False;
-      while Lit_End < Len loop
-         exit when Is_Whitespace (S (Lit_End));
-         if S (Lit_End) = '.' then
-            Is_Real := True;
-         end if;
-         Lit_End := Lit_End + 1;
-      end loop;
-      if Lit_End = Len then
-         --  No literal
-         Unit_Pos := Lit_Pos;
-         Lit_End := 0;
-      else
-         Unit_Pos := Lit_End + 1;
-         while Unit_Pos < Len loop
-            exit when not Is_Whitespace (S (Unit_Pos));
-            Unit_Pos := Unit_Pos + 1;
-         end loop;
-      end if;
-   end Ghdl_Value_Physical_Split;
-
    function Ghdl_Value_Physical_Type (Str : Std_String_Ptr;
                                       Rti : Ghdl_Rti_Access)
                                      return Ghdl_I64
@@ -294,7 +245,8 @@ package body Grt.Values is
       Remove_Whitespaces (S, Len, Lit_Pos);
 
       --  Extract literal and unit
-      Ghdl_Value_Physical_Split (Str, Found_Real, Lit_Pos, Lit_End, Unit_Pos);
+      Ghdl_Value_Physical_Split
+        (S, Len, Found_Real, Lit_Pos, Lit_End, Unit_Pos);
 
       --  Find unit value
       Multiple := null;

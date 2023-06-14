@@ -46,6 +46,8 @@ class Workspace(object):
         errorout_memory.Install_Handler()
         flags.Flag_Elocations.value = True
         # flags.Verbose.value = True
+        # Gather comments
+        flags.Flag_Gather_Comments.value = True
         # We do analysis even in case of errors.
         parse.Flag_Parse_Parenthesis.value = True
         # Force analysis to get more feedback + navigation even in case
@@ -76,20 +78,20 @@ class Workspace(object):
     def root_uri(self):
         return self._root_uri
 
-    def _create_document(self, doc_uri, sfe, version=None):
+    def _create_document(self, doc_uri, sfe, lib, version=None):
         """Create a document and put it in this workspace."""
-        doc = document.Document(doc_uri, sfe, version)
+        doc = document.Document(doc_uri, sfe, lib, version)
         self._docs[doc_uri] = doc
         self._fe_map[sfe] = doc
         return doc
 
-    def create_document_from_sfe(self, sfe, abspath):
+    def create_document_from_sfe(self, sfe, abspath, lib):
         # A filename has been given without a corresponding document.
         # Create the document.
         # Common case: an error message was reported in a non-open document.
         #  Create a document so that it could be reported to the client.
         doc_uri = lsp.path_to_uri(os.path.normpath(abspath))
-        return self._create_document(doc_uri, sfe)
+        return self._create_document(doc_uri, sfe, lib)
 
     def create_document_from_uri(self, doc_uri, source=None, version=None):
         # A document is referenced by an uri but not known.  Load it.
@@ -100,7 +102,7 @@ class Workspace(object):
         else:
             source = source.encode(document.Document.encoding, "replace")
         sfe = document.Document.load(source, os.path.dirname(path), os.path.basename(path))
-        return self._create_document(doc_uri, sfe)
+        return self._create_document(doc_uri, sfe, None)
 
     def get_or_create_document(self, doc_uri):
         res = self.get_document(doc_uri)
@@ -143,11 +145,11 @@ class Workspace(object):
             if not os.path.isabs(filename):
                 dirname = pyutils.name_image(files_map.Get_Directory_Name(sfe))
                 filename = os.path.join(dirname, filename)
-            doc = self.create_document_from_sfe(sfe, filename)
+            doc = self.create_document_from_sfe(sfe, filename, None)
         return doc
 
-    def add_vhdl_file(self, name):
-        log.info("loading %s", name)
+    def add_vhdl_file(self, name, lib):
+        log.info("loading %s in library %s", name, lib)
         if os.path.isabs(name):
             absname = name
         else:
@@ -160,7 +162,7 @@ class Workspace(object):
         except OSError as err:
             self._server.show_message(lsp.MessageType.Error, f"cannot load {name}: {err.strerror}")
             return
-        doc = self.create_document_from_sfe(sfe, absname)
+        doc = self.create_document_from_sfe(sfe, absname, lib)
         doc.parse_document()
 
     def read_project(self):
@@ -220,8 +222,9 @@ class Workspace(object):
                 if not isinstance(name, str):
                     raise ProjectError("a 'file' is not a string")
                 lang = f.get("language", "vhdl")
+                lib = f.get("library", None)
                 if lang == "vhdl":
-                    self.add_vhdl_file(name)
+                    self.add_vhdl_file(name, lib)
         except ProjectError as e:
             self._server.show_message(lsp.MessageType.Error, f"error in project file: {e.msg}")
 
@@ -386,18 +389,35 @@ class Workspace(object):
         return res
 
     def goto_definition(self, doc_uri, position):
-        decl = self._docs[doc_uri].goto_definition(position)
+        decl = self._docs[doc_uri].find_definition(position)
         if decl is None:
             return None
         decl_loc = self.declaration_to_location(decl)
         if decl_loc is None:
             return None
-        res = [decl_loc]
-        if nodes.Get_Kind(decl) == nodes.Iir_Kind.Component_Declaration:
+        return [decl_loc]
+
+    def goto_implementation(self, doc_uri, position):
+        decl = self._docs[doc_uri].find_definition(position)
+        if decl is None:
+            return None
+        k = nodes.Get_Kind(decl)
+        if k == nodes.Iir_Kind.Component_Declaration:
             ent = libraries.Find_Entity_For_Component(nodes.Get_Identifier(decl))
             if ent != nodes.Null_Iir:
-                res.append(self.declaration_to_location(nodes.Get_Library_Unit(ent)))
-        return res
+                decl = nodes.Get_Library_Unit(ent)
+        elif k in nodes.Iir_Kinds.Subprogram_Declaration:
+            bod = nodes.Get_Subprogram_Body(decl)
+            if bod != nodes.Null_Iir:
+                decl = bod
+
+        decl_loc = self.declaration_to_location(decl)
+        if decl_loc is None:
+            return None
+        return [decl_loc]
+
+    def hover(self, doc_uri, position):
+        return self._docs[doc_uri].hover(position)
 
     def x_show_all_files(self):
         res = []

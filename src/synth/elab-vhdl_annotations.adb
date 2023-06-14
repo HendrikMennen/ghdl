@@ -44,10 +44,6 @@ package body Elab.Vhdl_Annotations is
 
    procedure Annotate_Type_Definition (Block_Info: Sim_Info_Acc; Def: Iir);
 
-   --  Annotate type definition DEF only if it is anonymous.
-   procedure Annotate_Anonymous_Type_Definition
-     (Block_Info: Sim_Info_Acc; Def: Iir);
-
    -- Add an annotation to object OBJ.
    procedure Create_Object_Info (Block_Info : Sim_Info_Acc;
                                  Obj : Iir;
@@ -100,7 +96,7 @@ package body Elab.Vhdl_Annotations is
            | Kind_Extra =>
             raise Internal_Error;
       end case;
-      Set_Info (Obj, Info);
+      Set_Ann (Obj, Info);
    end Create_Object_Info;
 
    -- Add an annotation to SIGNAL.
@@ -131,19 +127,9 @@ package body Elab.Vhdl_Annotations is
                                  Inst_Slot => Block_Info.Nbr_Objects,
                                  Nbr_Objects => 0,
                                  Nbr_Instances => 0);
-      Set_Info (Blk, Info);
+      Set_Ann (Blk, Info);
       return Info;
    end Create_Block_Info;
-
-   --  Annotate type definition DEF only if it is anonymous.
-   procedure Annotate_Anonymous_Type_Definition
-     (Block_Info: Sim_Info_Acc; Def: Iir) is
-   begin
-      if Is_Anonymous_Type_Definition (Def) then
-         Annotate_Type_Definition (Block_Info, Def);
-      end if;
-   end Annotate_Anonymous_Type_Definition;
-
 
    procedure Annotate_Protected_Type_Declaration (Block_Info : Sim_Info_Acc;
                                                   Prot: Iir)
@@ -173,7 +159,7 @@ package body Elab.Vhdl_Annotations is
       Prot_Info := new Sim_Info_Type'(Kind => Kind_Protected,
                                       Ref => Prot,
                                       Nbr_Objects => 0);
-      Set_Info (Prot, Prot_Info);
+      Set_Ann (Prot, Prot_Info);
 
       Decl := Get_Declaration_Chain (Prot);
       while Decl /= Null_Iir loop
@@ -195,9 +181,9 @@ package body Elab.Vhdl_Annotations is
    is
       pragma Unreferenced (Block_Info);
       Prot_Info : constant Sim_Info_Acc :=
-        Get_Info (Get_Protected_Type_Declaration (Prot));
+        Get_Ann (Get_Protected_Type_Declaration (Prot));
    begin
-      Set_Info (Prot, Prot_Info);
+      Set_Ann (Prot, Prot_Info);
 
       Annotate_Declaration_List (Prot_Info, Get_Declaration_Chain (Prot));
    end Annotate_Protected_Type_Body;
@@ -219,26 +205,6 @@ package body Elab.Vhdl_Annotations is
            | Iir_Kind_Floating_Subtype_Definition
            | Iir_Kind_Enumeration_Subtype_Definition
            | Iir_Kind_Physical_Subtype_Definition =>
-            Annotate_Anonymous_Type_Definition
-              (Block_Info, Get_Base_Type (Def));
-            El := Get_Range_Constraint (Def);
-            if El /= Null_Iir then
-               case Get_Kind (El) is
-                  when Iir_Kind_Range_Expression =>
-                     --  A physical subtype may be defined by an integer range.
-                     if Get_Kind (Def) = Iir_Kind_Physical_Subtype_Definition
-                     then
-                        null;
-                        --  FIXME
-                        --  Convert_Int_To_Phys (Get_Info (El).Value);
-                     end if;
-                  when Iir_Kind_Range_Array_Attribute
-                    | Iir_Kind_Reverse_Range_Array_Attribute =>
-                     null;
-                  when others =>
-                     Error_Kind ("annotate_type_definition (rc)", El);
-               end case;
-            end if;
             Create_Object_Info (Block_Info, Def, Kind_Type);
 
          when Iir_Kind_Integer_Type_Definition =>
@@ -259,7 +225,7 @@ package body Elab.Vhdl_Annotations is
                --  But only if it is a proper new subtype definition
                --  (ie not a denoting name, or attributes like 'subtype).
                El := Get_Element_Subtype (Def);
-               Annotate_Anonymous_Type_Definition (Block_Info, El);
+               Annotate_Type_Definition (Block_Info, El);
             end if;
 
             --  Then for the array.
@@ -284,7 +250,8 @@ package body Elab.Vhdl_Annotations is
          when Iir_Kind_Access_Subtype_Definition =>
             Create_Object_Info (Block_Info, Def, Kind_Type);
 
-         when Iir_Kind_File_Type_Definition =>
+         when Iir_Kind_File_Type_Definition
+            | Iir_Kind_File_Subtype_Definition =>
             --  For the File type.
             Create_Object_Info (Block_Info, Def, Kind_Type);
 
@@ -292,7 +259,8 @@ package body Elab.Vhdl_Annotations is
             Annotate_Protected_Type_Declaration (Block_Info, Def);
 
          when Iir_Kind_Incomplete_Type_Definition
-            | Iir_Kind_Subtype_Attribute =>
+            | Iir_Kind_Subtype_Attribute
+            | Iir_Kind_Element_Attribute =>
             null;
 
          when Iir_Kind_Foreign_Vector_Type_Definition =>
@@ -316,9 +284,10 @@ package body Elab.Vhdl_Annotations is
               | Iir_Kind_Interface_Variable_Declaration
               | Iir_Kind_Interface_Constant_Declaration
               | Iir_Kind_Interface_File_Declaration =>
-               if not Get_Is_Ref (El) then
-                  Annotate_Anonymous_Type_Definition
-                    (Block_Info, Get_Type (El));
+               --  Elaborate the subtype indication only if it not shared.
+               if Has_Owned_Subtype_Indication (El) then
+                  Annotate_Type_Definition
+                    (Block_Info, Get_Subtype_Indication (El));
                end if;
             when others =>
                Error_Kind ("annotate_interface_list_subtype", El);
@@ -339,13 +308,53 @@ package body Elab.Vhdl_Annotations is
          Nbr_Objects => 0,
          Pkg_Slot => Block_Info.Nbr_Objects,
          Pkg_Parent => Block_Info);
-      Set_Info (Inter, Package_Info);
+      Set_Ann (Inter, Package_Info);
 
       Annotate_Interface_List
         (Package_Info, Get_Generic_Chain (Inter), True);
       Annotate_Declaration_List (Package_Info, Get_Declaration_Chain (Inter));
    end Annotate_Interface_Package_Declaration;
 
+   --  If WITH_TYPES is true, also annotate interface object subtypes. This is
+   --  set except for parameters (as the interface subtypes are elaborated
+   --  with the subprogram declaration).
+   procedure Annotate_Interface_Declaration
+     (Block_Info : Sim_Info_Acc; Decl : Iir; With_Types : Boolean) is
+   begin
+      case Iir_Kinds_Interface_Declaration (Get_Kind (Decl)) is
+         when Iir_Kind_Interface_Signal_Declaration
+           | Iir_Kind_Interface_View_Declaration =>
+            if With_Types and then Has_Owned_Subtype_Indication (Decl) then
+               Annotate_Type_Definition (Block_Info, Get_Type (Decl));
+            end if;
+            Create_Signal_Info (Block_Info, Decl);
+         when Iir_Kind_Interface_Variable_Declaration
+           | Iir_Kind_Interface_Constant_Declaration
+           | Iir_Kind_Interface_File_Declaration =>
+            if With_Types and then Has_Owned_Subtype_Indication (Decl) then
+               Annotate_Type_Definition (Block_Info, Get_Type (Decl));
+            end if;
+            Create_Object_Info (Block_Info, Decl);
+         when Iir_Kind_Interface_Package_Declaration =>
+            Annotate_Interface_Package_Declaration (Block_Info, Decl);
+         when Iir_Kind_Interface_Type_Declaration =>
+            --  Create an info on the interface_type_definition.
+            --  This is needed for a generic type in an entity, as the
+            --  nodes are not instantiated.
+            Create_Object_Info
+              (Block_Info, Get_Interface_Type_Definition (Decl));
+         when Iir_Kinds_Interface_Subprogram_Declaration =>
+            --  Macro-expanded
+            null;
+         when Iir_Kind_Interface_Quantity_Declaration
+           | Iir_Kind_Interface_Terminal_Declaration =>
+            Error_Kind ("annotate_interface_declaration", Decl);
+      end case;
+   end Annotate_Interface_Declaration;
+
+   --  If WITH_TYPES is true, also annotate interface object subtypes. This is
+   --  set except for parameters (as the interface subtypes are elaborated
+   --  with the subprogram declaration).
    procedure Annotate_Interface_List
      (Block_Info: Sim_Info_Acc; Decl_Chain: Iir; With_Types : Boolean)
    is
@@ -353,33 +362,7 @@ package body Elab.Vhdl_Annotations is
    begin
       Decl := Decl_Chain;
       while Decl /= Null_Iir loop
-         if With_Types
-           and then Get_Kind (Decl) in Iir_Kinds_Interface_Object_Declaration
-           and then not Get_Is_Ref (Decl)
-         then
-            Annotate_Anonymous_Type_Definition (Block_Info, Get_Type (Decl));
-         end if;
-         case Get_Kind (Decl) is
-            when Iir_Kind_Interface_Signal_Declaration =>
-               Create_Signal_Info (Block_Info, Decl);
-            when Iir_Kind_Interface_Variable_Declaration
-              | Iir_Kind_Interface_Constant_Declaration
-              | Iir_Kind_Interface_File_Declaration =>
-               Create_Object_Info (Block_Info, Decl);
-            when Iir_Kind_Interface_Package_Declaration =>
-               Annotate_Interface_Package_Declaration (Block_Info, Decl);
-            when Iir_Kind_Interface_Type_Declaration =>
-               --  Create an info on the interface_type_definition.
-               --  This is needed for a generic type in an entity, as the
-               --  nodes are not instantiated.
-               Create_Object_Info
-                 (Block_Info, Get_Interface_Type_Definition (Decl));
-            when Iir_Kinds_Interface_Subprogram_Declaration =>
-               --  Macro-expanded
-               null;
-            when others =>
-               Error_Kind ("annotate_interface_list", Decl);
-         end case;
+         Annotate_Interface_Declaration (Block_Info, Decl, With_Types);
          Decl := Get_Chain (Decl);
       end loop;
    end Annotate_Interface_List;
@@ -393,11 +376,7 @@ package body Elab.Vhdl_Annotations is
       --  of the interfaces are elaborated in the outer context.
       Annotate_Interface_List_Subtype (Block_Info, Interfaces);
 
-      if Get_Kind (Subprg) = Iir_Kind_Function_Declaration then
-         --  FIXME: can this create a new annotation ?
-         Annotate_Anonymous_Type_Definition
-           (Block_Info, Get_Return_Type (Subprg));
-      end if;
+      --  The return type is a type mark, so already annotated.
    end Annotate_Subprogram_Interfaces_Type;
 
    procedure Annotate_Subprogram_Specification
@@ -410,7 +389,7 @@ package body Elab.Vhdl_Annotations is
       Subprg_Info := new Sim_Info_Type'(Kind => Kind_Frame,
                                         Ref => Subprg,
                                         Nbr_Objects => 0);
-      Set_Info (Subprg, Subprg_Info);
+      Set_Ann (Subprg, Subprg_Info);
 
       Annotate_Interface_List (Subprg_Info, Interfaces, False);
    end Annotate_Subprogram_Specification;
@@ -420,9 +399,9 @@ package body Elab.Vhdl_Annotations is
    is
       pragma Unreferenced (Block_Info);
       Spec : constant Iir := Get_Subprogram_Specification (Subprg);
-      Subprg_Info : constant Sim_Info_Acc := Get_Info (Spec);
+      Subprg_Info : constant Sim_Info_Acc := Get_Ann (Spec);
    begin
-      Set_Info (Subprg, Subprg_Info);
+      Set_Ann (Subprg, Subprg_Info);
 
       --  Do not annotate body of foreign subprograms.
       if Get_Foreign_Flag (Spec) then
@@ -446,7 +425,7 @@ package body Elab.Vhdl_Annotations is
                                  Inst_Slot => Invalid_Object_Slot,
                                  Nbr_Objects => 0,
                                  Nbr_Instances => 1); --  For the instance.
-      Set_Info (Comp, Info);
+      Set_Ann (Comp, Info);
 
       Annotate_Interface_List (Info, Get_Generic_Chain (Comp), True);
       Annotate_Interface_List (Info, Get_Port_Chain (Comp), True);
@@ -479,18 +458,50 @@ package body Elab.Vhdl_Annotations is
          Nbr_Objects => 0,
          Pkg_Slot => Invalid_Object_Slot,
          Pkg_Parent => null);
+      Set_Ann (Decl, Package_Info);
 
       if Is_Inst or else not Is_Uninstantiated_Package (Decl) then
+         --  Allocate a slot in the parent block.
          Block_Info.Nbr_Objects := Block_Info.Nbr_Objects + 1;
+         --  Link with parent.
          Package_Info.Pkg_Slot := Block_Info.Nbr_Objects;
          Package_Info.Pkg_Parent := Block_Info;
       end if;
 
-      Set_Info (Decl, Package_Info);
-
       if Is_Inst then
-         Annotate_Interface_List
-           (Package_Info, Get_Generic_Chain (Decl), True);
+         --  Annotate the interfaces, but specially handle interface type.
+         declare
+            use Elab.Vhdl_Utils;
+            Init : Association_Iterator_Init;
+            It : Association_Iterator;
+            Assoc : Iir;
+            Inter : Iir;
+            Act : Iir;
+         begin
+            Init := Association_Iterator_Build
+              (Get_Generic_Chain (Decl),
+               Get_Generic_Map_Aspect_Chain (Decl));
+
+            --  Need to use iterators so that associations are processed in the
+            --  order of the interfaces.
+            Association_Iterate_Init (It, Init);
+            Association_Iterate_Next (It, Inter, Assoc);
+            while Inter /= Null_Node loop
+               Annotate_Interface_Declaration (Package_Info, Inter, True);
+
+               if Get_Kind (Inter) = Iir_Kind_Interface_Type_Declaration then
+                  --  For anonymous subtype, re-use the annotation of the
+                  --  interface type definition.
+                  --  If it is named, the definition will be reachable.
+                  Act := Get_Actual (Assoc);
+                  if Get_Kind (Act) not in Iir_Kinds_Denoting_Name then
+                     Set_Ann
+                       (Act, Get_Ann (Get_Interface_Type_Definition (Inter)));
+                  end if;
+               end if;
+               Association_Iterate_Next (It, Inter, Assoc);
+            end loop;
+         end;
       else
          Header := Get_Package_Header (Decl);
          if Header /= Null_Iir then
@@ -507,14 +518,16 @@ package body Elab.Vhdl_Annotations is
             Bod : constant Iir := Get_Instance_Package_Body (Decl);
          begin
             if Bod /= Null_Iir then
-               Set_Info (Bod, Package_Info);
-               Annotate_Declaration_List
-                 (Package_Info, Get_Declaration_Chain (Bod));
+               if Get_Immediate_Body_Flag (Decl) then
+                  Set_Ann (Bod, Package_Info);
+                  Annotate_Declaration_List
+                    (Package_Info, Get_Declaration_Chain (Bod));
+               end if;
             else
                declare
                   Uninst : constant Iir :=
                     Get_Uninstantiated_Package_Decl (Decl);
-                  Uninst_Info : constant Sim_Info_Acc := Get_Info (Uninst);
+                  Uninst_Info : constant Sim_Info_Acc := Get_Ann (Uninst);
                begin
                   --  There is not corresponding body for an instantiation, so
                   --  also add objects for the shared body.
@@ -529,10 +542,13 @@ package body Elab.Vhdl_Annotations is
 
    procedure Annotate_Package_Body (Bod: Iir)
    is
+      Is_Inst : constant Boolean :=
+        Get_Kind (Bod) = Iir_Kind_Package_Instantiation_Body;
       Pkg : constant Node := Get_Package (Bod);
-      Package_Info : constant Sim_Info_Acc := Get_Info (Pkg);
+      Package_Info : constant Sim_Info_Acc := Get_Ann (Pkg);
    begin
-      if Is_Uninstantiated_Package (Pkg)
+      if not Is_Inst
+        and then Is_Uninstantiated_Package (Pkg)
         and then Get_Macro_Expanded_Flag (Pkg)
       then
          --  The body of a macro-expanded flag.
@@ -540,34 +556,30 @@ package body Elab.Vhdl_Annotations is
       end if;
 
       --  Set info field of package body declaration.
-      Set_Info (Bod, Package_Info);
+      Set_Ann (Bod, Package_Info);
 
       -- declarations
       Annotate_Declaration_List (Package_Info, Get_Declaration_Chain (Bod));
    end Annotate_Package_Body;
 
-   procedure Annotate_Declaration_Type (Block_Info: Sim_Info_Acc; Decl: Iir)
-   is
-      Ind : Iir;
+   procedure Annotate_Declaration_Type (Block_Info: Sim_Info_Acc; Decl: Iir) is
    begin
-      if Get_Is_Ref (Decl) then
-         return;
+      if Has_Owned_Subtype_Indication (Decl) then
+         --  Really annotate the subtype indication, which might be different
+         --  from the type (for constant declarations).
+         Annotate_Type_Definition (Block_Info, Get_Subtype_Indication (Decl));
       end if;
-      Ind := Get_Subtype_Indication (Decl);
-      if Get_Kind (Ind) in Iir_Kinds_Denoting_Name then
-         return;
-      end if;
-      Annotate_Type_Definition (Block_Info, Ind);
    end Annotate_Declaration_Type;
 
    procedure Annotate_Declaration (Block_Info: Sim_Info_Acc; Decl: Iir) is
    begin
       case Get_Kind (Decl) is
          when Iir_Kind_Package_Declaration
-           | Iir_Kind_Package_Instantiation_Declaration =>
+            | Iir_Kind_Package_Instantiation_Declaration =>
             Annotate_Package_Declaration (Block_Info, Decl);
 
-         when Iir_Kind_Package_Body =>
+         when Iir_Kind_Package_Body
+            | Iir_Kind_Package_Instantiation_Body =>
             Annotate_Package_Body (Decl);
 
          when Iir_Kind_Attribute_Implicit_Declaration =>
@@ -619,7 +631,23 @@ package body Elab.Vhdl_Annotations is
            | Iir_Kind_Anonymous_Type_Declaration =>
             Annotate_Type_Definition (Block_Info, Get_Type_Definition (Decl));
          when Iir_Kind_Subtype_Declaration =>
-            Annotate_Type_Definition (Block_Info, Get_Type (Decl));
+            declare
+               Ind : constant Iir := Get_Subtype_Indication (Decl);
+            begin
+               --  No annotation for aliases.
+               if Get_Kind (Ind) not in Iir_Kinds_Denoting_Name then
+                  Annotate_Type_Definition (Block_Info, Get_Type (Decl));
+               end if;
+            end;
+
+         when Iir_Kind_Mode_View_Declaration =>
+            declare
+               Ind : constant Iir := Get_Subtype_Indication (Decl);
+            begin
+               if Get_Kind (Ind) not in Iir_Kinds_Denoting_Name then
+                  Annotate_Type_Definition (Block_Info, Ind);
+               end if;
+            end;
 
          when Iir_Kind_Protected_Type_Body =>
             Annotate_Protected_Type_Body (Block_Info, Decl);
@@ -641,9 +669,8 @@ package body Elab.Vhdl_Annotations is
             Annotate_Subprogram_Body (Block_Info, Decl);
 
          when Iir_Kind_Object_Alias_Declaration =>
-            if Get_Subtype_Indication (Decl) /= Null_Iir then
-               Annotate_Anonymous_Type_Definition
-                 (Block_Info, Get_Type (Decl));
+            if Has_Owned_Subtype_Indication (Decl) then
+               Annotate_Type_Definition (Block_Info, Get_Type (Decl));
             end if;
             Create_Object_Info (Block_Info, Decl);
 
@@ -963,18 +990,14 @@ package body Elab.Vhdl_Annotations is
                                  Inst_Slot => Block_Info.Nbr_Objects,
                                  Nbr_Objects => 0,
                                  Nbr_Instances => 1);
-      Set_Info (Stmt, Info);
+      Set_Ann (Stmt, Info);
    end Annotate_Component_Instantiation_Statement;
 
    procedure Annotate_Process_Statement (Block_Info : Sim_Info_Acc; Stmt : Iir)
    is
-      pragma Unreferenced (Block_Info);
       Info : Sim_Info_Acc;
    begin
-      Info := new Sim_Info_Type'(Kind => Kind_Process,
-                                 Ref => Stmt,
-                                 Nbr_Objects => 0);
-      Set_Info (Stmt, Info);
+      Info := Create_Block_Info (Block_Info, Stmt);
 
       Annotate_Declaration_List
         (Info, Get_Declaration_Chain (Stmt));
@@ -1036,7 +1059,7 @@ package body Elab.Vhdl_Annotations is
                Info := new Sim_Info_Type'(Kind => Kind_Process,
                                           Ref => Stmt,
                                           Nbr_Objects => 0);
-               Set_Info (Stmt, Info);
+               Set_Ann (Stmt, Info);
                Annotate_Procedure_Call_Statement (Info, Stmt);
             end;
 
@@ -1066,7 +1089,7 @@ package body Elab.Vhdl_Annotations is
                                         Inst_Slot => Invalid_Object_Slot,
                                         Nbr_Objects => 0,
                                         Nbr_Instances => 0);
-      Set_Info (Decl, Entity_Info);
+      Set_Ann (Decl, Entity_Info);
 
       Annotate_Interface_List (Entity_Info, Get_Generic_Chain (Decl), True);
       Annotate_Interface_List (Entity_Info, Get_Port_Chain (Decl), True);
@@ -1078,7 +1101,7 @@ package body Elab.Vhdl_Annotations is
 
    procedure Annotate_Architecture (Decl: Iir_Architecture_Body)
    is
-      Entity_Info : constant Sim_Info_Acc := Get_Info (Get_Entity (Decl));
+      Entity_Info : constant Sim_Info_Acc := Get_Ann (Get_Entity (Decl));
       Saved_Info : constant Sim_Info_Type (Kind_Block) := Entity_Info.all;
       Arch_Info: Sim_Info_Acc;
    begin
@@ -1094,7 +1117,7 @@ package body Elab.Vhdl_Annotations is
 
       Arch_Info := new Sim_Info_Type'(Entity_Info.all);
       Entity_Info.all := Saved_Info;
-      Set_Info (Decl, Arch_Info);
+      Set_Ann (Decl, Arch_Info);
    end Annotate_Architecture;
 
    procedure Annotate_Vunit_Declaration (Decl : Iir)
@@ -1107,7 +1130,7 @@ package body Elab.Vhdl_Annotations is
                                        Inst_Slot => Invalid_Object_Slot,
                                        Nbr_Objects => 0,
                                        Nbr_Instances => 0);
-      Set_Info (Decl, Vunit_Info);
+      Set_Ann (Decl, Vunit_Info);
 
       Item := Get_Vunit_Item_Chain (Decl);
       while Item /= Null_Iir loop
@@ -1158,7 +1181,7 @@ package body Elab.Vhdl_Annotations is
                                  Inst_Slot => Invalid_Object_Slot,
                                  Nbr_Objects => 0,
                                  Nbr_Instances => 0);
-      Set_Info (Decl, Info);
+      Set_Ann (Decl, Info);
 
       Annotate_Interface_List (Info, Get_Generic_Chain (Decl), True);
       Annotate_Interface_List (Info, Get_Port_Chain (Decl), True);
@@ -1207,7 +1230,7 @@ package body Elab.Vhdl_Annotations is
          Nbr_Objects => 0,
          Pkg_Slot => Block_Info.Nbr_Objects,
          Pkg_Parent => Block_Info);
-      Set_Info (Decl, Config_Info);
+      Set_Ann (Decl, Config_Info);
 
       Annotate_Declaration_List (Config_Info, Get_Declaration_Chain (Decl));
       Annotate_Block_Configuration (Get_Block_Configuration (Decl));
@@ -1259,9 +1282,9 @@ package body Elab.Vhdl_Annotations is
                   Annotate_Package_Declaration (Global_Info, El);
                   --  These types are not in std.standard!
                   Annotate_Type_Definition
-                    (Get_Info (El), Convertible_Integer_Type_Definition);
+                    (Get_Ann (El), Convertible_Integer_Type_Definition);
                   Annotate_Type_Definition
-                    (Get_Info (El), Convertible_Real_Type_Definition);
+                    (Get_Ann (El), Convertible_Real_Type_Definition);
                else
                   pragma Assert (Global_Info /= null);
                   Annotate_Package_Declaration (Global_Info, El);
@@ -1314,7 +1337,7 @@ package body Elab.Vhdl_Annotations is
    procedure Disp_Vhdl_Info (Node: Iir)
    is
       use Simple_IO;
-      Info : constant Sim_Info_Acc := Get_Info (Node);
+      Info : constant Sim_Info_Acc := Get_Ann (Node);
    begin
       if Info = null then
          return;
@@ -1378,17 +1401,17 @@ package body Elab.Vhdl_Annotations is
 
    procedure Disp_Tree_Info (Node: Iir) is
    begin
-      Disp_Info (Get_Info (Node));
+      Disp_Info (Get_Ann (Node));
    end Disp_Tree_Info;
 
-   procedure Set_Info (Target: Iir; Info: Sim_Info_Acc) is
+   procedure Set_Ann (Target: Iir; Info: Sim_Info_Acc) is
    begin
       pragma Assert (Info_Node.Table (Target) = null);
       Info_Node.Table (Target) := Info;
-   end Set_Info;
+   end Set_Ann;
 
-   function Get_Info (Target: Iir) return Sim_Info_Acc is
+   function Get_Ann (Target: Iir) return Sim_Info_Acc is
    begin
       return Info_Node.Table (Target);
-   end Get_Info;
+   end Get_Ann;
 end Elab.Vhdl_Annotations;

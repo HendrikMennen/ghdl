@@ -552,8 +552,7 @@ package body Vhdl.Sem_Expr is
    -- FIXME: avoid to run it on an already analyzed node, be careful
    --  with range_type_expr.
    function Sem_Simple_Range_Expression
-     (Expr: Iir_Range_Expression; A_Type: Iir; Any_Dir : Boolean)
-      return Iir_Range_Expression
+     (Expr: Iir_Range_Expression; A_Type: Iir) return Iir_Range_Expression
    is
       Base_Type: Iir;
       Left, Right: Iir;
@@ -710,13 +709,6 @@ package body Vhdl.Sem_Expr is
          return Null_Iir;
       end if;
 
-      if Get_Expr_Staticness (Expr) = Locally
-        and then Get_Type_Staticness (Expr_Type) = Locally
-        and then Get_Kind (Expr_Type) in Iir_Kinds_Subtype_Definition
-      then
-         Eval_Check_Range (Expr, Expr_Type, Any_Dir);
-      end if;
-
       return Expr;
    end Sem_Simple_Range_Expression;
 
@@ -727,15 +719,14 @@ package body Vhdl.Sem_Expr is
    -- LRM93 3.2.1.1
    -- FIXME: avoid to run it on an already analyzed node, be careful
    --  with range_type_expr.
-   function Sem_Range_Expression (Expr: Iir; A_Type: Iir; Any_Dir : Boolean)
-                                 return Iir
+   function Sem_Range_Expression (Expr: Iir; A_Type: Iir) return Iir
    is
       Res : Iir;
       Res_Type : Iir;
    begin
       case Get_Kind (Expr) is
          when Iir_Kind_Range_Expression =>
-            Res := Sem_Simple_Range_Expression (Expr, A_Type, Any_Dir);
+            Res := Sem_Simple_Range_Expression (Expr, A_Type);
             return Res;
 
          when Iir_Kinds_Denoting_Name
@@ -781,21 +772,10 @@ package body Vhdl.Sem_Expr is
          return Null_Iir;
       end if;
 
-      Res := Eval_Range_If_Static (Res);
-
-      if A_Type /= Null_Iir
-        and then Get_Type_Staticness (A_Type) = Locally
-        and then Get_Kind (A_Type) in Iir_Kinds_Subtype_Definition
-      then
-         if Get_Expr_Staticness (Res) = Locally then
-            Eval_Check_Range (Res, A_Type, Any_Dir);
-         end if;
-      end if;
-      return Res;
+      return Eval_Range_If_Static (Res);
    end Sem_Range_Expression;
 
-   function Sem_Discrete_Range (Expr: Iir; A_Type: Iir; Any_Dir : Boolean)
-                               return Iir
+   function Sem_Discrete_Range (Expr: Iir; A_Type: Iir) return Iir
    is
       Res : Iir;
       Res_Type : Iir;
@@ -819,7 +799,7 @@ package body Vhdl.Sem_Expr is
             --  FIXME: override type of RES ?
          end if;
       else
-         Res := Sem_Range_Expression (Expr, A_Type, Any_Dir);
+         Res := Sem_Range_Expression (Expr, A_Type);
 
          if Res = Null_Iir then
             return Null_Iir;
@@ -850,7 +830,7 @@ package body Vhdl.Sem_Expr is
       Res : Iir;
       Range_Type : Iir;
    begin
-      Res := Sem_Discrete_Range (Expr, Null_Iir, True);
+      Res := Sem_Discrete_Range (Expr, Null_Iir);
       if Res = Null_Iir then
          return Null_Iir;
       end if;
@@ -871,7 +851,7 @@ package body Vhdl.Sem_Expr is
          --  FIXME: catch phys/phys.
          Set_Type (Res, Integer_Type_Definition);
          if Get_Expr_Staticness (Res) = Locally then
-            Eval_Check_Range (Res, Integer_Subtype_Definition, True);
+            Check_Range_Compatibility (Res, Integer_Subtype_Definition);
          end if;
       elsif Range_Type = Universal_Integer_Type_Definition then
          if Vhdl_Std >= Vhdl_08 then
@@ -897,6 +877,9 @@ package body Vhdl.Sem_Expr is
                              & "literal or attribute");
          end if;
          Set_Type (Res, Integer_Type_Definition);
+         if Get_Expr_Staticness (Res) = Locally then
+            Check_Range_Compatibility (Res, Integer_Subtype_Definition);
+         end if;
       end if;
       return Res;
    end Sem_Discrete_Range_Integer;
@@ -1261,6 +1244,15 @@ package body Vhdl.Sem_Expr is
    begin
       Set_Function_Call_Staticness (Expr, Imp);
       Sem_Decls.Mark_Subprogram_Used (Imp);
+
+      --  Check the subprogram is not called before its elaboration.
+      if not Unelaborated_Use_Allowed
+        and then Get_Kind (Imp) in Iir_Kinds_Subprogram_Declaration
+        and then not Get_Elaborated_Flag (Imp)
+      then
+         Warning_Msg_Sem (Warnid_Elaboration, +Expr,
+                          "%n is called before elaborated of its body", +Imp);
+      end if;
 
       --  Check purity/wait/passive.
 
@@ -2725,7 +2717,7 @@ package body Vhdl.Sem_Expr is
                      null;
                end case;
                if not Ok then
-                  Error_Msg_Sem (+Choice, "%n out of index range", +Expr);
+                  Error_Msg_Sem (+Choice, "choice is out of index range");
                   Has_Err := True;
                end if;
                Choice := Get_Chain (Choice);
@@ -2946,10 +2938,11 @@ package body Vhdl.Sem_Expr is
       is
          Expr : Iir;
          Ent : Iir;
+         Static : Iir_Staticness;
       begin
          if Get_Kind (El) = Iir_Kind_Choice_By_Range then
             Expr := Get_Choice_Range (El);
-            Expr := Sem_Discrete_Range (Expr, Choice_Type, True);
+            Expr := Sem_Discrete_Range (Expr, Choice_Type);
             if Expr = Null_Iir then
                return False;
             end if;
@@ -2957,13 +2950,16 @@ package body Vhdl.Sem_Expr is
                when Iir_Kind_Range_Expression
                  | Iir_Kinds_Range_Attribute
                  | Iir_Kinds_Denoting_Name =>
-                  Expr := Eval_Range_If_Static (Expr);
-                  Set_Choice_Staticness (El, Get_Expr_Staticness (Expr));
+                  Static := Get_Expr_Staticness (Expr);
                when Iir_Kinds_Scalar_Subtype_Definition =>
-                  Set_Choice_Staticness (El, Get_Type_Staticness (Expr));
+                  Static := Get_Type_Staticness (Expr);
                when others =>
                   Error_Kind ("sem_sime_choice(1)", Expr);
             end case;
+            Set_Choice_Staticness (El, Static);
+            if Static = Locally then
+               Expr := Eval_Range (Expr);
+            end if;
             Set_Choice_Range (El, Expr);
          else
             Expr := Get_Choice_Expression (El);
@@ -2989,6 +2985,7 @@ package body Vhdl.Sem_Expr is
                         return Replace_By_Range_Choice (Expr, Ent);
                      when Iir_Kind_Subtype_Declaration
                        | Iir_Kind_Type_Declaration =>
+                        Set_Type (Expr, Get_Type (Ent));
                         Ent := Is_Type_Name (Expr);
                         Set_Expr_Staticness (Expr, Get_Type_Staticness (Ent));
                         return Replace_By_Range_Choice (Expr, Ent);
@@ -3133,8 +3130,7 @@ package body Vhdl.Sem_Expr is
    -- A_TYPE.
    -- return FALSE is case of failure
    function Sem_Record_Aggregate
-     (Aggr : Iir_Aggregate; A_Type : Iir; Constrained : Boolean)
-     return boolean
+     (Aggr : Iir_Aggregate; A_Type : Iir; Constrained : Boolean) return Iir
    is
       El_List : constant Iir_Flist := Get_Elements_Declaration_List (A_Type);
 
@@ -3143,6 +3139,7 @@ package body Vhdl.Sem_Expr is
 
       Matches: Iir_Array (0 .. Get_Nbr_Elements (El_List) - 1);
       Ok : Boolean;
+      Ovf : Boolean;
 
       --  Add a choice for element REC_EL.
       --  Checks the element is not already associated.
@@ -3222,6 +3219,7 @@ package body Vhdl.Sem_Expr is
       Set_Aggregate_Expand_Flag (Aggr, True);
 
       Ok := True;
+      Ovf := False;
       Assoc_Chain := Get_Association_Choices_Chain (Aggr);
       Matches := (others => Null_Iir);
       Expr_Staticness := Locally;
@@ -3298,11 +3296,10 @@ package body Vhdl.Sem_Expr is
          if not Get_Same_Alternative_Flag (El) then
             if El_Type /= Null_Iir then
                --  Analyze the expression only if the choice is correct.
-               Expr := Sem_Expression_Wildcard
-                 (Expr, El_Type, Constrained);
+               Expr := Sem_Expression_Wildcard (Expr, El_Type, Constrained);
                if Expr /= Null_Iir then
-                  Set_Associated_Expr
-                    (El, Eval_Expr_Check_If_Static (Expr, El_Type));
+                  Expr := Eval_Expr_Check_If_Static (Expr, El_Type);
+                  Set_Associated_Expr (El, Expr);
                   Expr_Staticness := Min (Expr_Staticness,
                                           Get_Expr_Staticness (Expr));
                   if not Add_Constraints
@@ -3313,6 +3310,15 @@ package body Vhdl.Sem_Expr is
                   end if;
                   if not Is_Static_Construct (Expr) then
                      Set_Aggregate_Expand_Flag (Aggr, False);
+                  end if;
+                  --  Check constraints.
+                  if Get_Kind (Expr) /= Iir_Kind_Overflow_Literal
+                    and then not Eval_Is_In_Bound (Expr, El_Type)
+                  then
+                     Warning_Msg_Sem
+                       (Warnid_Runtime_Error, +Expr,
+                        "expression constraints don't match record element");
+                     Ovf := True;
                   end if;
                else
                   Ok := False;
@@ -3395,7 +3401,13 @@ package body Vhdl.Sem_Expr is
          end;
       end if;
 
-      return Ok;
+      if Ovf then
+         return Build_Overflow (Aggr, Get_Type (Aggr));
+      elsif not Ok then
+         return Null_Iir;
+      else
+         return Aggr;
+      end if;
    end Sem_Record_Aggregate;
 
    --  Information for each dimension of an aggregate.
@@ -3851,15 +3863,21 @@ package body Vhdl.Sem_Expr is
       Expr_Staticness : Iir_Staticness;
 
       Info : Array_Aggr_Info renames Infos (Dim);
+
+      Is_Sub_Range : Boolean;
    begin
       --  Analyze choices (for aggregate but not for strings).
       if Get_Kind (Aggr) = Iir_Kind_Aggregate then
          --  By default, consider the aggregate can be statically built.
          Set_Aggregate_Expand_Flag (Aggr, True);
 
+         --  True if the aggregate (and not the context) defines its range.
+         Is_Sub_Range :=
+           not (Constrained and then Get_Index_Constraint_Flag (A_Type));
+
          Assoc_Chain := Get_Association_Choices_Chain (Aggr);
          Sem_Choices_Range (Assoc_Chain, Index_Type, Low, High,
-                            Get_Location (Aggr), not Constrained, False);
+                            Get_Location (Aggr), Is_Sub_Range, False);
          Set_Association_Choices_Chain (Aggr, Assoc_Chain);
 
          --  Update infos.
@@ -4137,6 +4155,7 @@ package body Vhdl.Sem_Expr is
                   --  Avoid error propagation.
                   Set_Range_Constraint (Info.Index_Subtype,
                                         Get_Range_Constraint (Index_Type));
+                  Set_Is_Ref (Info.Index_Subtype, True);
                   Free_Iir (Index_Subtype_Constraint);
                else
                   Set_Direction (Index_Subtype_Constraint, Dir);
@@ -4334,6 +4353,24 @@ package body Vhdl.Sem_Expr is
          else
             Set_Aggregate_Expand_Flag (Aggr, False);
          end if;
+
+         if Get_Literal_Subtype (Aggr) = Null_Iir then
+            --  Free the index range info if not used to create the literal
+            --  subtype.
+            for I in Infos'Range loop
+               declare
+                  St : constant Iir := Infos (I).Index_Subtype;
+                  Rng : constant Iir := Get_Range_Constraint (St);
+               begin
+                  if not Get_Is_Ref (St) then
+                     Free_Iir (Get_Left_Limit_Expr (Rng));
+                     Free_Iir (Get_Right_Limit_Expr (Rng));
+                     Free_Iir (Rng);
+                  end if;
+                  Free_Iir (St);
+               end;
+            end loop;
+         end if;
       else
          --  If the array is not constrained, expression cannot be more
          --  static than the type.  In particular, if the type is not
@@ -4466,10 +4503,7 @@ package body Vhdl.Sem_Expr is
             return Sem_Array_Aggregate (Expr, A_Type, Constrained);
          when Iir_Kind_Record_Type_Definition
             | Iir_Kind_Record_Subtype_Definition =>
-            if not Sem_Record_Aggregate (Expr, A_Type, Constrained) then
-               return Null_Iir;
-            end if;
-            return Expr;
+            return Sem_Record_Aggregate (Expr, A_Type, Constrained);
          when Iir_Kind_Error =>
             return Null_Iir;
          when others =>
@@ -4574,7 +4608,8 @@ package body Vhdl.Sem_Expr is
    --  Analyze an allocator by expression or an allocator by subtype.
    function Sem_Allocator (Expr : Iir; A_Type : Iir) return Iir
    is
-      Arg: Iir;
+      Arg : Iir;
+      Ind : Iir;
       Arg_Type : Iir;
    begin
       Set_Expr_Staticness (Expr, None);
@@ -4597,15 +4632,13 @@ package body Vhdl.Sem_Expr is
 
             when Iir_Kind_Allocator_By_Subtype =>
                --  Analyze subtype indication.
-               Arg := Get_Subtype_Indication (Expr);
-               Arg := Sem_Types.Sem_Subtype_Indication (Arg);
-               Set_Subtype_Indication (Expr, Arg);
-               Arg := Get_Type_Of_Subtype_Indication (Arg);
+               Ind := Get_Subtype_Indication (Expr);
+               Ind := Sem_Types.Sem_Subtype_Indication (Ind);
+               Set_Subtype_Indication (Expr, Ind);
+               Set_Allocator_Subtype (Expr, Ind);
+               Arg := Get_Type_Of_Subtype_Indication (Ind);
                if Arg = Null_Iir or else Is_Error (Arg) then
                   return Null_Iir;
-               end if;
-               if Is_Anonymous_Type_Definition (Arg) then
-                  Set_Allocator_Subtype (Expr, Get_Subtype_Indication (Expr));
                end if;
 
                --  LRM93 7.3.6
@@ -4621,7 +4654,7 @@ package body Vhdl.Sem_Expr is
                --  LRM93 7.3.6
                --  A subtype indication that is part of an allocator must
                --  not include a resolution function.
-               if Is_Anonymous_Type_Definition (Arg)
+               if Is_Proper_Subtype_Indication (Ind)
                  and then Get_Kind (Arg) /= Iir_Kind_Access_Subtype_Definition
                  and then Get_Resolution_Indication (Arg) /= Null_Iir
                then
@@ -4734,13 +4767,6 @@ package body Vhdl.Sem_Expr is
 
       return Expr;
    end Sem_Qualified_Expression;
-
-   function Is_Signal_Parameter (Obj : Iir) return Boolean is
-   begin
-      return Get_Kind (Obj) = Iir_Kind_Interface_Signal_Declaration
-        and then
-        Get_Kind (Get_Parent (Obj)) in Iir_Kinds_Subprogram_Declaration;
-   end Is_Signal_Parameter;
 
    function Can_Interface_Be_Read (Inter : Iir) return Boolean is
    begin
@@ -4886,6 +4912,10 @@ package body Vhdl.Sem_Expr is
                if not Can_Interface_Be_Read (Obj) then
                   Error_Msg_Sem (+Expr, "%n cannot be read", +Obj);
                end if;
+               return;
+            when Iir_Kind_Interface_View_Declaration =>
+               --  Must be refined by the caller.  We don't know here if there
+               --  is a selected element.
                return;
             when Iir_Kind_Enumeration_Literal
               | Iir_Kind_Physical_Int_Literal
@@ -5336,7 +5366,9 @@ package body Vhdl.Sem_Expr is
             declare
                Res : Iir;
             begin
-               Res := Sem_Simple_Range_Expression (Expr, A_Type, True);
+               Error_Msg_Sem
+                 (+Expr, "range expression not allowed as an expression");
+               Res := Sem_Simple_Range_Expression (Expr, A_Type);
                return Create_Error_Expr (Res, A_Type);
             end;
 
@@ -6074,7 +6106,7 @@ package body Vhdl.Sem_Expr is
       Cond_Type : Iir;
    begin
       Cond_Type := Get_Type (Cond);
-      if Cond_Type = Null_Iir then
+      if Cond_Type = Null_Iir or else Is_Error (Cond_Type) then
          --  Error.
          return Cond;
       end if;

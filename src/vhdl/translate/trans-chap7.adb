@@ -848,114 +848,350 @@ package body Trans.Chap7 is
       return Res;
    end Convert_Constrained_To_Unconstrained;
 
-   --  Innert procedure for Convert_Unconstrained_To_Constrained.
-   procedure Convert_To_Constrained_Check
-     (Bounds : Mnode; Expr_Type : Iir; Atype : Iir; Failure_Label : O_Snode)
+   --  Return true iff ATYPE is derived from PARENT_TYPE
+   --  (or to say the same, if PARENT_TYPE is a parent of ATYPE).
+   function Is_A_Derived_Type (Atype : Iir; Parent_Type : Iir) return Boolean
    is
-      Stable_Bounds : Mnode;
+      Ptype : Iir;
+      T : Iir;
    begin
-      Open_Temp;
-      Stable_Bounds := Stabilize (Bounds);
-      case Get_Kind (Expr_Type) is
-         when Iir_Kind_Array_Type_Definition
-           | Iir_Kind_Array_Subtype_Definition =>
+      --  Optimize: if PARENT_TYPE is an alias of its parent (or if it
+      --  just add a resolution function), use its parent type instead.
+      --  This mainly optimize conversions between std_ulogic_vector and
+      --  std_logic_vector.
+      Ptype := Parent_Type;
+      while Get_Kind (Ptype) = Iir_Kind_Array_Subtype_Definition
+        and then Get_Index_Constraint_List (Ptype) = Null_Iir_Flist
+        and then Get_Array_Element_Constraint (Ptype) = Null_Iir
+      loop
+         T := Get_Parent_Type (Ptype);
+         exit when T = Null_Iir;
+         Ptype := T;
+      end loop;
+
+      --  If ATYPE is a parent type of PARENT_TYPE, then all the constrained
+      --  are inherited and there is nothing to check.
+      T := Atype;
+      loop
+         if T = Ptype then
+            return True;
+         end if;
+         exit when (Get_Kind (T)
+                    not in Iir_Kinds_Composite_Subtype_Definition);
+         T := Get_Parent_Type (T);
+      end loop;
+      return False;
+   end Is_A_Derived_Type;
+
+   procedure Copy_Check_Bounds_Inner (Bnd : Mnode;
+                                      Expr_Type : Iir;
+                                      Res_Bnd : Mnode;
+                                      Res_Type : Iir;
+                                      Do_Copy : Boolean;
+                                      Failure_Label : O_Snode)
+   is
+      --  Stabilized bounds.
+      S_Bnd : Mnode;
+      S_Res_Bnd : Mnode;
+   begin
+      S_Bnd := Stabilize (Bnd);
+      if Res_Bnd = Mnode_Null then
+         S_Res_Bnd := Mnode_Null;
+         pragma Assert (not Do_Copy);
+      else
+         S_Res_Bnd := Stabilize (Res_Bnd);
+      end if;
+      pragma Unreferenced (Bnd, Res_Bnd);
+
+      case Iir_Kinds_Composite_Type_Definition (Get_Kind (Res_Type)) is
+         when Iir_Kind_Array_Type_Definition =>
+            --  Unconstrained by definition.
+            raise Internal_Error;
+         when Iir_Kind_Array_Subtype_Definition =>
+            if Get_Index_Constraint_Flag (Res_Type) then
+               declare
+                  Expr_Indexes : constant Iir_Flist :=
+                    Get_Index_Subtype_List (Expr_Type);
+                  Rng : Mnode;
+                  Res_Rng : Mnode;
+                  Res_Length : O_Enode;
+               begin
+                  for I in 1 .. Get_Nbr_Elements (Expr_Indexes) loop
+                     Open_Temp;
+                     Rng := Chap3.Bounds_To_Range (S_Bnd, Expr_Type, I);
+                     if S_Res_Bnd = Mnode_Null then
+                        Res_Rng := Mnode_Null;
+                     else
+                        Res_Rng :=
+                          Chap3.Bounds_To_Range (S_Res_Bnd, Res_Type, I);
+                     end if;
+                     if Do_Copy then
+                        Stabilize (Rng);
+                        Stabilize (Res_Rng);
+                     end if;
+                     if S_Res_Bnd = Mnode_Null then
+                        Res_Length := New_Lit
+                          (New_Index_Lit
+                             (Unsigned_64
+                                (Eval_Discrete_Type_Length
+                                   (Get_Index_Type (Res_Type, I - 1)))));
+                     else
+                        Res_Length := M2E (Chap3.Range_To_Length (Res_Rng));
+                     end if;
+                     Gen_Exit_When
+                       (Failure_Label,
+                        New_Compare_Op (ON_Neq,
+                                        M2E (Chap3.Range_To_Length (Rng)),
+                                        Res_Length,
+                                        Ghdl_Bool_Type));
+
+                     if Do_Copy then
+                        Chap3.Copy_Range_No_Length (Rng, Res_Rng);
+                     end if;
+                     Close_Temp;
+                  end loop;
+               end;
+            end if;
+
             declare
-               Expr_Indexes  : constant Iir_Flist :=
-                 Get_Index_Subtype_List (Expr_Type);
+               Expr_El_Type : constant Iir := Get_Element_Subtype (Expr_Type);
+               Res_El_Type : constant Iir := Get_Element_Subtype (Res_Type);
+               Res_El_Bnd : Mnode;
             begin
-               for I in 1 .. Get_Nbr_Elements (Expr_Indexes) loop
-                  Gen_Exit_When
-                    (Failure_Label,
-                     New_Compare_Op
-                       (ON_Neq,
-                        M2E (Chap3.Range_To_Length
-                               (Chap3.Bounds_To_Range
-                                  (Stable_Bounds, Expr_Type, I))),
-                        Chap6.Get_Array_Bound_Length
-                          (T2M (Atype, Mode_Value), Atype, I),
-                        Ghdl_Bool_Type));
-               end loop;
+               if (Get_Kind (Expr_El_Type)
+                     not in Iir_Kinds_Composite_Type_Definition)
+               then
+                  return;
+               end if;
+
+               if Is_A_Derived_Type (Expr_El_Type, Res_El_Type) then
+                  return;
+               end if;
+
+               if S_Res_Bnd = Mnode_Null then
+                  Res_El_Bnd := Mnode_Null;
+               else
+                  Res_El_Bnd :=
+                    Chap3.Array_Bounds_To_Element_Bounds (S_Res_Bnd, Res_Type);
+               end if;
+               Copy_Check_Bounds_Inner
+                 (Chap3.Array_Bounds_To_Element_Bounds (S_Bnd, Expr_Type),
+                  Expr_El_Type,
+                  Res_El_Bnd, Res_El_Type,
+                  Do_Copy, Failure_Label);
             end;
-         when Iir_Kind_Record_Type_Definition
-           | Iir_Kind_Record_Subtype_Definition =>
+         when Iir_Kind_Record_Type_Definition =>
+            --  Not derived by definition
+            raise Internal_Error;
+         when Iir_Kind_Record_Subtype_Definition =>
             declare
                Expr_Els : constant Iir_Flist :=
                  Get_Elements_Declaration_List (Expr_Type);
-               Atype_Els : constant Iir_Flist :=
-                 Get_Elements_Declaration_List (Atype);
-               Expr_El, Atype_El : Iir;
-               Expr_El_Type, Atype_El_Type : Iir;
+               Res_Els : constant Iir_Flist :=
+                 Get_Elements_Declaration_List (Res_Type);
+               Expr_El, Res_El : Iir;
+               Expr_El_Type, Res_El_Type : Iir;
+               Res_El_Bnd : Mnode;
             begin
                for I in Flist_First .. Flist_Last (Expr_Els) loop
                   Expr_El := Get_Nth_Element (Expr_Els, I);
-                  Atype_El := Get_Nth_Element (Atype_Els, I);
+                  Res_El := Get_Nth_Element (Res_Els, I);
                   Expr_El_Type := Get_Type (Expr_El);
-                  Atype_El_Type := Get_Type (Atype_El);
-                  if Expr_El_Type /= Atype_El_Type then
-                     Convert_To_Constrained_Check
+                  Res_El_Type := Get_Type (Res_El);
+                  if Expr_El_Type /= Res_El_Type then
+                     if S_Res_Bnd = Mnode_Null then
+                        Res_El_Bnd := Mnode_Null;
+                     else
+                        Res_El_Bnd := Chap3.Record_Bounds_To_Element_Bounds
+                          (S_Res_Bnd, Res_El);
+                     end if;
+                     Copy_Check_Bounds_Inner
                        (Chap3.Record_Bounds_To_Element_Bounds
-                          (Stable_Bounds, Expr_El),
-                        Expr_El_Type, Atype_El_Type, Failure_Label);
+                          (S_Bnd, Expr_El),
+                        Expr_El_Type,
+                        Res_El_Bnd, Res_El_Type,
+                        Do_Copy, Failure_Label);
                   end if;
                end loop;
             end;
-         when others =>
-            Error_Kind ("convert_unconstrained_to_constrained_check",
-                        Expr_Type);
       end case;
-      Close_Temp;
-   end Convert_To_Constrained_Check;
+   end Copy_Check_Bounds_Inner;
 
-   function Convert_To_Constrained
-     (Expr : Mnode; Expr_Type : Iir; Atype : Iir; Loc : Iir) return Mnode
+   --  Perform a subtype conversions on bounds.
+   --  BND are the bounds of the results and can be modified (it's a copy).
+   --  EXPR_TYPE is the composite type whose bounds are described by BND.
+   --  RES_TYPE is the composite type of the result (partially constrained),
+   --  while RES_BND are the bounds of the composite type.
+   procedure Copy_Check_Bounds (Bnd : Mnode;
+                                Expr_Type : Iir;
+                                Res_Bnd : Mnode;
+                                Res_Type : Iir;
+                                Do_Copy : Boolean;
+                                Loc : Iir)
    is
-      Parent_Type : Iir;
-      Expr_Stable   : Mnode;
       Success_Label : O_Snode;
       Failure_Label : O_Snode;
    begin
       --  If ATYPE is a parent type of EXPR_TYPE, then all the constrained
       --  are inherited and there is nothing to check.
-      Parent_Type := Expr_Type;
-      loop
-         if Parent_Type = Atype then
-            return Expr;
-         end if;
-         exit when (Get_Kind (Parent_Type)
-                    not in Iir_Kinds_Composite_Subtype_Definition);
-         Parent_Type := Get_Parent_Type (Parent_Type);
-      end loop;
+      if Is_A_Derived_Type (Expr_Type, Res_Type) then
+         return;
+      end if;
 
-      Expr_Stable := Stabilize (Expr);
-
-      Open_Temp;
       --  Check each dimension.
       Start_Loop_Stmt (Success_Label);
       Start_Loop_Stmt (Failure_Label);
 
-      Convert_To_Constrained_Check
-        (Chap3.Get_Composite_Bounds (Expr_Stable), Expr_Type,
-         Atype, Failure_Label);
+      Open_Temp;
+      Copy_Check_Bounds_Inner
+        (Bnd, Expr_Type, Res_Bnd, Res_Type, Do_Copy, Failure_Label);
+      Close_Temp;
 
       New_Exit_Stmt (Success_Label);
 
       Finish_Loop_Stmt (Failure_Label);
       Chap6.Gen_Bound_Error (Loc);
       Finish_Loop_Stmt (Success_Label);
-      Close_Temp;
+   end Copy_Check_Bounds;
+
+   function Convert_Constrained_To_Constrained (Expr : Mnode;
+                                                Expr_Type : Iir;
+                                                Res_Type : Iir;
+                                                Loc : Iir) return Mnode
+   is
+      Expr_Stable   : Mnode;
+      Res_Tinfo : Type_Info_Acc;
+      Res_Bnd : Mnode;
+   begin
+      --  If RES_TYPE is a parent type of EXPR_TYPE, then all the constrained
+      --  are inherited and there is nothing to check.
+      if Is_A_Derived_Type (Expr_Type, Res_Type) then
+         return Expr;
+      end if;
+
+      Expr_Stable := Stabilize (Expr);
+
+      Res_Tinfo := Get_Info (Res_Type);
+      if Res_Tinfo.Type_Mode = Type_Mode_Static_Array
+        or else Res_Tinfo.Type_Mode = Type_Mode_Static_Record
+      then
+         Res_Bnd := Mnode_Null;
+      else
+         Res_Bnd := Chap3.Get_Composite_Type_Bounds (Res_Type);
+      end if;
+
+      Copy_Check_Bounds
+        (Chap3.Get_Composite_Bounds (Expr_Stable), Expr_Type,
+         Res_Bnd, Res_Type,
+         False, Loc);
 
       declare
-         Ainfo : constant Type_Info_Acc := Get_Info (Atype);
+         Res_Tinfo : constant Type_Info_Acc := Get_Info (Res_Type);
          Kind : constant Object_Kind_Type := Get_Object_Kind (Expr);
          Nptr : O_Enode;
       begin
          --  Pointer to the array.
          Nptr := M2E (Chap3.Get_Composite_Base (Expr_Stable));
          --  Convert it to pointer to the constrained type.
-         Nptr := New_Convert_Ov (Nptr, Ainfo.Ortho_Ptr_Type (Kind));
-         return E2M (Nptr, Ainfo, Kind);
+         Nptr := New_Convert_Ov (Nptr, Res_Tinfo.Ortho_Ptr_Type (Kind));
+         return E2M (Nptr, Res_Tinfo, Kind);
       end;
-   end Convert_To_Constrained;
+   end Convert_Constrained_To_Constrained;
+
+   function Convert_Unconstrained_To_Partially_Constrained
+     (Expr : Mnode; Expr_Type : Iir; Res_Type : Iir; Loc : Iir) return Mnode
+   is
+      Res_Tinfo : constant Type_Info_Acc := Get_Info (Res_Type);
+      Kind : constant Object_Kind_Type := Get_Object_Kind (Expr);
+      Stable_Expr : Mnode;
+      Res  : Mnode;
+      Bnd : Mnode;
+      Res_Bnd : Mnode;
+      Expr_Bnd : Mnode;
+   begin
+      if Is_A_Derived_Type (Expr_Type, Res_Type) then
+         return Expr;
+      end if;
+
+      Stable_Expr := Stabilize (Expr);
+
+      --  Allocate result (the fat pointer).
+      --  TODO: could we reuse EXPR (also a fat pointer) ?
+      Res := Create_Temp (Res_Tinfo, Kind);
+
+      --  Copy pointer to the data.
+      New_Assign_Stmt
+        (M2Lp (Chap3.Get_Composite_Base (Res)),
+         New_Convert_Ov (M2Addr (Chap3.Get_Composite_Base (Stable_Expr)),
+                         Res_Tinfo.B.Base_Ptr_Type (Kind)));
+
+      --  Allocate new bounds.
+      Bnd := Create_Temp_Bounds (Res_Tinfo);
+      New_Assign_Stmt
+        (M2Lp (Chap3.Get_Composite_Bounds (Res)), M2Addr (Bnd));
+
+      --  Copy existing bounds
+      --  Most of them (in particular offsets and sizes) are correct.
+      Expr_Bnd := Chap3.Get_Composite_Bounds (Stable_Expr);
+      Gen_Memcpy (M2Addr (Bnd), M2Addr (Expr_Bnd),
+                  New_Lit (New_Sizeof (Res_Tinfo.B.Bounds_Type,
+                                       Ghdl_Index_Type)));
+
+      --  Copy/check bounds.
+      Res_Bnd := Chap3.Get_Composite_Type_Bounds (Res_Type);
+      Copy_Check_Bounds (Bnd, Expr_Type, Res_Bnd, Res_Type, True, Loc);
+
+      return Res;
+   end Convert_Unconstrained_To_Partially_Constrained;
+
+   --  EXPR is fully constrained, check and create bounds.
+   function Convert_Constrained_To_Partially_Constrained
+     (Expr : Mnode; Expr_Type : Iir; Res_Type : Iir; Loc : Iir) return Mnode
+   is
+      Res_Tinfo : constant Type_Info_Acc := Get_Info (Res_Type);
+      Kind : constant Object_Kind_Type := Get_Object_Kind (Expr);
+      Stable_Expr : Mnode;
+      Res  : Mnode;
+      Bnd : Mnode;
+      Res_Bnd : Mnode;
+      Expr_Bnd : Mnode;
+   begin
+      Stable_Expr := Stabilize (Expr);
+
+      --  Allocate result (the fat pointer).
+      --  TODO: could we reuse EXPR (also a fat pointer) ?
+      Res := Create_Temp (Res_Tinfo, Kind);
+
+      --  Copy pointer to the data.
+      New_Assign_Stmt
+        (M2Lp (Chap3.Get_Composite_Base (Res)),
+         New_Convert_Ov (M2Addr (Chap3.Get_Composite_Base (Stable_Expr)),
+                         Res_Tinfo.B.Base_Ptr_Type (Kind)));
+
+      if Is_A_Derived_Type (Expr_Type, Res_Type) then
+         --  Copy existing bounds
+         Expr_Bnd := Chap3.Get_Composite_Bounds (Stable_Expr);
+         New_Assign_Stmt
+           (M2Lp (Chap3.Get_Composite_Bounds (Res)), M2Addr (Expr_Bnd));
+      else
+         --  Allocate new bounds.
+         Bnd := Create_Temp_Bounds (Res_Tinfo);
+         New_Assign_Stmt
+           (M2Lp (Chap3.Get_Composite_Bounds (Res)), M2Addr (Bnd));
+
+         --  Copy existing bounds
+         --  Most of them (in particular offsets and sizes) are correct.
+         Expr_Bnd := Chap3.Get_Composite_Bounds (Stable_Expr);
+         Gen_Memcpy (M2Addr (Bnd), M2Addr (Expr_Bnd),
+                     New_Lit (New_Sizeof (Res_Tinfo.B.Bounds_Type,
+                                          Ghdl_Index_Type)));
+
+         --  Copy/check bounds.
+         Res_Bnd := Chap3.Get_Composite_Type_Bounds (Res_Type);
+         Copy_Check_Bounds (Bnd, Expr_Type, Res_Bnd, Res_Type, True, Loc);
+      end if;
+      return Res;
+   end Convert_Constrained_To_Partially_Constrained;
 
    function Translate_Implicit_Array_Conversion
      (Expr : Mnode; Expr_Type : Iir; Res_Type : Iir; Loc : Iir) return Mnode
@@ -963,6 +1199,7 @@ package body Trans.Chap7 is
       Res_Tinfo : Type_Info_Acc;
       Einfo : Type_Info_Acc;
       Mode  : Object_Kind_Type;
+      Expr_State, Res_State : Iir_Constraint;
    begin
       pragma Assert
         (Get_Kind (Expr_Type) in Iir_Kinds_Array_Type_Definition);
@@ -971,47 +1208,59 @@ package body Trans.Chap7 is
          return Expr;
       end if;
 
-      Res_Tinfo := Get_Info (Res_Type);
-      Einfo := Get_Info (Expr_Type);
-      case Res_Tinfo.Type_Mode is
-         when Type_Mode_Unbounded_Array =>
-            --  X to unconstrained.
-            case Einfo.Type_Mode is
-               when Type_Mode_Unbounded_Array =>
-                  --  unconstrained to unconstrained.
-                  return Expr;
-               when Type_Mode_Bounded_Arrays =>
-                  --  constrained to unconstrained.
-                  return Convert_Constrained_To_Unconstrained
-                    (Expr, Res_Tinfo);
-               when others =>
-                  raise Internal_Error;
+      Expr_State := Get_Constraint_State (Expr_Type);
+      Res_State := Get_Constraint_State (Res_Type);
+      case Expr_State is
+         when Fully_Constrained =>
+            case Res_State is
+               when Fully_Constrained =>
+                  --  Fully to fully.
+                  Einfo := Get_Info (Expr_Type);
+                  Res_Tinfo := Get_Info (Res_Type);
+                  if Einfo.Type_Mode = Type_Mode_Static_Array
+                    and then Res_Tinfo.Type_Mode = Type_Mode_Static_Array
+                  then
+                     --  FIXME: optimize static vs non-static
+                     --  constrained to constrained.
+                     if Chap3.Locally_Types_Match (Expr_Type, Res_Type) /= True
+                     then
+                        --  FIXME: generate a bound error ?
+                        --  Even if this is caught at compile-time,
+                        --  the code is not required to run.
+                        Chap6.Gen_Bound_Error (Loc);
+                     end if;
+                     --  Convert.  For subtypes of arrays with
+                     --  unbounded elements, the subtype can be the
+                     --  same but the ortho type can be different.
+                     Mode := Get_Object_Kind (Expr);
+                     return E2M
+                       (New_Convert_Ov (M2Addr (Expr),
+                                        Res_Tinfo.Ortho_Ptr_Type (Mode)),
+                        Res_Tinfo, Mode);
+                  else
+                     --  Unbounded/bounded array to bounded array.
+                     return Convert_Constrained_To_Constrained
+                       (Expr, Expr_Type, Res_Type, Loc);
+                  end if;
+               when Unconstrained
+                 | Partially_Constrained =>
+                  return Convert_Constrained_To_Partially_Constrained
+                    (Expr, Expr_Type, Res_Type, Loc);
             end case;
-         when Type_Mode_Static_Array =>
-            if Einfo.Type_Mode = Type_Mode_Static_Array then
-               --  FIXME: optimize static vs non-static
-               --  constrained to constrained.
-               if Chap3.Locally_Types_Match (Expr_Type, Res_Type) /= True then
-                  --  FIXME: generate a bound error ?
-                  --  Even if this is caught at compile-time,
-                  --  the code is not required to run.
-                  Chap6.Gen_Bound_Error (Loc);
-               end if;
-               --  Convert.  For subtypes of arrays with unbounded elements,
-               --  the subtype can be the same but the ortho type can be
-               --  different.
-               Mode := Get_Object_Kind (Expr);
-               return E2M (New_Convert_Ov (M2Addr (Expr),
-                                           Res_Tinfo.Ortho_Ptr_Type (Mode)),
-                           Res_Tinfo, Mode);
-            else
-               --  Unbounded/bounded array to bounded array.
-               return Convert_To_Constrained (Expr, Expr_Type, Res_Type, Loc);
-            end if;
-         when Type_Mode_Complex_Array =>
-            return Convert_To_Constrained (Expr, Expr_Type, Res_Type, Loc);
-         when others =>
-            raise Internal_Error;
+         when Partially_Constrained
+           | Unconstrained =>
+            case Res_State is
+               when Unconstrained =>
+                  --  Not constrained to unconstrained.
+                  --  Already a fat pointer.
+                  return Expr;
+               when Partially_Constrained =>
+                  return Convert_Unconstrained_To_Partially_Constrained
+                    (Expr, Expr_Type, Res_Type, Loc);
+               when Fully_Constrained =>
+                  return Convert_Constrained_To_Constrained
+                    (Expr, Expr_Type, Res_Type, Loc);
+            end case;
       end case;
    end Translate_Implicit_Array_Conversion;
 
@@ -1043,7 +1292,8 @@ package body Trans.Chap7 is
             end case;
          when Type_Mode_Bounded_Records =>
             --  X to bounded
-            return Convert_To_Constrained (Expr, Expr_Type, Res_Type, Loc);
+            return Convert_Constrained_To_Constrained
+              (Expr, Expr_Type, Res_Type, Loc);
          when others =>
             raise Internal_Error;
       end case;
@@ -1054,8 +1304,7 @@ package body Trans.Chap7 is
                                      Expr_Type : Iir;
                                      Atype     : Iir;
                                      Is_Sig    : Object_Kind_Type;
-                                     Loc       : Iir)
-                                    return O_Enode is
+                                     Loc       : Iir) return O_Enode is
    begin
       --  Same type: nothing to do.
       if Atype = Expr_Type then
@@ -1476,13 +1725,25 @@ package body Trans.Chap7 is
             Bnd := Chap3.Get_Composite_Bounds (Dyn_Mnodes (1));
             if Res_Type = Expr_Type then
                Bnd := Chap3.Array_Bounds_To_Element_Layout (Bnd, Expr_Type);
+               Gen_Memcpy
+                 (M2Addr (Chap3.Array_Bounds_To_Element_Layout
+                            (Var_Bounds, Expr_Type)),
+                  M2Addr (Bnd),
+                  New_Lit (New_Sizeof (Get_Info (El_Type).B.Layout_Type,
+                                       Ghdl_Index_Type)));
+            else
+               Gen_Memcpy
+                 (M2Addr (Chap3.Array_Bounds_To_Element_Bounds
+                            (Var_Bounds, Expr_Type)),
+                  M2Addr (Bnd),
+                  New_Lit (New_Sizeof (Get_Info (El_Type).B.Bounds_Type,
+                                       Ghdl_Index_Type)));
+               --  Compute size.
+               Chap3.Gen_Call_Type_Builder
+                 (Chap3.Array_Bounds_To_Element_Layout (Var_Bounds, Expr_Type),
+                  Get_Element_Subtype (Expr_Type),
+                  Mode_Value);
             end if;
-            Gen_Memcpy
-              (M2Addr (Chap3.Array_Bounds_To_Element_Layout
-                         (Var_Bounds, Expr_Type)),
-               M2Addr (Bnd),
-               New_Lit (New_Sizeof (Get_Info (El_Type).B.Layout_Type,
-                                    Ghdl_Index_Type)));
          end if;
       end Eval_One;
 
@@ -4272,9 +4533,138 @@ package body Trans.Chap7 is
       end case;
    end Translate_Allocator_By_Subtype;
 
+   --  Convert the bounds of an array (and only the bounds).
+   procedure Translate_Type_Conversion_Array_Bounds
+     (Res : Mnode; Src : Mnode; Res_Type : Iir; Src_Type : Iir; Loc : Iir)
+   is
+      Res_Indexes  : constant Iir_Flist := Get_Index_Subtype_List (Res_Type);
+      Src_Indexes  : constant Iir_Flist := Get_Index_Subtype_List (Src_Type);
+      Res_Base_Type    : constant Iir := Get_Base_Type (Res_Type);
+      Src_Base_Type    : constant Iir := Get_Base_Type (Src_Type);
+      Res_Base_Indexes : constant Iir_Flist :=
+        Get_Index_Subtype_List (Res_Base_Type);
+      Src_Base_Indexes : constant Iir_Flist :=
+        Get_Index_Subtype_List (Src_Base_Type);
+   begin
+      --  Convert bounds.
+      for I in Flist_First .. Flist_Last (Src_Indexes) loop
+         declare
+            Res_Idx : constant Iir := Get_Index_Type (Res_Indexes, I);
+            Src_Idx : constant Iir := Get_Index_Type (Src_Indexes, I);
+            Same_Index_Type : constant Boolean :=
+              (Get_Index_Type (Res_Base_Indexes, I)
+               = Get_Index_Type (Src_Base_Indexes, I));
+            Rb_Ptr          : Mnode;
+            Sb_Ptr          : Mnode;
+            Ee              : O_Enode;
+         begin
+            Open_Temp;
+            Rb_Ptr := Stabilize (Chap3.Bounds_To_Range (Res, Res_Type, I + 1));
+            Sb_Ptr := Stabilize (Chap3.Bounds_To_Range (Src, Src_Type, I + 1));
+            --  Convert left and right (unless they have the same type -
+            --  this is an optimization but also this deals with null
+            --  array in common cases).
+            Ee := M2E (Chap3.Range_To_Left (Sb_Ptr));
+            if not Same_Index_Type then
+               Ee := Translate_Type_Conversion (Ee, Src_Idx, Res_Idx, Loc);
+            end if;
+            New_Assign_Stmt (M2Lv (Chap3.Range_To_Left (Rb_Ptr)), Ee);
+            Ee := M2E (Chap3.Range_To_Right (Sb_Ptr));
+            if not Same_Index_Type then
+               Ee := Translate_Type_Conversion (Ee, Src_Idx, Res_Idx, Loc);
+            end if;
+            New_Assign_Stmt (M2Lv (Chap3.Range_To_Right (Rb_Ptr)), Ee);
+            --  Copy Dir and Length.
+            New_Assign_Stmt (M2Lv (Chap3.Range_To_Dir (Rb_Ptr)),
+                             M2E (Chap3.Range_To_Dir (Sb_Ptr)));
+            New_Assign_Stmt (M2Lv (Chap3.Range_To_Length (Rb_Ptr)),
+                             M2E (Chap3.Range_To_Length (Sb_Ptr)));
+            Close_Temp;
+         end;
+      end loop;
+
+      --  TODO: element layout
+      --  array: same sizes, bounds: recurse; but constrained states can be
+      --     different.
+      --  record: no conversion, simply copy ?
+      declare
+         Res_El_Type : constant Iir := Get_Element_Subtype (Res_Type);
+         Src_El_Type : constant Iir := Get_Element_Subtype (Src_Type);
+         Res_El : Mnode;
+         Src_El : Mnode;
+      begin
+         if Is_Fully_Constrained_Type (Res_El_Type)
+           and then Is_Fully_Constrained_Type (Src_El_Type)
+         then
+            --  No need to convert.
+            --  TODO: still check matching length (if not same type).
+            return;
+         end if;
+
+         --  TODO: if the subtype is fully bounded, get the subtype bounds
+         --  directly (and not from the object bounds).
+         Res_El := Stabilize
+           (Chap3.Array_Bounds_To_Element_Layout (Res, Res_Type));
+         Src_El := Stabilize
+           (Chap3.Array_Bounds_To_Element_Layout (Src, Src_Type));
+
+         if Res_El_Type = Src_El_Type then
+            --  TODO: copy layout, no need to check.
+            raise Internal_Error;
+         else
+            --  TODO: copy or convert.
+            --  1. Copy layout size
+            for K in Object_Kind_Type loop
+               New_Assign_Stmt (Chap3.Layout_To_Size (Res_El, K),
+                                New_Value (Chap3.Layout_To_Size (Res_El, K)));
+            end loop;
+
+            --  2. Recurse on bounds
+            Translate_Type_Conversion_Array_Bounds
+              (Stabilize (Chap3.Layout_To_Bounds (Res_El)),
+               Stabilize (Chap3.Layout_To_Bounds (Src_El)),
+               Res_El_Type, Src_El_Type, Loc);
+         end if;
+      end;
+   end Translate_Type_Conversion_Array_Bounds;
+
    function Translate_Fat_Array_Type_Conversion
      (Expr : O_Enode; Expr_Type : Iir; Res_Type : Iir; Loc : Iir)
-     return O_Enode;
+     return O_Enode
+   is
+      Res_Info  : constant Type_Info_Acc := Get_Info (Res_Type);
+      Expr_Info : constant Type_Info_Acc := Get_Info (Expr_Type);
+
+      Res       : Mnode;
+      E         : Mnode;
+      Bounds    : O_Dnode;
+   begin
+      Res := Create_Temp (Res_Info, Mode_Value);
+      Bounds := Create_Temp (Res_Info.B.Bounds_Type);
+
+      Open_Temp;
+      E := Stabilize (E2M (Expr, Expr_Info, Mode_Value));
+
+      --  Set base.
+      New_Assign_Stmt
+        (M2Lp (Chap3.Get_Composite_Base (Res)),
+         New_Convert_Ov (M2Addr (Chap3.Get_Composite_Base (E)),
+           Res_Info.B.Base_Ptr_Type (Mode_Value)));
+      --  Set bounds.
+      New_Assign_Stmt
+        (M2Lp (Chap3.Get_Composite_Bounds (Res)),
+         New_Address (New_Obj (Bounds), Res_Info.B.Bounds_Ptr_Type));
+
+      --  Convert bounds.
+      Translate_Type_Conversion_Array_Bounds
+        (Dv2M (Bounds, Res_Info, Mode_Value,
+               Res_Info.B.Bounds_Type, Res_Info.B.Bounds_Ptr_Type),
+         Stabilize (Chap3.Get_Composite_Bounds (E)),
+         Res_Type, Expr_Type, Loc);
+
+      Close_Temp;
+      return M2E (Res);
+   end Translate_Fat_Array_Type_Conversion;
 
    function Translate_Array_Subtype_Conversion
      (Expr : O_Enode; Expr_Type : Iir; Res_Type : Iir; Loc : Iir)
@@ -4338,97 +4728,6 @@ package body Trans.Chap7 is
             Error_Kind ("translate_type_conversion", Res_Type);
       end case;
    end Translate_Type_Conversion;
-
-   procedure Translate_Type_Conversion_Bounds
-     (Res : Mnode; Src : Mnode; Res_Type : Iir; Src_Type : Iir; Loc : Iir)
-   is
-      Res_Indexes  : constant Iir_Flist := Get_Index_Subtype_List (Res_Type);
-      Src_Indexes  : constant Iir_Flist := Get_Index_Subtype_List (Src_Type);
-      Res_Base_Type    : constant Iir := Get_Base_Type (Res_Type);
-      Src_Base_Type    : constant Iir := Get_Base_Type (Src_Type);
-      Res_Base_Indexes : constant Iir_Flist :=
-        Get_Index_Subtype_List (Res_Base_Type);
-      Src_Base_Indexes : constant Iir_Flist :=
-        Get_Index_Subtype_List (Src_Base_Type);
-
-      R_El              : Iir;
-      S_El              : Iir;
-   begin
-      --  Convert bounds.
-      for I in Flist_First .. Flist_Last (Src_Indexes) loop
-         R_El := Get_Index_Type (Res_Indexes, I);
-         S_El := Get_Index_Type (Src_Indexes, I);
-         declare
-            Rb_Ptr          : Mnode;
-            Sb_Ptr          : Mnode;
-            Ee              : O_Enode;
-            Same_Index_Type : constant Boolean :=
-              (Get_Index_Type (Res_Base_Indexes, I)
-               = Get_Index_Type (Src_Base_Indexes, I));
-         begin
-            Open_Temp;
-            Rb_Ptr := Stabilize (Chap3.Bounds_To_Range (Res, Res_Type, I + 1));
-            Sb_Ptr := Stabilize (Chap3.Bounds_To_Range (Src, Src_Type, I + 1));
-            --  Convert left and right (unless they have the same type -
-            --  this is an optimization but also this deals with null
-            --  array in common cases).
-            Ee := M2E (Chap3.Range_To_Left (Sb_Ptr));
-            if not Same_Index_Type then
-               Ee := Translate_Type_Conversion (Ee, S_El, R_El, Loc);
-            end if;
-            New_Assign_Stmt (M2Lv (Chap3.Range_To_Left (Rb_Ptr)), Ee);
-            Ee := M2E (Chap3.Range_To_Right (Sb_Ptr));
-            if not Same_Index_Type then
-               Ee := Translate_Type_Conversion (Ee, S_El, R_El, Loc);
-            end if;
-            New_Assign_Stmt (M2Lv (Chap3.Range_To_Right (Rb_Ptr)), Ee);
-            --  Copy Dir and Length.
-            New_Assign_Stmt (M2Lv (Chap3.Range_To_Dir (Rb_Ptr)),
-                             M2E (Chap3.Range_To_Dir (Sb_Ptr)));
-            New_Assign_Stmt (M2Lv (Chap3.Range_To_Length (Rb_Ptr)),
-                             M2E (Chap3.Range_To_Length (Sb_Ptr)));
-            Close_Temp;
-         end;
-      end loop;
-   end Translate_Type_Conversion_Bounds;
-
-   function Translate_Fat_Array_Type_Conversion
-     (Expr : O_Enode; Expr_Type : Iir; Res_Type : Iir; Loc : Iir)
-     return O_Enode
-   is
-      Res_Info  : constant Type_Info_Acc := Get_Info (Res_Type);
-      Expr_Info : constant Type_Info_Acc := Get_Info (Expr_Type);
-
-      Res       : Mnode;
-      E         : Mnode;
-      Bounds    : O_Dnode;
-   begin
-      Res := Create_Temp (Res_Info, Mode_Value);
-      Bounds := Create_Temp (Res_Info.B.Bounds_Type);
-
-      Open_Temp;
-      E := Stabilize (E2M (Expr, Expr_Info, Mode_Value));
-
-      --  Set base.
-      New_Assign_Stmt
-        (M2Lp (Chap3.Get_Composite_Base (Res)),
-         New_Convert_Ov (M2Addr (Chap3.Get_Composite_Base (E)),
-           Res_Info.B.Base_Ptr_Type (Mode_Value)));
-      --  Set bounds.
-      New_Assign_Stmt
-        (M2Lp (Chap3.Get_Composite_Bounds (Res)),
-         New_Address (New_Obj (Bounds), Res_Info.B.Bounds_Ptr_Type));
-
-      --  Convert bounds.
-      Translate_Type_Conversion_Bounds
-        (Dv2M (Bounds, Res_Info, Mode_Value,
-               Res_Info.B.Bounds_Type, Res_Info.B.Bounds_Ptr_Type),
-         Stabilize (Chap3.Get_Composite_Bounds (E)),
-         Res_Type, Expr_Type, Loc);
-
-      Close_Temp;
-      return M2E (Res);
-   end Translate_Fat_Array_Type_Conversion;
 
    function Sig2val_Prepare_Composite
      (Targ : Mnode; Targ_Type : Iir; Data : Mnode) return Mnode
@@ -4740,6 +5039,7 @@ package body Trans.Chap7 is
             | Iir_Kind_Interface_Constant_Declaration
             | Iir_Kind_Interface_Variable_Declaration
             | Iir_Kind_Interface_Signal_Declaration
+            | Iir_Kind_Interface_View_Declaration
             | Iir_Kind_Interface_File_Declaration
             | Iir_Kind_Indexed_Name
             | Iir_Kind_Slice_Name

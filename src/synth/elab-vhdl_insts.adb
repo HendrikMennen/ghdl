@@ -102,7 +102,7 @@ package body Elab.Vhdl_Insts is
                            Dyn : Dyn_Name;
                         begin
                            Synth_Assignment_Prefix
-                             (Syn_Inst, Sub_Inst, Formal,
+                             (Syn_Inst, Formal,
                               Formal_Base, Formal_Typ, Formal_Offs, Dyn);
                            pragma Assert (Dyn = No_Dyn_Name);
                         end;
@@ -147,12 +147,17 @@ package body Elab.Vhdl_Insts is
 
             when Iir_Kind_Interface_Package_Declaration =>
                declare
-                  Actual : constant Iir :=
-                    Strip_Denoting_Name (Get_Actual (Assoc));
+                  Actual : Node;
                   Pkg_Inst : Synth_Instance_Acc;
                begin
-                  Pkg_Inst := Get_Package_Object (Sub_Inst, Actual);
-                  Create_Package_Interface (Sub_Inst, Inter, Pkg_Inst);
+                  if Get_Kind (Assoc) = Iir_Kind_Association_Element_Open
+                  then
+                     Elab_Package_Instantiation (Sub_Inst, Inter);
+                  else
+                     Actual := Strip_Denoting_Name (Get_Actual (Assoc));
+                     Pkg_Inst := Get_Package_Object (Sub_Inst, Actual);
+                     Create_Package_Interface (Sub_Inst, Inter, Pkg_Inst);
+                  end if;
                end;
 
             when Iir_Kind_Interface_Type_Declaration =>
@@ -165,8 +170,10 @@ package body Elab.Vhdl_Insts is
                      Act := Get_Type (Act);
                   end if;
                   if Get_Kind (Act) in Iir_Kinds_Subtype_Definition then
+                     --  Need to elaborate the subtype.
                      Act_Typ := Synth_Subtype_Indication (Syn_Inst, Act);
                   else
+                     --  An existing type.
                      Act_Typ := Get_Subtype_Object (Syn_Inst, Act);
                   end if;
                   Act_Typ := Unshare (Act_Typ, Instance_Pool);
@@ -178,6 +185,7 @@ package body Elab.Vhdl_Insts is
             when Iir_Kind_Interface_Variable_Declaration
                | Iir_Kind_Interface_File_Declaration
                | Iir_Kind_Interface_Signal_Declaration
+               | Iir_Kind_Interface_View_Declaration
                | Iir_Kind_Interface_Quantity_Declaration
                | Iir_Kind_Interface_Terminal_Declaration =>
                raise Internal_Error;
@@ -233,10 +241,27 @@ package body Elab.Vhdl_Insts is
    procedure Elab_Package_Instantiation
      (Parent_Inst : Synth_Instance_Acc; Pkg : Node)
    is
-      Bod : constant Node := Get_Instance_Package_Body (Pkg);
+      Uninst : constant Node := Get_Uninstantiated_Package_Decl (Pkg);
+      Bod : Node;
       Sub_Inst : Synth_Instance_Acc;
    begin
       Sub_Inst := Create_Package_Instance (Parent_Inst, Pkg);
+
+      if Get_Kind (Pkg) = Iir_Kind_Interface_Package_Declaration then
+         --  Not yet implemented: macro-expanded body for mapped package.
+         Bod := Null_Node;
+      else
+         Bod := Get_Instance_Package_Body (Pkg);
+      end if;
+
+      --  Set uninstantiated scope.
+      --  Technically this can be done later as it is needed only when
+      --  the body is used.  However some designs do access before elaboration,
+      --  and we need to detect that.
+      if Bod = Null_Node then
+         --  Shared body
+         Set_Uninstantiated_Scope (Sub_Inst, Uninst);
+      end if;
 
       Elab_Generics_Association
         (Sub_Inst, Parent_Inst,
@@ -246,15 +271,15 @@ package body Elab.Vhdl_Insts is
 
       if Bod /= Null_Node then
          --  Macro expanded package instantiation.
-         Elab_Declarations
-           (Sub_Inst, Get_Declaration_Chain (Bod));
+         if Get_Immediate_Body_Flag (Pkg) then
+            Elab_Declarations
+              (Sub_Inst, Get_Declaration_Chain (Bod));
+         end if;
       else
          --  Shared body
          declare
-            Uninst : constant Node := Get_Uninstantiated_Package_Decl (Pkg);
             Uninst_Bod : constant Node := Get_Package_Body (Uninst);
          begin
-            Set_Uninstantiated_Scope (Sub_Inst, Uninst);
             --  Synth declarations of (optional) body.
             if Uninst_Bod /= Null_Node then
                Elab_Declarations
@@ -264,11 +289,25 @@ package body Elab.Vhdl_Insts is
       end if;
    end Elab_Package_Instantiation;
 
+   procedure Elab_Package_Instantiation_Body
+     (Parent_Inst : Synth_Instance_Acc; Bod : Node)
+   is
+      Sub_Inst : Synth_Instance_Acc;
+   begin
+      Sub_Inst := Get_Package_Object (Parent_Inst, Bod);
+      Elab_Declarations
+        (Sub_Inst, Get_Declaration_Chain (Bod));
+   end Elab_Package_Instantiation_Body;
+
+   procedure Elab_Dependencies (Parent_Inst : Synth_Instance_Acc; Unit : Node);
+
    procedure Elab_Configuration_Declaration (Parent_Inst : Synth_Instance_Acc;
                                              Conf : Node)
    is
       Syn_Inst : Synth_Instance_Acc;
    begin
+      Elab_Dependencies (Root_Instance, Get_Design_Unit (Conf));
+
       Syn_Inst := Create_Package_Instance (Parent_Inst, Conf);
       Elab_Declarations (Syn_Inst, Get_Declaration_Chain (Conf));
    end Elab_Configuration_Declaration;
@@ -287,20 +326,21 @@ package body Elab.Vhdl_Insts is
            and then not Get_Elab_Flag (Dep)
          then
             Set_Elab_Flag (Dep, True);
-            Elab_Dependencies (Parent_Inst, Dep);
             Dep_Unit := Get_Library_Unit (Dep);
             case Iir_Kinds_Library_Unit (Get_Kind (Dep_Unit)) is
                when Iir_Kind_Entity_Declaration =>
                   null;
                when Iir_Kind_Configuration_Declaration =>
+                  Elab_Dependencies (Parent_Inst, Dep);
                   Elab_Configuration_Declaration (Parent_Inst, Dep_Unit);
                when Iir_Kind_Context_Declaration =>
-                  null;
+                  Elab_Dependencies (Parent_Inst, Dep);
                when Iir_Kind_Package_Declaration =>
                   declare
                      Bod : constant Node := Get_Package_Body (Dep_Unit);
                      Bod_Unit : Node;
                   begin
+                     Elab_Dependencies (Parent_Inst, Dep);
                      Elab_Package_Declaration (Parent_Inst, Dep_Unit);
                      --  Do not try to elaborate math_real body: there are
                      --  functions with loop.  Currently, try create signals,
@@ -312,6 +352,7 @@ package body Elab.Vhdl_Insts is
                      end if;
                   end;
                when Iir_Kind_Package_Instantiation_Declaration =>
+                  Elab_Dependencies (Parent_Inst, Dep);
                   Elab_Package_Instantiation (Parent_Inst, Dep_Unit);
                when Iir_Kind_Package_Body =>
                   null;
@@ -388,12 +429,14 @@ package body Elab.Vhdl_Insts is
                                         Inter : Node;
                                         Assoc : Node) return Type_Acc
    is
+      Inter_Type : constant Node := Get_Type (Inter);
+      Ind : Node;
       Marker : Mark_Type;
       Inter_Typ : Type_Acc;
       Val : Valtyp;
       Res : Type_Acc;
    begin
-      if not Is_Fully_Constrained_Type (Get_Type (Inter)) then
+      if not Is_Fully_Constrained_Type (Inter_Type) then
          --  TODO
          --  Find the association for this interface
          --  * if individual assoc: get type
@@ -412,6 +455,9 @@ package body Elab.Vhdl_Insts is
             Val := Synth_Expression_With_Type
               (Syn_Inst, Get_Actual (Assoc), Inter_Typ);
             Res := Val.Typ;
+            if Res /= null then
+               Res := Unshare (Res, Global_Pool'Access);
+            end if;
          else
             case Iir_Kinds_Association_Element_Parameters (Get_Kind (Assoc)) is
                when Iir_Kinds_Association_Element_By_Actual =>
@@ -423,9 +469,21 @@ package body Elab.Vhdl_Insts is
                   Res := Exec_Name_Subtype
                     (Syn_Inst, Get_Default_Value (Inter));
             end case;
+
+            if Res /= null then
+               Res := Unshare (Res, Global_Pool'Access);
+            end if;
+
+            Ind := Get_Subtype_Indication (Inter);
+            if Res /= null
+              and then Ind /= Null_Iir
+              and then Get_Kind (Ind) in Iir_Kinds_Subtype_Definition
+              and then not Get_Is_Ref (Inter)
+            then
+               Create_Subtype_Object (Sub_Inst, Inter_Type, Res);
+            end if;
          end if;
 
-         Res := Unshare (Res, Global_Pool'Access);
          Release_Expr_Pool (Marker);
          return Res;
       else
@@ -450,7 +508,9 @@ package body Elab.Vhdl_Insts is
          if Get_Whole_Association_Flag (Assoc) then
             Inter_Typ := Elab_Port_Association_Type
               (Sub_Inst, Syn_Inst, Inter, Assoc);
-            Create_Signal (Sub_Inst, Inter, Inter_Typ);
+            if Inter_Typ /= null then
+               Create_Signal (Sub_Inst, Inter, Inter_Typ);
+            end if;
          end if;
          Next_Association_Interface (Assoc, Assoc_Inter);
       end loop;
@@ -609,10 +669,11 @@ package body Elab.Vhdl_Insts is
            | Iir_Kind_Psl_Assume_Directive
            | Iir_Kind_Psl_Cover_Directive
            | Iir_Kind_Psl_Assert_Directive
+           | Iir_Kind_Psl_Endpoint_Declaration
            | Iir_Kind_Concurrent_Assertion_Statement =>
             null;
          when others =>
-            Error_Kind ("elab_recurse_instantiations_Statement", Stmt);
+            Error_Kind ("elab_recurse_instantiations_statement", Stmt);
       end case;
    end Elab_Recurse_Instantiations_Statement;
 
@@ -649,7 +710,7 @@ package body Elab.Vhdl_Insts is
          return;
       end if;
 
-      pragma Assert (Areapools.Is_Empty (Expr_Pool));
+      pragma Assert (Is_Expr_Pool_Empty);
 
       Entity := Get_Entity (Arch);
       Apply_Block_Configuration (Config, Arch);
@@ -657,29 +718,39 @@ package body Elab.Vhdl_Insts is
       Elab.Vhdl_Files.Set_Design_Unit (Arch);
 
       Elab_Declarations (Syn_Inst, Get_Declaration_Chain (Entity));
-      Elab_Concurrent_Statements
-        (Syn_Inst, Get_Concurrent_Statement_Chain (Entity));
+      pragma Assert (Is_Expr_Pool_Empty);
 
-      pragma Assert (Areapools.Is_Empty (Expr_Pool));
+      if not Is_Error (Syn_Inst) then
+         Elab_Concurrent_Statements
+           (Syn_Inst, Get_Concurrent_Statement_Chain (Entity));
+         pragma Assert (Is_Expr_Pool_Empty);
+      end if;
 
-      Elab_Verification_Units (Syn_Inst, Entity);
+      if not Is_Error (Syn_Inst) then
+         Elab_Verification_Units (Syn_Inst, Entity);
+         pragma Assert (Is_Expr_Pool_Empty);
+      end if;
 
-      pragma Assert (Areapools.Is_Empty (Expr_Pool));
+      if not Is_Error (Syn_Inst) then
+         Elab_Declarations (Syn_Inst, Get_Declaration_Chain (Arch));
+         pragma Assert (Is_Expr_Pool_Empty);
+      end if;
 
-      Elab_Declarations (Syn_Inst, Get_Declaration_Chain (Arch));
-      pragma Assert (Areapools.Is_Empty (Expr_Pool));
-      Elab_Concurrent_Statements
-        (Syn_Inst, Get_Concurrent_Statement_Chain (Arch));
+      if not Is_Error (Syn_Inst) then
+         Elab_Concurrent_Statements
+           (Syn_Inst, Get_Concurrent_Statement_Chain (Arch));
+         pragma Assert (Is_Expr_Pool_Empty);
+      end if;
 
-      pragma Assert (Areapools.Is_Empty (Expr_Pool));
+      if not Is_Error (Syn_Inst) then
+         Elab_Recurse_Instantiations (Syn_Inst, Arch);
+         pragma Assert (Areapools.Is_Empty (Expr_Pool));
+      end if;
 
-      Elab_Recurse_Instantiations (Syn_Inst, Arch);
-
-      pragma Assert (Areapools.Is_Empty (Expr_Pool));
-
-      Elab_Verification_Units (Syn_Inst, Arch);
-
-      pragma Assert (Areapools.Is_Empty (Expr_Pool));
+      if not Is_Error (Syn_Inst) then
+         Elab_Verification_Units (Syn_Inst, Arch);
+         pragma Assert (Areapools.Is_Empty (Expr_Pool));
+      end if;
    end Elab_Instance_Body;
 
    procedure Elab_Direct_Instantiation_Statement
@@ -971,6 +1042,8 @@ package body Elab.Vhdl_Insts is
       end loop;
 
       pragma Assert (Is_Expr_Pool_Empty);
+
+      Top_Instance := Top_Inst;
 
       Elab_Instance_Body (Top_Inst);
 

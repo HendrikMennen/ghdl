@@ -21,6 +21,9 @@ with Vhdl.Nodes; use Vhdl.Nodes;
 with Elab.Vhdl_Context; use Elab.Vhdl_Context;
 
 package Elab.Vhdl_Insts is
+   --  The result of Elab_Top_Unit, to handle external names.
+   Top_Instance : Synth_Instance_Acc;
+
    function Elab_Top_Unit (Config : Node) return Synth_Instance_Acc;
 
    procedure Elab_Generics_Association (Sub_Inst : Synth_Instance_Acc;
@@ -39,6 +42,8 @@ package Elab.Vhdl_Insts is
      (Parent_Inst : Synth_Instance_Acc; Pkg : Node; Bod : Node);
    procedure Elab_Package_Instantiation
      (Parent_Inst : Synth_Instance_Acc; Pkg : Node);
+   procedure Elab_Package_Instantiation_Body
+     (Parent_Inst : Synth_Instance_Acc; Bod : Node);
 
    procedure Elab_Component_Instantiation_Statement
      (Syn_Inst : Synth_Instance_Acc; Stmt : Node);

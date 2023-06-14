@@ -95,6 +95,7 @@ package Synth.Vhdl_Expr is
    Hook_Last_Event_Attribute : Hook_Attribute_Acc;
    Hook_Last_Active_Attribute : Hook_Attribute_Acc;
    Hook_Dot_Attribute : Hook_Attribute_Acc;
+   Hook_Endpoint : Hook_Attribute_Acc;
 
    --  Use base type of EXPR to synthesize EXPR.  Useful when the type of
    --  EXPR is defined by itself or a range.
@@ -118,10 +119,12 @@ package Synth.Vhdl_Expr is
    procedure Synth_Slice_Suffix (Syn_Inst : Synth_Instance_Acc;
                                  Name : Node;
                                  Pfx_Bnd : Bound_Type;
+                                 Order : Wkind_Type;
                                  El_Typ : Type_Acc;
                                  Res_Bnd : out Bound_Type;
                                  Inp : out Net;
-                                 Off : out Value_Offsets);
+                                 Off : out Value_Offsets;
+                                 Error : out Boolean);
 
    --  If VOFF is No_Net then OFF is valid, if VOFF is not No_Net then
    --  OFF is 0.

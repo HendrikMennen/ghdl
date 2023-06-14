@@ -68,7 +68,6 @@ package Vhdl.Nodes_Meta is
       Field_Analysis_Time_Stamp,
       Field_Design_File_Source,
       Field_Library,
-      Field_File_Dependence_List,
       Field_Design_File_Filename,
       Field_Design_File_Directory,
       Field_Design_File,
@@ -142,7 +141,9 @@ package Vhdl.Nodes_Meta is
       Field_Package,
       Field_Package_Body,
       Field_Instance_Package_Body,
+      Field_Owned_Instance_Package_Body,
       Field_Need_Body,
+      Field_Immediate_Body_Flag,
       Field_Macro_Expanded_Flag,
       Field_Need_Instance_Bodies,
       Field_Hierarchical_Name,
@@ -185,6 +186,7 @@ package Vhdl.Nodes_Meta is
       Field_Implicit_Definition,
       Field_Uninstantiated_Subprogram_Name,
       Field_Default_Value,
+      Field_Mode_View_Indication,
       Field_Deferred_Declaration,
       Field_Deferred_Declaration_Flag,
       Field_Shared_Flag,
@@ -199,6 +201,7 @@ package Vhdl.Nodes_Meta is
       Field_Context_Reference_Chain,
       Field_Inherit_Spec_Chain,
       Field_Selected_Name,
+      Field_Mode_View_Name,
       Field_Type_Declarator,
       Field_Complete_Type_Definition,
       Field_Incomplete_Type_Ref_Chain,
@@ -250,6 +253,8 @@ package Vhdl.Nodes_Meta is
       Field_Has_Array_Constraint_Flag,
       Field_Has_Element_Constraint_Flag,
       Field_Elements_Declaration_List,
+      Field_Elements_Definition_Chain,
+      Field_Elements_Definition_List,
       Field_Owned_Elements_Chain,
       Field_Designated_Type,
       Field_Designated_Subtype_Indication,
@@ -410,6 +415,7 @@ package Vhdl.Nodes_Meta is
       Field_Protected_Type_Body,
       Field_Protected_Type_Declaration,
       Field_Use_Flag,
+      Field_Elaborated_Flag,
       Field_End_Has_Reserved_Id,
       Field_End_Has_Identifier,
       Field_End_Has_Postponed,
@@ -666,7 +672,6 @@ package Vhdl.Nodes_Meta is
    function Has_Analysis_Time_Stamp (K : Iir_Kind) return Boolean;
    function Has_Design_File_Source (K : Iir_Kind) return Boolean;
    function Has_Library (K : Iir_Kind) return Boolean;
-   function Has_File_Dependence_List (K : Iir_Kind) return Boolean;
    function Has_Design_File_Filename (K : Iir_Kind) return Boolean;
    function Has_Design_File_Directory (K : Iir_Kind) return Boolean;
    function Has_Design_File (K : Iir_Kind) return Boolean;
@@ -741,7 +746,9 @@ package Vhdl.Nodes_Meta is
    function Has_Package (K : Iir_Kind) return Boolean;
    function Has_Package_Body (K : Iir_Kind) return Boolean;
    function Has_Instance_Package_Body (K : Iir_Kind) return Boolean;
+   function Has_Owned_Instance_Package_Body (K : Iir_Kind) return Boolean;
    function Has_Need_Body (K : Iir_Kind) return Boolean;
+   function Has_Immediate_Body_Flag (K : Iir_Kind) return Boolean;
    function Has_Macro_Expanded_Flag (K : Iir_Kind) return Boolean;
    function Has_Need_Instance_Bodies (K : Iir_Kind) return Boolean;
    function Has_Hierarchical_Name (K : Iir_Kind) return Boolean;
@@ -786,6 +793,7 @@ package Vhdl.Nodes_Meta is
    function Has_Uninstantiated_Subprogram_Name (K : Iir_Kind)
       return Boolean;
    function Has_Default_Value (K : Iir_Kind) return Boolean;
+   function Has_Mode_View_Indication (K : Iir_Kind) return Boolean;
    function Has_Deferred_Declaration (K : Iir_Kind) return Boolean;
    function Has_Deferred_Declaration_Flag (K : Iir_Kind) return Boolean;
    function Has_Shared_Flag (K : Iir_Kind) return Boolean;
@@ -800,6 +808,7 @@ package Vhdl.Nodes_Meta is
    function Has_Context_Reference_Chain (K : Iir_Kind) return Boolean;
    function Has_Inherit_Spec_Chain (K : Iir_Kind) return Boolean;
    function Has_Selected_Name (K : Iir_Kind) return Boolean;
+   function Has_Mode_View_Name (K : Iir_Kind) return Boolean;
    function Has_Type_Declarator (K : Iir_Kind) return Boolean;
    function Has_Complete_Type_Definition (K : Iir_Kind) return Boolean;
    function Has_Incomplete_Type_Ref_Chain (K : Iir_Kind) return Boolean;
@@ -853,6 +862,8 @@ package Vhdl.Nodes_Meta is
    function Has_Has_Array_Constraint_Flag (K : Iir_Kind) return Boolean;
    function Has_Has_Element_Constraint_Flag (K : Iir_Kind) return Boolean;
    function Has_Elements_Declaration_List (K : Iir_Kind) return Boolean;
+   function Has_Elements_Definition_Chain (K : Iir_Kind) return Boolean;
+   function Has_Elements_Definition_List (K : Iir_Kind) return Boolean;
    function Has_Owned_Elements_Chain (K : Iir_Kind) return Boolean;
    function Has_Designated_Type (K : Iir_Kind) return Boolean;
    function Has_Designated_Subtype_Indication (K : Iir_Kind)
@@ -1017,6 +1028,7 @@ package Vhdl.Nodes_Meta is
    function Has_Protected_Type_Body (K : Iir_Kind) return Boolean;
    function Has_Protected_Type_Declaration (K : Iir_Kind) return Boolean;
    function Has_Use_Flag (K : Iir_Kind) return Boolean;
+   function Has_Elaborated_Flag (K : Iir_Kind) return Boolean;
    function Has_End_Has_Reserved_Id (K : Iir_Kind) return Boolean;
    function Has_End_Has_Identifier (K : Iir_Kind) return Boolean;
    function Has_End_Has_Postponed (K : Iir_Kind) return Boolean;

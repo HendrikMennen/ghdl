@@ -498,6 +498,30 @@ package body Vhdl.Sem_Names is
       return Res;
    end Find_Declarations_In_List;
 
+   function Sem_Mode_View_Name (Name : Iir) return Iir
+   is
+      View : Iir;
+      Res : Iir;
+   begin
+      Sem_Name (Name);
+      View := Get_Named_Entity (Name);
+      if Is_Error (View) then
+         return View;
+      end if;
+
+      Res := Finish_Sem_Name (Name);
+
+      case Get_Kind (View) is
+         when Iir_Kind_Mode_View_Declaration
+           | Iir_Kind_Converse_Attribute =>
+            null;
+         when others =>
+            Error_Msg_Sem (+Res, "mode view name expected");
+            Res := Create_Error_Name (Res);
+      end case;
+      return Res;
+   end Sem_Mode_View_Name;
+
    --  If PREFIX is a function specification that cannot be converted to a
    --  function call (because of lack of association), return FALSE.
    function Maybe_Function_Call (Prefix : Iir) return Boolean
@@ -720,7 +744,6 @@ package body Vhdl.Sem_Names is
       end if;
 
       Index_Type := Get_Index_Type (Index_List, 0);
-      Prefix_Rng := Eval_Static_Range (Index_Type);
 
       --  LRM93 6.5
       --  It is an error if either the bounds of the discrete range does not
@@ -734,7 +757,7 @@ package body Vhdl.Sem_Names is
       --  The bounds of the discrete range [...] must be of the
       --  type of the index of the array.
       Suffix := Get_Suffix (Name);
-      Suffix := Sem_Discrete_Range (Suffix, Index_Type, False);
+      Suffix := Sem_Discrete_Range (Suffix, Index_Type);
       if Suffix = Null_Iir then
          return;
       end if;
@@ -766,16 +789,22 @@ package body Vhdl.Sem_Names is
       if Get_Kind (Prefix_Type) = Iir_Kind_Array_Subtype_Definition
         and then Get_Index_Constraint_Flag (Prefix_Type)
         and then Staticness = Locally
-        and then Prefix_Rng /= Null_Iir
-        and then Get_Direction (Suffix_Rng) /= Get_Direction (Prefix_Rng)
+        and then Get_Type_Staticness (Index_Type) = Locally
       then
-         if False and then Flags.Vhdl_Std = Vhdl_87 then
-            -- emit a warning for a null slice.
-            Warning_Msg_Sem (Warnid_Runtime_Error, +Name,
-                             "direction mismatch results in a null slice");
+         Prefix_Rng := Eval_Static_Range (Index_Type);
+         if Get_Direction (Suffix_Rng) /= Get_Direction (Prefix_Rng) then
+            if False and then Flags.Vhdl_Std = Vhdl_87 then
+               -- emit a warning for a null slice.
+               Warning_Msg_Sem (Warnid_Runtime_Error, +Name,
+                                "direction mismatch results in a null slice");
 
+            end if;
+            Error_Msg_Sem (+Name, "direction of the range mismatch");
+         else
+            Check_Range_Compatibility (Suffix_Rng, Prefix_Rng);
+            --  May have changed in case of overflow.
+            Staticness := Get_Expr_Staticness (Suffix_Rng);
          end if;
-         Error_Msg_Sem (+Name, "direction of the range mismatch");
       end if;
 
       --  LRM93 7.4.1
@@ -895,9 +924,6 @@ package body Vhdl.Sem_Names is
       Res : Iir;
       Decl : Iir;
    begin
-      --  The name must not have been analyzed.
-      pragma Assert (Get_Type (Name) = Null_Iir);
-
       if Is_Error (Name) then
          Set_Type (Name, Name);
          return Name;
@@ -906,6 +932,8 @@ package body Vhdl.Sem_Names is
       case Get_Kind (Name) is
          when Iir_Kinds_Name
            | Iir_Kind_Attribute_Name =>
+            --  The name must not have been analyzed.
+            pragma Assert (Get_Type (Name) = Null_Iir);
             null;
          when others =>
             Error_Msg_Sem (+Name, "name expected for a type mark");
@@ -978,7 +1006,6 @@ package body Vhdl.Sem_Names is
             when Iir_Kind_Entity_Declaration
               | Iir_Kind_Architecture_Body
               | Iir_Kind_Block_Statement
-              | Iir_Kind_Block_Header
               | Iir_Kind_Component_Declaration
               | Iir_Kinds_Process_Statement
               | Iir_Kind_Generate_Statement_Body
@@ -1002,6 +1029,34 @@ package body Vhdl.Sem_Names is
       end loop;
    end Get_Object_Type_Staticness;
 
+   procedure Finish_Sem_Array_Attribute_Prefix (Attr_Name : Iir; Attr : Iir)
+   is
+      Prefix : Iir;
+      Prefix_Name : Iir;
+   begin
+      --  See Sem_Array_Attribute_Name for comments about the prefix.
+      Prefix_Name := Get_Prefix (Attr_Name);
+      if Is_Type_Name (Prefix_Name) /= Null_Iir then
+         Prefix := Sem_Type_Mark (Prefix_Name);
+      else
+         Prefix := Finish_Sem_Name (Prefix_Name, Get_Prefix (Attr));
+         --  Convert function declaration to call.
+         if Get_Kind (Prefix) in Iir_Kinds_Denoting_Name
+           and then
+           (Get_Kind (Get_Named_Entity (Prefix))
+              = Iir_Kind_Function_Declaration)
+         then
+            Prefix := Function_Declaration_To_Call (Prefix);
+         end if;
+         if not Is_Object_Name (Prefix) then
+            Error_Msg_Sem_Relaxed
+              (Attr, Warnid_Attribute,
+               "prefix of array attribute must be an object name");
+         end if;
+      end if;
+      Set_Prefix (Attr, Prefix);
+   end Finish_Sem_Array_Attribute_Prefix;
+
    procedure Finish_Sem_Array_Attribute
      (Attr_Name : Iir; Attr : Iir; Param : Iir)
    is
@@ -1009,7 +1064,6 @@ package body Vhdl.Sem_Names is
       Prefix_Type : Iir;
       Index_Type : Iir;
       Prefix : Iir;
-      Prefix_Name : Iir;
       Staticness : Iir_Staticness;
    begin
       --  LRM93 14.1
@@ -1032,28 +1086,9 @@ package body Vhdl.Sem_Names is
          end if;
       end if;
 
-      --  See Sem_Array_Attribute_Name for comments about the prefix.
-      Prefix_Name := Get_Prefix (Attr_Name);
-      if Is_Type_Name (Prefix_Name) /= Null_Iir then
-         Prefix := Sem_Type_Mark (Prefix_Name);
-      else
-         Prefix := Finish_Sem_Name (Prefix_Name, Get_Prefix (Attr));
-         --  Convert function declaration to call.
-         if Get_Kind (Prefix) in Iir_Kinds_Denoting_Name
-           and then
-           (Get_Kind (Get_Named_Entity (Prefix))
-              = Iir_Kind_Function_Declaration)
-         then
-            Prefix := Function_Declaration_To_Call (Prefix);
-         end if;
-         if not Is_Object_Name (Prefix) then
-            Error_Msg_Sem_Relaxed
-              (Attr, Warnid_Attribute,
-               "prefix of array attribute must be an object name");
-         end if;
-      end if;
-      Set_Prefix (Attr, Prefix);
+      Finish_Sem_Array_Attribute_Prefix (Attr_Name, Attr);
 
+      Prefix := Get_Prefix (Attr);
       Prefix_Type := Get_Type (Prefix);
       if Is_Error (Prefix_Type) then
          return;
@@ -1908,7 +1943,8 @@ package body Vhdl.Sem_Names is
            | Iir_Kind_Non_Object_Alias_Declaration
            | Iir_Kind_Library_Declaration
            | Iir_Kind_Interface_Package_Declaration
-           | Iir_Kind_Interface_Type_Declaration =>
+           | Iir_Kind_Interface_Type_Declaration
+           | Iir_Kind_Mode_View_Declaration =>
             Name_Res := Finish_Sem_Denoting_Name (Name, Res);
             Set_Base_Name (Name_Res, Res);
             return Name_Res;
@@ -1989,6 +2025,7 @@ package body Vhdl.Sem_Names is
                Prefix := Finish_Sem_Name_1 (Get_Prefix (Name_Prefix), Prefix);
                Set_Prefix (Res, Prefix);
                --  But free it.
+               Free_Iir (Name_Prefix);
                Free_Parenthesis_Name (Name, Res);
             else
                pragma Assert (Get_Parameter (Res) = Null_Iir);
@@ -2024,6 +2061,8 @@ package body Vhdl.Sem_Names is
             Free_Iir (Name);
             return Res;
          when Iir_Kind_Element_Attribute =>
+            pragma Assert (Get_Kind (Name) = Iir_Kind_Attribute_Name);
+            Finish_Sem_Array_Attribute_Prefix (Name, Res);
             Set_Base_Name (Res, Res);
             Set_Name_Staticness (Res, Get_Name_Staticness (Get_Prefix (Res)));
             Set_Type_Staticness (Res, Get_Type_Staticness (Get_Type (Res)));
@@ -2031,7 +2070,8 @@ package body Vhdl.Sem_Names is
             return Res;
          when Iir_Kind_Simple_Name_Attribute
            | Iir_Kind_Path_Name_Attribute
-           | Iir_Kind_Instance_Name_Attribute =>
+           | Iir_Kind_Instance_Name_Attribute
+           | Iir_Kind_Converse_Attribute =>
             Free_Iir (Name);
             return Res;
          when Iir_Kinds_External_Name =>
@@ -2165,7 +2205,9 @@ package body Vhdl.Sem_Names is
          if not Keep_Alias
            and then Get_Kind (Res) = Iir_Kind_Non_Object_Alias_Declaration
          then
-            Res := Get_Named_Entity (Get_Name (Res));
+            Res := Get_Name (Res);
+            --  Could be a 'converse attribute.
+            Res := Strip_Denoting_Name (Res);
          end if;
       else
          --  Name is overloaded.
@@ -2591,7 +2633,9 @@ package body Vhdl.Sem_Names is
            | Iir_Kind_Element_Attribute
            | Iir_Kind_Enumeration_Literal
            | Iir_Kind_Unit_Declaration
-           | Iir_Kind_Variable_Assignment_Statement =>
+           | Iir_Kind_Variable_Assignment_Statement
+           | Iir_Kind_Component_Declaration
+           | Iir_Kind_Mode_View_Declaration =>
             if not Soft then
                Error_Msg_Sem
                  (+Prefix_Loc, "%n cannot be selected by name", +Prefix);
@@ -2759,7 +2803,7 @@ package body Vhdl.Sem_Names is
             Set_Index_List (Res, Create_Iir_Flist (1));
             Set_Nth_Element (Get_Index_List (Res), 0, Actual);
          when Iir_Kind_Slice_Name =>
-            Actual := Sem_Discrete_Range (Actual, Itype, False);
+            Actual := Sem_Discrete_Range (Actual, Itype);
             if Actual = Null_Iir then
                return Null_Iir;
             end if;
@@ -3395,7 +3439,8 @@ package body Vhdl.Sem_Names is
            | Iir_Kind_Enumeration_Literal
            | Iir_Kind_Unit_Declaration
            | Iir_Kind_Component_Declaration
-           | Iir_Kinds_Library_Unit =>
+           | Iir_Kinds_Library_Unit
+           | Iir_Kind_Mode_View_Declaration =>
             --  FIXME: complete
             null;
          when Iir_Kinds_Sequential_Statement
@@ -3752,6 +3797,7 @@ package body Vhdl.Sem_Names is
       --  If the prefix is an object, we know its type is constrained.
       if not Is_Prefix_Object
         and then not Get_Index_Constraint_Flag (Prefix_Type)
+        and then Get_Identifier (Attr) /= Name_Element
       then
          Error_Msg_Sem (+Attr, "prefix type is not constrained");
          --  We continue using the unconstrained array type.
@@ -3797,6 +3843,41 @@ package body Vhdl.Sem_Names is
       Set_Type (Res, Res_Type);
       return Res;
    end Sem_Array_Attribute_Name;
+
+   function Sem_View_Attribute (Attr : Iir_Attribute_Name) return Iir
+   is
+      use Std_Names;
+      Id : constant Name_Id := Get_Identifier (Attr);
+      Prefix_Name : constant Iir := Get_Prefix (Attr);
+      Prefix: Iir;
+      Res : Iir;
+   begin
+      Prefix := Get_Named_Entity (Prefix_Name);
+
+      --  LRM19 16.2.8 Predefined attributes of named mode views
+      --  Prefix: Any named mode view M of composite type T, or an alias
+      --  thereof.
+      case Get_Kind (Prefix) is
+         when Iir_Kind_Mode_View_Declaration =>
+            null;
+         when others =>
+            Error_Msg_Sem
+              (+Attr, "prefix of %i attribute must denote a mode view", +Attr);
+            return Error_Mark;
+      end case;
+
+      case Id is
+         when Name_Converse =>
+            Res := Create_Iir (Iir_Kind_Converse_Attribute);
+         when others =>
+            raise Internal_Error;
+      end case;
+
+      Location_Copy (Res, Attr);
+      Set_Prefix (Res, Prefix_Name);
+
+      return Res;
+   end Sem_View_Attribute;
 
    --  For 'Subtype
    function Sem_Subtype_Attribute (Attr : Iir_Attribute_Name) return Iir
@@ -4481,6 +4562,13 @@ package body Vhdl.Sem_Names is
                Res := Sem_User_Attribute (Attr);
             end if;
 
+         when Name_Converse =>
+            if Flags.Vhdl_Std >= Vhdl_08 then
+               Res := Sem_View_Attribute (Attr);
+            else
+               Res := Sem_User_Attribute (Attr);
+            end if;
+
          when Name_Across
            | Name_Through =>
             if Flags.AMS_Vhdl then
@@ -4599,10 +4687,15 @@ package body Vhdl.Sem_Names is
       --  Clear and free overload lists of Named_entity and type.
       Named_Entity := Get_Named_Entity (Name);
       Set_Named_Entity (Name, Null_Iir);
-      if Named_Entity /= Null_Iir
-        and then Is_Overload_List (Named_Entity)
-      then
-         Free_Iir (Named_Entity);
+      if Named_Entity /= Null_Iir then
+         case Get_Kind (Named_Entity) is
+            when Iir_Kind_Overload_List
+              | Iir_Kind_Selected_Element
+              | Iir_Kind_Indexed_Name =>
+               Free_Iir (Named_Entity);
+            when others =>
+               null;
+         end case;
       end if;
 
       Atype := Get_Type (Name);

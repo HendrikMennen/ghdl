@@ -1287,6 +1287,16 @@ package body Vhdl.Scanner is
                   end if;
                   Current_Token := Tok_Identifier;
                end if;
+            when Name_Id_Vhdl19_Reserved_Words =>
+               if Vhdl_Std < Vhdl_19 then
+                  if Is_Warning_Enabled (Warnid_Reserved_Word) then
+                     Warning_Msg_Scan
+                       (Warnid_Reserved_Word,
+                        "using %i vhdl-2019 reserved word as an identifier",
+                        +Current_Identifier);
+                  end if;
+                  Current_Token := Tok_Identifier;
+               end if;
             when Name_Id_Vhdl08_Reserved_Words =>
                if Vhdl_Std < Vhdl_08 then
                   --  Some vhdl08 reserved words are PSL keywords.
@@ -1647,7 +1657,7 @@ package body Vhdl.Scanner is
                when Special_Character =>
                   -- The current character is legal in an identifier.
                   if C = '_' then
-                     if I = 1 then
+                     if I = F then
                         Error_Msg_Option
                           ("an identifier cannot start with an underscore");
                         return;

@@ -21,13 +21,16 @@ with Areapools;
 with Vhdl.Errors; use Vhdl.Errors;
 with Vhdl.Utils; use Vhdl.Utils;
 with Vhdl.Canon;
+with Vhdl.Canon_PSL;
+
+with PSL.Nodes;
+with PSL.Subsets;
+with PSL.Types;
 
 with Synth.Vhdl_Stmts;
 with Synth.Vhdl_Decls;
 with Synth.Vhdl_Expr;
 with Trans_Analyzes;
-
-with Simul.Vhdl_Debug;
 
 package body Simul.Vhdl_Elab is
    procedure Gather_Processes_1 (Inst : Synth_Instance_Acc);
@@ -101,7 +104,7 @@ package body Simul.Vhdl_Elab is
                end if;
                for I in 1 .. Len loop
                   Mark_Resolved_Signals
-                    (Sig_Off + (Len - I) * Typ.Arr_El.W,
+                    (Sig_Off + (I - 1) * Typ.Arr_El.W,
                      El_Type, Typ.Arr_El,
                      Vec, Already_Resolved);
                end loop;
@@ -155,14 +158,16 @@ package body Simul.Vhdl_Elab is
       end if;
       E.Sig := null;
 
-      if E.Kind in Mode_Signal_User then
+      if E.Kind = Signal_User then
          if E.Typ.W > 0 then
-            E.Nbr_Sources :=
-              new Nbr_Sources_Array'(0 .. E.Typ.W - 1 =>
-                                       (Nbr_Drivers => 0,
-                                        Nbr_Conns => 0,
-                                        Total => 0,
-                                        Last_Proc => No_Process_Index));
+            E.Nbr_Sources := new Nbr_Sources_Array (0 .. E.Typ.W - 1);
+            --  Avoid aggregate to avoid stack overflow.
+            for I in E.Nbr_Sources'Range loop
+               E.Nbr_Sources (I) := (Nbr_Drivers => 0,
+                                     Nbr_Conns => 0,
+                                     Total => 0,
+                                     Last_Proc => No_Process_Index);
+            end loop;
 
             Mark_Resolved_Signals
               (0, Get_Type (E.Decl), E.Typ, E.Nbr_Sources.all, False);
@@ -171,8 +176,9 @@ package body Simul.Vhdl_Elab is
          end if;
       end if;
 
-      pragma Assert (E.Kind /= Mode_End);
-      pragma Assert (Signals_Table.Table (Val.Val.S).Kind = Mode_End);
+      pragma Assert (E.Kind /= Signal_None);
+      pragma Assert (Signals_Table.Table (Val.Val.S).Kind = Signal_None);
+
       Signals_Table.Table (Val.Val.S) := E;
    end Gather_Signal;
 
@@ -188,9 +194,15 @@ package body Simul.Vhdl_Elab is
       Mark_Expr_Pool (Marker);
 
       Synth.Vhdl_Stmts.Synth_Assignment_Prefix (Inst, Name, Base, Typ, Off);
-      Res := (Base => Base.Val.S,
-              Typ => Unshare (Typ, Global_Pool'Access),
-              Offs => Off);
+      if Base = No_Valtyp then
+         Res := (Base => No_Signal_Index,
+                 Typ => null,
+                 Offs => No_Value_Offsets);
+      else
+         Res := (Base => Base.Val.S,
+                 Typ => Unshare (Typ, Global_Pool'Access),
+                 Offs => Off);
+      end if;
 
       Release_Expr_Pool (Marker);
       return Res;
@@ -270,39 +282,11 @@ package body Simul.Vhdl_Elab is
    procedure Gather_Processes_Decl (Inst : Synth_Instance_Acc; Decl : Node) is
    begin
       case Get_Kind (Decl) is
-         when Iir_Kind_Interface_Signal_Declaration =>
+         when Iir_Kind_Interface_Signal_Declaration
+           | Iir_Kind_Signal_Declaration
+           | Iir_Kind_Interface_View_Declaration =>
             --  Driver.
-            case Get_Mode (Decl) is
-               when Iir_Unknown_Mode =>
-                  raise Internal_Error;
-               when Iir_Linkage_Mode =>
-                  Gather_Signal ((Mode_Linkage, Decl, Inst, null, null, null,
-                                  No_Sensitivity_Index, No_Signal_Index,
-                                  No_Connect_Index, No_Driver_Index,
-                                  No_Disconnect_Index, null));
-               when Iir_Buffer_Mode =>
-                  Gather_Signal ((Mode_Buffer, Decl, Inst, null, null, null,
-                                  No_Sensitivity_Index, No_Signal_Index,
-                                  No_Connect_Index, No_Driver_Index,
-                                  No_Disconnect_Index, null));
-               when Iir_Out_Mode =>
-                  Gather_Signal ((Mode_Out, Decl, Inst, null, null, null,
-                                  No_Sensitivity_Index, No_Signal_Index,
-                                  No_Connect_Index, No_Driver_Index,
-                                  No_Disconnect_Index, null));
-               when Iir_Inout_Mode =>
-                  Gather_Signal ((Mode_Inout, Decl, Inst, null, null, null,
-                                  No_Sensitivity_Index, No_Signal_Index,
-                                  No_Connect_Index, No_Driver_Index,
-                                  No_Disconnect_Index, null));
-               when Iir_In_Mode =>
-                  Gather_Signal ((Mode_In, Decl, Inst, null, null, null,
-                                  No_Sensitivity_Index, No_Signal_Index,
-                                  No_Connect_Index, No_Driver_Index,
-                                  No_Disconnect_Index, null));
-            end case;
-         when Iir_Kind_Signal_Declaration =>
-            Gather_Signal ((Mode_Signal, Decl, Inst, null, null, null,
+            Gather_Signal ((Signal_User, Decl, Inst, null, null, null,
                             No_Sensitivity_Index, No_Signal_Index,
                             No_Connect_Index, No_Driver_Index,
                             No_Disconnect_Index, null));
@@ -336,7 +320,7 @@ package body Simul.Vhdl_Elab is
                end loop;
             end;
          when Iir_Kind_Above_Attribute =>
-            Gather_Signal ((Mode_Above, Decl, Inst, null, null, null,
+            Gather_Signal ((Signal_Above, Decl, Inst, null, null, null,
                             No_Sensitivity_Index, No_Signal_Index,
                             No_Connect_Index));
          when Iir_Kind_Quiet_Attribute =>
@@ -346,7 +330,7 @@ package body Simul.Vhdl_Elab is
             begin
                T := Compute_Attribute_Time (Inst, Decl);
                Pfx := Compute_Sub_Signal (Inst, Get_Prefix (Decl));
-               Gather_Signal ((Mode_Quiet, Decl, Inst, null, null, null,
+               Gather_Signal ((Signal_Quiet, Decl, Inst, null, null, null,
                                No_Sensitivity_Index, No_Signal_Index,
                                No_Connect_Index, T, Pfx));
             end;
@@ -357,7 +341,7 @@ package body Simul.Vhdl_Elab is
             begin
                T := Compute_Attribute_Time (Inst, Decl);
                Pfx := Compute_Sub_Signal (Inst, Get_Prefix (Decl));
-               Gather_Signal ((Mode_Stable, Decl, Inst, null, null, null,
+               Gather_Signal ((Signal_Stable, Decl, Inst, null, null, null,
                                No_Sensitivity_Index, No_Signal_Index,
                                No_Connect_Index, T, Pfx));
             end;
@@ -366,9 +350,10 @@ package body Simul.Vhdl_Elab is
                Pfx : Sub_Signal_Type;
             begin
                Pfx := Compute_Sub_Signal (Inst, Get_Prefix (Decl));
-               Gather_Signal ((Mode_Transaction, Decl, Inst, null, null, null,
-                               No_Sensitivity_Index, No_Signal_Index,
-                               No_Connect_Index, 0, Pfx));
+               Gather_Signal
+                 ((Signal_Transaction, Decl, Inst, null, null, null,
+                   No_Sensitivity_Index, No_Signal_Index,
+                   No_Connect_Index, 0, Pfx));
             end;
          when Iir_Kind_Delayed_Attribute =>
             declare
@@ -377,7 +362,7 @@ package body Simul.Vhdl_Elab is
             begin
                T := Compute_Attribute_Time (Inst, Decl);
                Pfx := Compute_Sub_Signal (Inst, Get_Prefix (Decl));
-               Gather_Signal ((Mode_Delayed, Decl, Inst, null, null, null,
+               Gather_Signal ((Signal_Delayed, Decl, Inst, null, null, null,
                                No_Sensitivity_Index, No_Signal_Index,
                                No_Connect_Index, T, Pfx));
             end;
@@ -405,27 +390,8 @@ package body Simul.Vhdl_Elab is
          when Iir_Kind_Disconnection_Specification =>
             Gather_Disconnection (Inst, Decl);
          when Iir_Kind_Variable_Declaration =>
-            pragma Assert (Get_Shared_Flag (Decl));
-            if Get_Default_Value (Decl) = Null_Node then
-               --  Elab doesn't set a value to variables with no default
-               --  value.
-               declare
-                  V : Valtyp;
-               begin
-                  V := Get_Value (Inst, Decl);
-                  pragma Assert (V.Val = null);
-                  Current_Pool := Global_Pool'Access;
-                  if V.Typ.Kind = Type_Protected then
-                     V := Synth.Vhdl_Decls.Create_Protected_Object
-                       (Inst, Decl, V.Typ);
-                  else
-                     V := Create_Value_Default (V.Typ);
-                  end if;
-                  Current_Pool := Expr_Pool'Access;
-                  Mutate_Object (Inst, Decl, V);
-               end;
-            end if;
-
+            --  Variables are always created.
+            null;
          when Iir_Kind_Constant_Declaration
            | Iir_Kind_Non_Object_Alias_Declaration
            | Iir_Kind_Attribute_Declaration
@@ -442,6 +408,7 @@ package body Simul.Vhdl_Elab is
            | Iir_Kind_Protected_Type_Body
            | Iir_Kind_Psl_Default_Clock
            | Iir_Kind_Use_Clause
+           | Iir_Kind_Mode_View_Declaration
            | Iir_Kind_Group_Template_Declaration
            | Iir_Kind_Group_Declaration =>
             null;
@@ -477,7 +444,6 @@ package body Simul.Vhdl_Elab is
                                  Loc : Node)
    is
       S : Signal_Entry renames Signals_Table.Table (Sig.Base);
-      Resolved : constant Boolean := Get_Resolved_Flag (Get_Type (S.Decl));
       Need_It : Boolean;
    begin
       pragma Assert (Sig.Typ.Wkind = Wkind_Sim);
@@ -495,10 +461,8 @@ package body Simul.Vhdl_Elab is
          begin
             if Ns.Last_Proc /= Proc_Idx then
                --  New driver.
-               if not Need_It
-                 and then Ns.Nbr_Drivers > 0
+               if (Ns.Nbr_Conns + Ns.Nbr_Drivers) > 0
                  and then Ns.Total = 0
-                 and then not Resolved
                then
                   Error_Msg_Elab (Loc, "too many drivers for %n", +S.Decl);
                end if;
@@ -529,6 +493,7 @@ package body Simul.Vhdl_Elab is
    procedure Gather_Process_Drivers
      (Inst : Synth_Instance_Acc; Proc : Node; Proc_Idx : Process_Index_Type)
    is
+      Prev_Instance_Pool : constant Areapools.Areapool_Acc := Instance_Pool;
       Driver_List: Iir_List;
       It : List_Iterator;
       El : Node;
@@ -543,11 +508,14 @@ package body Simul.Vhdl_Elab is
          exit when El = Null_Node;
          Sig := Compute_Sub_Signal (Inst, El);
 
-         Add_Process_Driver (Proc_Idx, Sig, El);
+         if Sig.Base /= No_Signal_Index then
+            --  Only if no error.
+            Add_Process_Driver (Proc_Idx, Sig, El);
+         end if;
 
          Next (It);
       end loop;
-      Instance_Pool := null;
+      Instance_Pool := Prev_Instance_Pool;
       Trans_Analyzes.Free_Drivers_List (Driver_List);
    end Gather_Process_Drivers;
 
@@ -555,15 +523,23 @@ package body Simul.Vhdl_Elab is
                                  Proc_Idx : Process_Index_Type;
                                  List : Iir_List)
    is
+      Prev_Instance_Pool : constant Areapools.Areapool_Acc := Instance_Pool;
       It : List_Iterator;
       El : Node;
       Sig : Sub_Signal_Type;
    begin
+      --  There can be function calls.
+      Instance_Pool := Process_Pool'Access;
+
       It := List_Iterate_Safe (List);
       while Is_Valid (It) loop
          El := Get_Element (It);
          exit when El = Null_Node;
+
          Sig := Compute_Sub_Signal (Inst, El);
+
+         --  Exit now in case of error.
+         exit when Sig.Base = No_Signal_Index;
 
          Sensitivity_Table.Append
            ((Sig => Sig,
@@ -578,6 +554,8 @@ package body Simul.Vhdl_Elab is
 
          Next (It);
       end loop;
+
+      Instance_Pool := Prev_Instance_Pool;
    end Gather_Sensitivity;
 
    procedure Gather_Process_Sensitivity
@@ -618,9 +596,29 @@ package body Simul.Vhdl_Elab is
                Gather_Sensitivity (Inst, Proc_Idx, List);
                return;
             end if;
-         when Iir_Kind_Psl_Assert_Directive =>
+         when Iir_Kind_Psl_Assert_Directive
+            | Iir_Kind_Psl_Assume_Directive
+            | Iir_Kind_Psl_Cover_Directive
+            | Iir_Kind_Psl_Endpoint_Declaration =>
             List := Get_PSL_Clock_Sensitivity (Proc);
             Gather_Sensitivity (Inst, Proc_Idx, List);
+            if Get_Kind (Proc) in Iir_Kinds_Psl_Property_Directive
+              and then Get_PSL_Abort_Flag (Proc)
+            then
+               declare
+                  use PSL.Types;
+                  use PSL.Nodes;
+                  Prop : constant PSL_Node := Get_Psl_Property (Proc);
+               begin
+                  if PSL.Subsets.Is_Async_Abort (Prop) then
+                     List := Create_Iir_List;
+                     Vhdl.Canon_PSL.Canon_Extract_Sensitivity
+                       (Get_Boolean (Prop), List);
+                     Gather_Sensitivity (Inst, Proc_Idx, List);
+                     Destroy_Iir_List (List);
+                  end if;
+               end;
+            end if;
             return;
          when Iir_Kind_Concurrent_Break_Statement =>
             List := Get_Sensitivity_List (Proc);
@@ -640,20 +638,54 @@ package body Simul.Vhdl_Elab is
    end Gather_Process_Sensitivity;
 
    --  Increment the number of sources for EP.
-   procedure Increment_Nbr_Sources (Ep : Sub_Signal_Type) is
+   --  (Called for actual of an non-in association).
+   procedure Increment_Nbr_Sources (Ep : Sub_Signal_Type; Loc : Node)
+   is
+      S : Signal_Entry renames Signals_Table.Table (Ep.Base);
    begin
       if Ep.Typ.W = 0 then
          return;
       end if;
       for I in Ep.Offs.Net_Off .. Ep.Offs.Net_Off + Ep.Typ.W - 1 loop
          declare
-            N : Uns32 renames
-              Signals_Table.Table (Ep.Base).Nbr_Sources (I).Nbr_Conns;
+            Src : Nbr_Sources_Type renames S.Nbr_Sources (I);
          begin
-            N := N + 1;
+            Src.Nbr_Conns := Src.Nbr_Conns + 1;
+            if (Src.Nbr_Conns + Src.Nbr_Drivers) > 1
+              and then Src.Total = 0
+            then
+               Error_Msg_Elab (Loc, "too many drivers for %n", +S.Decl);
+            end if;
          end;
       end loop;
    end Increment_Nbr_Sources;
+
+   procedure Increment_View_Nbr_Sources
+     (View : Node; Reversed : Boolean; Actual_Ep : Sub_Signal_Type) is
+   begin
+      if Get_Kind (View) = Iir_Kind_Simple_Mode_View_Element then
+         if Get_Mode (View) /= Iir_In_Mode xor Reversed then
+            Increment_Nbr_Sources (Actual_Ep, View);
+         end if;
+      else
+         declare
+            Typ : constant Type_Acc := Actual_Ep.Typ;
+            Sub_View : Iir;
+            Sub_Reversed : Boolean;
+            Sub_Ep : Sub_Signal_Type;
+         begin
+            pragma Assert (Typ.Kind = Type_Record);
+            for I in 1 .. Typ.Rec.Len loop
+               Update_Mode_View_By_Pos
+                 (Sub_View, Sub_Reversed, View, Reversed, Natural (I - 1));
+               Sub_Ep := (Base => Actual_Ep.Base,
+                          Offs => Actual_Ep.Offs + Typ.Rec.E (I).Offs,
+                          Typ => Typ.Rec.E (I).Typ);
+               Increment_View_Nbr_Sources (Sub_View, Sub_Reversed, Sub_Ep);
+            end loop;
+         end;
+      end if;
+   end Increment_View_Nbr_Sources;
 
    procedure Gather_Connections (Port_Inst : Synth_Instance_Acc;
                                  Ports : Node;
@@ -675,6 +707,7 @@ package body Simul.Vhdl_Elab is
       Conn : Connect_Entry;
       List : Iir_List;
       Formal_Ep, Actual_Ep : Sub_Signal_Type;
+      Is_Collapsed : Boolean;
    begin
       Mark_Expr_Pool (Marker);
       Assoc := Assocs;
@@ -699,37 +732,38 @@ package body Simul.Vhdl_Elab is
                Actual_Sig := Actual_Base.Val.S;
                Actual_Ep := (Actual_Sig, Off, Typ);
 
+               Is_Collapsed := Get_Collapse_Signal_Flag (Assoc)
+                 and then Formal_Ep.Offs.Mem_Off = 0
+                 and then Actual_Ep.Offs.Mem_Off = 0
+                 and then Actual_Base.Typ.W = Actual_Ep.Typ.W
+                 and then Formal_Base.Typ.W = Formal_Ep.Typ.W;
+
                Conn :=
                  (Formal => Formal_Ep,
                   Formal_Link => Signals_Table.Table (Formal_Sig).Connect,
                   Actual => Actual_Ep,
                   Actual_Link => Signals_Table.Table (Actual_Sig).Connect,
-                  Drive_Formal => False,
-                  Drive_Actual => False,
-                  Collapsed => False,
+                  Collapsed => Is_Collapsed,
                   Assoc => Assoc,
                   Assoc_Inst => Assoc_Inst);
 
-               --  LRM08 6.4.2.3 Signal declarations
-               --  [...], each source is either a driver or an OUT, INOUT,
-               --  BUFFER, or LINKAGE port [...]
-               case Get_Mode (Inter) is
-                  when Iir_In_Mode =>
-                     Conn.Drive_Formal := True;
-                     Conn.Drive_Actual := False;
-                  when Iir_Out_Mode
-                    | Iir_Buffer_Mode =>
-                     Conn.Drive_Formal := False;
-                     Conn.Drive_Actual := True;
-                     Increment_Nbr_Sources (Actual_Ep);
-                  when Iir_Inout_Mode
-                    | Iir_Linkage_Mode =>
-                     Conn.Drive_Formal := True;
-                     Conn.Drive_Actual := True;
-                     Increment_Nbr_Sources (Actual_Ep);
-                  when Iir_Unknown_Mode =>
-                     raise Internal_Error;
-               end case;
+               if Get_Kind (Inter) = Iir_Kind_Interface_View_Declaration then
+                  --  TODO: increase nbr sources
+                  declare
+                     View : Iir;
+                     Reversed : Boolean;
+                  begin
+                     Get_Mode_View_From_Name (Formal, View, Reversed);
+                     Increment_View_Nbr_Sources (View, Reversed, Actual_Ep);
+                  end;
+               else
+                  --  LRM08 6.4.2.3 Signal declarations
+                  --  [...], each source is either a driver or an OUT, INOUT,
+                  --  BUFFER, or LINKAGE port [...]
+                  if Get_Mode (Inter) /= Iir_In_Mode then
+                     Increment_Nbr_Sources (Actual_Ep, Assoc);
+                  end if;
+               end if;
 
                Connect_Table.Append (Conn);
 
@@ -737,18 +771,12 @@ package body Simul.Vhdl_Elab is
                Signals_Table.Table (Actual_Sig).Connect := Connect_Table.Last;
 
                --  Collapse
-               if Get_Collapse_Signal_Flag (Assoc)
-                 and then Formal_Ep.Offs.Mem_Off = 0
-                 and then Actual_Ep.Offs.Mem_Off = 0
-                 and then Actual_Base.Typ.W = Actual_Ep.Typ.W
-                 and then Formal_Base.Typ.W = Formal_Ep.Typ.W
-               then
+               if Is_Collapsed then
                   --  Full collapse.
                   pragma Assert (Signals_Table.Table (Formal_Sig).Collapsed_By
                                    = No_Signal_Index);
                   pragma Assert (Formal_Sig > Actual_Sig);
                   Signals_Table.Table (Formal_Sig).Collapsed_By := Actual_Sig;
-                  Connect_Table.Table (Connect_Table.Last).Collapsed := True;
                end if;
             when Iir_Kind_Association_Element_Open
               | Iir_Kind_Association_Element_By_Individual =>
@@ -768,8 +796,6 @@ package body Simul.Vhdl_Elab is
                   Formal_Link => Signals_Table.Table (Formal_Ep.Base).Connect,
                   Actual => Actual_Ep,
                   Actual_Link => No_Connect_Index,
-                  Drive_Formal => True, --  Always an IN interface
-                  Drive_Actual => False,
                   Collapsed => False,
                   Assoc => Assoc,
                   Assoc_Inst => Assoc_Inst);
@@ -892,9 +918,8 @@ package body Simul.Vhdl_Elab is
                end if;
             end;
          when Iir_Kinds_Concurrent_Signal_Assignment
-           | Iir_Kind_Concurrent_Assertion_Statement
-           | Iir_Kind_Concurrent_Procedure_Call_Statement
-           | Iir_Kinds_Process_Statement =>
+            | Iir_Kind_Concurrent_Assertion_Statement
+            | Iir_Kind_Concurrent_Procedure_Call_Statement =>
             Processes_Table.Append ((Proc => Stmt,
                                      Inst => Inst,
                                      Drivers => No_Driver_Index,
@@ -903,9 +928,20 @@ package body Simul.Vhdl_Elab is
             Gather_Process_Drivers (Inst, Stmt, Processes_Table.Last);
             pragma Assert (Is_Expr_Pool_Empty);
             Gather_Process_Sensitivity (Inst, Stmt, Processes_Table.Last);
-         when Iir_Kind_Psl_Default_Clock =>
+         when Iir_Kinds_Process_Statement =>
+            Processes_Table.Append ((Proc => Stmt,
+                                     Inst => Inst,
+                                     Drivers => No_Driver_Index,
+                                     Sensitivity => No_Sensitivity_Index));
+            --  Do not yet compute drivers or sensitivity as it may depends
+            --  on declarations within the process.
+         when Iir_Kind_Psl_Default_Clock
+           | Iir_Kind_Psl_Declaration =>
             null;
          when Iir_Kind_Psl_Assert_Directive
+           | Iir_Kind_Psl_Assume_Directive
+           | Iir_Kind_Psl_Cover_Directive
+           | Iir_Kind_Psl_Endpoint_Declaration
            | Iir_Kind_Concurrent_Break_Statement =>
             Processes_Table.Append ((Proc => Stmt,
                                      Inst => Inst,
@@ -967,7 +1003,7 @@ package body Simul.Vhdl_Elab is
                Guard : constant Node := Get_Guard_Decl (N);
             begin
                if Guard /= Null_Node then
-                  Gather_Signal ((Mode_Guard, Guard, Inst, null, null, null,
+                  Gather_Signal ((Signal_Guard, Guard, Inst, null, null, null,
                                   No_Sensitivity_Index, No_Signal_Index,
                                   No_Connect_Index));
                end if;
@@ -1007,13 +1043,11 @@ package body Simul.Vhdl_Elab is
       Signals_Table.Init;
       Drivers_Table.Init;
 
-      Simul.Vhdl_Debug.Init;
-
       --  Init Signals_Table.
       Signals_Table.Set_Last (Get_Nbr_Signal);
       for I in Signals_Table.First .. Signals_Table.Last loop
          Signals_Table.Table (I) :=
-           (Mode_End, Null_Node, null, null, null, null,
+           (Signal_None, Null_Node, null, null, null, null,
             No_Sensitivity_Index, No_Signal_Index, No_Connect_Index);
       end loop;
 
@@ -1036,7 +1070,10 @@ package body Simul.Vhdl_Elab is
 
       --  For the debugger.
       Top_Instance := Top;
+   end Gather_Processes;
 
+   procedure Compute_Sources is
+   begin
       --  Compute total number of sources.
       for I in Signals_Table.First .. Signals_Table.Last loop
          declare
@@ -1045,18 +1082,21 @@ package body Simul.Vhdl_Elab is
               Get_Kind (E.Decl) = Iir_Kind_Interface_Signal_Declaration
               and then Get_Mode (E.Decl) in Iir_Out_Modes;
          begin
-            if E.Kind in Mode_Signal_User then
+            if E.Kind = Signal_User then
                for J in 1 .. E.Typ.W loop
                   declare
                      Ns : Nbr_Sources_Type renames E.Nbr_Sources (J - 1);
                   begin
+                     --  Total number of sources.  (It was set to 1 to know
+                     --  if it is resolved).
                      Ns.Total := Ns.Nbr_Drivers + Ns.Nbr_Conns;
+                     --  Undriven out ports have a default source.
                      if Ns.Total = 0 and then Is_Out then
                         Ns.Total := 1;
                      end if;
                      if E.Collapsed_By /= No_Signal_Index
                        and then (Signals_Table.Table (E.Collapsed_By).Kind
-                                   in Mode_Signal_User)
+                                   = Signal_User)
                      then
                         --  Add to the parent.
                         declare
@@ -1064,8 +1104,9 @@ package body Simul.Vhdl_Elab is
                              Signals_Table.Table (E.Collapsed_By)
                              .Nbr_Sources (J - 1);
                         begin
-                           --  Remove 1 for the connection.
-                           C_Ns.Total := C_Ns.Total + Ns.Total - 1;
+                           --  Remove 1 for out connection.
+                           C_Ns.Total :=
+                             C_Ns.Total + Ns.Total - Boolean'Pos (Is_Out);
                         end;
                      end if;
                   end;
@@ -1073,7 +1114,7 @@ package body Simul.Vhdl_Elab is
             end if;
          end;
       end loop;
-   end Gather_Processes;
+   end Compute_Sources;
 
    procedure Elab_Processes
    is
@@ -1088,18 +1129,20 @@ package body Simul.Vhdl_Elab is
          if Get_Kind (Proc) in Iir_Kinds_Process_Statement then
             Proc_Inst := Make_Elab_Instance (Processes_Table.Table (I).Inst,
                                              Proc, Proc, Null_Node);
+            Set_Sub_Instance (Processes_Table.Table (I).Inst, Proc, Proc_Inst);
             Processes_Table.Table (I).Inst := Proc_Inst;
             Set_Instance_Const (Proc_Inst, True);
             Synth.Vhdl_Decls.Synth_Declarations
               (Proc_Inst, Get_Declaration_Chain (Proc), True);
             exit when Is_Error (Proc_Inst);
+
+            pragma Assert (Is_Expr_Pool_Empty);
+            Gather_Process_Drivers (Proc_Inst, Proc, I);
+            pragma Assert (Is_Expr_Pool_Empty);
+            Gather_Process_Sensitivity (Proc_Inst, Proc, I);
+
          end if;
       end loop;
       Instance_Pool := null;
    end Elab_Processes;
-
-   procedure Elab_Drivers is
-   begin
-      null;
-   end Elab_Drivers;
 end Simul.Vhdl_Elab;

@@ -18,6 +18,8 @@
 --  sequence of tokens displayed is the same as the sequence of tokens in the
 --  input file.  If parenthesis are kept by the parser, the only differences
 --  are comments and layout.
+with Ada.Unchecked_Deallocation;
+
 with Types; use Types;
 with Simple_IO;
 with Flags; use Flags;
@@ -482,11 +484,9 @@ package body Vhdl.Prints is
       Inner (Ind);
    end Disp_Resolution_Indication;
 
-   procedure Disp_Element_Constraint
-     (Ctxt : in out Ctxt_Class; Def : Iir; Type_Mark : Iir);
+   procedure Disp_Element_Constraint (Ctxt : in out Ctxt_Class; Def : Iir);
 
-   procedure Disp_Discrete_Range
-     (Ctxt : in out Ctxt_Class; Iterator: Iir) is
+   procedure Disp_Discrete_Range (Ctxt : in out Ctxt_Class; Iterator: Iir) is
    begin
       if Get_Kind (Iterator) in Iir_Kinds_Subtype_Definition then
          Disp_Subtype_Indication (Ctxt, Iterator);
@@ -517,7 +517,7 @@ package body Vhdl.Prints is
    end Disp_Array_Sub_Definition_Indexes;
 
    procedure Disp_Array_Element_Constraint
-     (Ctxt : in out Ctxt_Class; Def : Iir; Type_Mark : Iir) is
+     (Ctxt : in out Ctxt_Class; Def : Iir) is
    begin
       if not Get_Has_Array_Constraint_Flag (Def)
         and then not Get_Has_Element_Constraint_Flag (Def)
@@ -536,23 +536,19 @@ package body Vhdl.Prints is
       end if;
 
       if Get_Has_Element_Constraint_Flag (Def) then
-         Disp_Element_Constraint (Ctxt, Get_Array_Element_Constraint (Def),
-                                  Get_Element_Subtype (Type_Mark));
+         Disp_Element_Constraint (Ctxt, Get_Array_Element_Constraint (Def));
       end if;
    end Disp_Array_Element_Constraint;
 
    procedure Disp_Record_Element_Constraint
      (Ctxt : in out Ctxt_Class; Def : Iir)
    is
-      El_List : constant Iir_Flist := Get_Elements_Declaration_List (Def);
       El : Iir;
       Has_El : Boolean := False;
    begin
-      for I in Flist_First .. Flist_Last (El_List) loop
-         El := Get_Nth_Element (El_List, I);
-         if Get_Kind (El) = Iir_Kind_Record_Element_Constraint
-           and then Get_Parent (El) = Def
-         then
+      El := Get_Owned_Elements_Chain (Def);
+      while El /= Null_Iir loop
+         if Get_Kind (El) = Iir_Kind_Record_Element_Constraint then
             if Has_El then
                Disp_Token (Ctxt, Tok_Comma);
             else
@@ -560,9 +556,9 @@ package body Vhdl.Prints is
                Has_El := True;
             end if;
             Disp_Name_Of (Ctxt, El);
-            Disp_Element_Constraint (Ctxt, Get_Type (El),
-                                     Get_Base_Type (Get_Type (El)));
+            Disp_Element_Constraint (Ctxt, Get_Subtype_Indication (El));
          end if;
+         El := Get_Chain (El);
       end loop;
       if Has_El then
          Disp_Token (Ctxt, Tok_Right_Paren);
@@ -570,13 +566,13 @@ package body Vhdl.Prints is
    end Disp_Record_Element_Constraint;
 
    procedure Disp_Element_Constraint
-     (Ctxt : in out Ctxt_Class; Def : Iir; Type_Mark : Iir) is
+     (Ctxt : in out Ctxt_Class; Def : Iir) is
    begin
       case Get_Kind (Def) is
          when Iir_Kind_Record_Subtype_Definition =>
             Disp_Record_Element_Constraint (Ctxt, Def);
          when Iir_Kind_Array_Subtype_Definition =>
-            Disp_Array_Element_Constraint (Ctxt, Def, Type_Mark);
+            Disp_Array_Element_Constraint (Ctxt, Def);
          when others =>
             Error_Kind ("disp_element_constraint", Def);
       end case;
@@ -627,8 +623,9 @@ package body Vhdl.Prints is
 
       case Get_Kind (Def) is
          when Iir_Kind_Array_Subtype_Definition =>
-            Disp_Array_Element_Constraint
-              (Ctxt, Def, Or_Else (Type_Mark, Def));
+            Disp_Array_Element_Constraint (Ctxt, Def);
+         when Iir_Kind_Record_Subtype_Definition =>
+            Disp_Record_Element_Constraint (Ctxt, Def);
          when Iir_Kind_Subtype_Definition =>
             declare
                Rng : constant Iir := Get_Range_Constraint (Def);
@@ -667,13 +664,11 @@ package body Vhdl.Prints is
                      if Des_Ind /= Null_Iir then
                         pragma Assert (Get_Kind (Des_Ind)
                                          = Iir_Kind_Array_Subtype_Definition);
-                        Disp_Array_Element_Constraint
-                          (Ctxt, Des_Ind, Get_Designated_Type (Base_Type));
+                        Disp_Array_Element_Constraint (Ctxt, Des_Ind);
                      end if;
                   end;
                when Iir_Kind_Array_Type_Definition =>
-                  Disp_Array_Element_Constraint
-                    (Ctxt, Def, Or_Else (Type_Mark, Def));
+                  Disp_Array_Element_Constraint (Ctxt, Def);
                when Iir_Kind_Record_Type_Definition =>
                   Disp_Record_Element_Constraint (Ctxt, Def);
                when others =>
@@ -1184,7 +1179,7 @@ package body Vhdl.Prints is
          --  For implicit subprogram
          Disp_Type (Ctxt, Get_Type (Inter));
       else
-         Disp_Subtype_Indication (Ctxt, Get_Subtype_Indication (Inter));
+         Disp_Subtype_Indication (Ctxt, Ind);
       end if;
       if Get_Kind (Inter) = Iir_Kind_Interface_Signal_Declaration then
          Disp_Signal_Kind (Ctxt, Inter);
@@ -1966,6 +1961,54 @@ package body Vhdl.Prints is
       Close_Hbox (Ctxt);
    end Disp_Group_Declaration;
 
+   procedure Disp_Mode_View_Declaration (Ctxt : in out Ctxt_Class; Decl : Iir)
+   is
+      El, First : Iir;
+      Reindent : Boolean;
+   begin
+      Start_Hbox (Ctxt);
+      Disp_Token (Ctxt, Tok_View);
+      Disp_Identifier (Ctxt, Decl);
+      Disp_Token (Ctxt, Tok_Of);
+      Print (Ctxt, Get_Subtype_Indication (Decl));
+      Disp_Token (Ctxt, Tok_Is);
+      Close_Hbox (Ctxt);
+      Start_Vbox (Ctxt);
+      Reindent := True;
+      El := Get_Elements_Definition_Chain (Decl);
+      while El /= Null_Iir loop
+         if Reindent then
+            First := El;
+            Start_Hbox (Ctxt);
+         end if;
+         Disp_Identifier (Ctxt, El);
+         if Get_Has_Identifier_List (El) then
+            Disp_Token (Ctxt, Tok_Comma);
+            Reindent := False;
+         else
+            Disp_Token (Ctxt, Tok_Colon);
+            case Iir_Kinds_Mode_View_Element_Definition (Get_Kind (First)) is
+               when Iir_Kind_Simple_Mode_View_Element =>
+                  Disp_Mode (Ctxt, Get_Mode (First));
+               when Iir_Kind_Array_Mode_View_Element =>
+                  Disp_Token (Ctxt, Tok_View);
+                  Disp_Token (Ctxt, Tok_Left_Paren);
+                  Print (Ctxt, Get_Mode_View_Name (First));
+                  Disp_Token (Ctxt, Tok_Right_Paren);
+               when Iir_Kind_Record_Mode_View_Element =>
+                  Disp_Token (Ctxt, Tok_View);
+                  Print (Ctxt, Get_Mode_View_Name (First));
+            end case;
+            Disp_Token (Ctxt, Tok_Semi_Colon);
+            Close_Hbox (Ctxt);
+            Reindent := True;
+         end if;
+         El := Get_Chain (El);
+      end loop;
+      Close_Vbox (Ctxt);
+      Disp_End_Label (Ctxt, Decl, Tok_View);
+   end Disp_Mode_View_Declaration;
+
    procedure Print_Expr (Ctxt : in out Ctxt_Class;
                          N : PSL_Node;
                          Parent_Prio : Priority := Prio_Lowest)
@@ -2622,6 +2665,22 @@ package body Vhdl.Prints is
                Disp_Package_Instantiation_Declaration (Ctxt, Decl);
             when Iir_Kind_Psl_Default_Clock =>
                Disp_Psl_Default_Clock (Ctxt, Decl);
+
+            when Iir_Kind_Mode_View_Declaration =>
+               Disp_Mode_View_Declaration (Ctxt, Decl);
+
+            when Iir_Kind_Suspend_State_Declaration =>
+               Start_Hbox (Ctxt);
+               Disp_Ident (Ctxt, Name_State);
+               Disp_Token (Ctxt, Tok_Semi_Colon);
+               Close_Hbox (Ctxt);
+
+            when Iir_Kind_Package_Instantiation_Body =>
+               Start_Hbox (Ctxt);
+               OOB.Put ("-- body for instantiation ");
+               Disp_Ident (Ctxt, Get_Identifier (Get_Package (Decl)));
+               Close_Hbox (Ctxt);
+
             when others =>
                Error_Kind ("disp_declaration_chain", Decl);
          end case;
@@ -3240,7 +3299,7 @@ package body Vhdl.Prints is
    begin
       Stmt := First;
       while Stmt /= Null_Iir loop
-         case Iir_Kinds_Sequential_Statement (Get_Kind (Stmt)) is
+         case Iir_Kinds_Sequential_Statement_Ext (Get_Kind (Stmt)) is
             when Iir_Kind_Null_Statement =>
                Start_Hbox (Ctxt);
                Disp_Label (Ctxt, Stmt);
@@ -3354,6 +3413,17 @@ package body Vhdl.Prints is
                end;
             when Iir_Kind_Break_Statement =>
                Disp_Break_Statement (Ctxt, Stmt);
+
+            when Iir_Kind_Suspend_State_Statement =>
+               Start_Hbox (Ctxt);
+               Disp_Ident (Ctxt, Name_State);
+               Disp_Token (Ctxt, Tok_Colon);
+               Start_Lit (Ctxt, Tok_Integer);
+               Disp_Int32 (Ctxt, Iir_Int32 (Get_Suspend_State_Index (Stmt)));
+               Close_Lit (Ctxt);
+               Disp_Token (Ctxt, Tok_Semi_Colon);
+               Close_Hbox (Ctxt);
+
          end case;
          Stmt := Get_Chain (Stmt);
       end loop;
@@ -3917,20 +3987,19 @@ package body Vhdl.Prints is
       Has_Beg : constant Boolean := Get_Has_Begin (Bod);
       Has_End : constant Boolean := Get_Has_End (Bod);
    begin
+      Start_Vbox (Ctxt);
       Disp_Declaration_Chain (Ctxt, Bod);
+      Close_Vbox (Ctxt);
+
       if Has_Beg then
          Start_Hbox (Ctxt);
          Disp_Token (Ctxt, Tok_Begin);
          Close_Hbox (Ctxt);
       end if;
 
-      if Has_Beg or Has_End then
-         Start_Vbox (Ctxt);
-      end if;
+      Start_Vbox (Ctxt);
       Disp_Concurrent_Statement_Chain (Ctxt, Bod);
-      if Has_Beg or Has_End then
-         Close_Vbox (Ctxt);
-      end if;
+      Close_Vbox (Ctxt);
 
       if Has_End then
          Start_Hbox (Ctxt);
@@ -3953,10 +4022,8 @@ package body Vhdl.Prints is
       Disp_Token (Ctxt, Tok_Generate);
       Close_Hbox (Ctxt);
 
-      Start_Vbox (Ctxt);
       Disp_Generate_Statement_Body
         (Ctxt, Get_Generate_Statement_Body (Stmt));
-      Close_Vbox (Ctxt);
 
       Disp_End (Ctxt, Stmt, Tok_Generate);
    end Disp_For_Generate_Statement;
@@ -3984,9 +4051,7 @@ package body Vhdl.Prints is
          Disp_Token (Ctxt, Tok_Generate);
          Close_Hbox (Ctxt);
 
-         Start_Vbox (Ctxt);
          Disp_Generate_Statement_Body (Ctxt, Bod);
-         Close_Vbox (Ctxt);
 
          Clause := Get_Generate_Else_Clause (Clause);
          exit when Clause = Null_Iir;
@@ -4029,9 +4094,7 @@ package body Vhdl.Prints is
          Disp_Token (Ctxt, Tok_Double_Arrow);
          Close_Hbox (Ctxt);
 
-         Start_Vbox (Ctxt);
          Disp_Generate_Statement_Body (Ctxt, Bod);
-         Close_Vbox (Ctxt);
       end loop;
       Close_Vbox (Ctxt);
       Disp_End (Ctxt, Stmt, Tok_Generate);
@@ -4055,39 +4118,41 @@ package body Vhdl.Prints is
       S : NFA_State;
       E : NFA_Edge;
    begin
-      if N /= No_NFA then
-         OOB.Put ("-- start: ");
-         Disp_State (Get_Start_State (N));
-         OOB.Put (", final: ");
-         Disp_State (Get_Final_State (N));
-         OOB.Put (", active: ");
-         S := Get_Active_State (N);
-         if S = No_State then
-            OOB.Put ("-");
-         else
-            Disp_State (S);
-         end if;
-         if Get_Epsilon_NFA (N) then
-            OOB.Put (", epsilon");
-         end if;
-         OOB.New_Line;
-
-         S := Get_First_State (N);
-         while S /= No_State loop
-            E := Get_First_Src_Edge (S);
-            while E /= No_Edge loop
-               OOB.Put ("-- ");
-               Disp_State (S);
-               OOB.Put (" -> ");
-               Disp_State (Get_Edge_Dest (E));
-               Disp_Token (Ctxt, Tok_Colon);  --  To display ": "
-               Disp_Psl_Expression (Ctxt, Get_Edge_Expr (E));
-               OOB.New_Line;
-               E := Get_Next_Src_Edge (E);
-            end loop;
-            S := Get_Next_State (S);
-         end loop;
+      if N = No_NFA then
+         return;
       end if;
+
+      OOB.Put ("-- start: ");
+      Disp_State (Get_Start_State (N));
+      OOB.Put (", final: ");
+      Disp_State (Get_Final_State (N));
+      OOB.Put (", active: ");
+      S := Get_Active_State (N);
+      if S = No_State then
+         OOB.Put ("-");
+      else
+         Disp_State (S);
+      end if;
+      if Get_Epsilon_NFA (N) then
+         OOB.Put (", epsilon");
+      end if;
+      OOB.New_Line;
+
+      S := Get_First_State (N);
+      while S /= No_State loop
+         E := Get_First_Src_Edge (S);
+         while E /= No_Edge loop
+            OOB.Put ("-- ");
+            Disp_State (S);
+            OOB.Put (" -> ");
+            Disp_State (Get_Edge_Dest (E));
+            Disp_Token (Ctxt, Tok_Colon);  --  To display ": "
+            Disp_Psl_Expression (Ctxt, Get_Edge_Expr (E));
+            OOB.New_Line;
+            E := Get_Next_Src_Edge (E);
+         end loop;
+         S := Get_Next_State (S);
+      end loop;
    end Disp_PSL_NFA;
 
    procedure Disp_Psl_Assert_Directive
@@ -4694,7 +4759,9 @@ package body Vhdl.Prints is
          when Iir_Kind_Selected_Name
            | Iir_Kind_Selected_Element
            | Iir_Kind_Indexed_Name
-           | Iir_Kind_Slice_Name =>
+           | Iir_Kind_Slice_Name
+           | Iir_Kind_Procedure_Body
+           | Iir_Kind_Function_Body =>
             Print (Ctxt, N);
          when Iir_Kind_Psl_Cover_Directive =>
             Disp_Psl_Cover_Directive (Ctxt, N);
@@ -4882,6 +4949,9 @@ package body Vhdl.Prints is
             Disp_Name_Attribute (Ctxt, Expr, Name_Low);
          when Iir_Kind_Ascending_Type_Attribute =>
             Disp_Name_Attribute (Ctxt, Expr, Name_Ascending);
+
+         when Iir_Kind_Converse_Attribute =>
+            Disp_Name_Attribute (Ctxt, Expr, Name_Converse);
 
          when Iir_Kind_Nature_Reference_Attribute =>
             Disp_Name_Attribute (Ctxt, Expr, Name_Reference);
@@ -5359,5 +5429,132 @@ package body Vhdl.Prints is
       Disp_Psl_Expression (Ctxt, N);
       OOB.New_Line;
    end Disp_PSL_Expr;
+
+   package Vstring_Disp_Ctxt is
+      type Vstring_Ctxt is new Disp_Ctxt with record
+         Buf : Vstring_Acc;
+
+         --  Previous token, to decided whether or not a blank must be added.
+         Prev_Tok : Token_Type;
+      end record;
+
+      procedure Init (Ctxt : out Vstring_Ctxt; Buf : Vstring_Acc);
+      procedure Start_Hbox (Ctxt : in out Vstring_Ctxt) is null;
+      procedure Close_Hbox (Ctxt : in out Vstring_Ctxt) is null;
+      procedure Start_Vbox (Ctxt : in out Vstring_Ctxt) is null;
+      procedure Close_Vbox (Ctxt : in out Vstring_Ctxt) is null;
+      procedure Start_Node (Ctxt : in out Vstring_Ctxt; N : Iir) is null;
+      procedure Valign (Ctxt : in out Vstring_Ctxt; Point : Valign_Type)
+        is null;
+      procedure Disp_Token (Ctxt : in out Vstring_Ctxt; Tok : Token_Type);
+      procedure Start_Lit (Ctxt : in out Vstring_Ctxt; Tok : Token_Type);
+      procedure Disp_Char (Ctxt : in out Vstring_Ctxt; C : Character);
+      procedure Close_Lit (Ctxt : in out Vstring_Ctxt) is null;
+   private
+      procedure Put (Ctxt : in out Vstring_Ctxt; C : Character);
+   end Vstring_Disp_Ctxt;
+
+   package body Vstring_Disp_Ctxt is
+      procedure Init (Ctxt : out Vstring_Ctxt; Buf : Vstring_Acc) is
+      begin
+         Ctxt := (Buf => Buf,
+                  Prev_Tok => Tok_Newline);
+      end Init;
+
+      procedure Put (Ctxt : in out Vstring_Ctxt; C : Character) is
+      begin
+         Grt.Vstrings.Append (Ctxt.Buf.all, C);
+      end Put;
+
+      procedure Disp_Space (Ctxt : in out Vstring_Ctxt; Tok : Token_Type)
+      is
+         Prev_Tok : constant Token_Type := Ctxt.Prev_Tok;
+      begin
+         if Need_Space (Tok, Prev_Tok) then
+            Put (Ctxt, ' ');
+         end if;
+         Ctxt.Prev_Tok := Tok;
+      end Disp_Space;
+
+      procedure Disp_Token (Ctxt : in out Vstring_Ctxt; Tok : Token_Type) is
+      begin
+         Disp_Space (Ctxt, Tok);
+         Disp_Str (Ctxt, Image (Tok));
+      end Disp_Token;
+
+      procedure Start_Lit (Ctxt : in out Vstring_Ctxt; Tok : Token_Type) is
+      begin
+         Disp_Space (Ctxt, Tok);
+      end Start_Lit;
+
+      procedure Disp_Char (Ctxt : in out Vstring_Ctxt; C : Character) is
+      begin
+         Put (Ctxt, C);
+      end Disp_Char;
+   end Vstring_Disp_Ctxt;
+
+   procedure Print_String (N : Iir; Buf : Vstring_Acc)
+   is
+      use Vstring_Disp_Ctxt;
+      Ctxt : Vstring_Ctxt;
+   begin
+      Init (Ctxt, Buf);
+
+      case Get_Kind (N) is
+         when Iir_Kind_File_Declaration
+            | Iir_Kind_Signal_Declaration
+            | Iir_Kind_Constant_Declaration
+            | Iir_Kind_Variable_Declaration
+            | Iir_Kind_Free_Quantity_Declaration
+            | Iir_Kinds_Source_Quantity_Declaration =>
+            Disp_Object_Declaration (Ctxt, N);
+         when Iir_Kind_Type_Declaration =>
+            Disp_Type_Declaration (Ctxt, N);
+         when Iir_Kind_Subtype_Declaration =>
+            Disp_Subtype_Declaration (Ctxt, N);
+         when Iir_Kinds_Interface_Object_Declaration =>
+            Disp_Interface_Class (Ctxt, N);
+            Disp_Name_Of (Ctxt, N);
+            --  FIXME: need first interface.
+            Disp_Interface_Mode_And_Type (Ctxt, N);
+         when Iir_Kind_Function_Declaration
+           | Iir_Kind_Procedure_Declaration =>
+            Disp_Subprogram_Declaration (Ctxt, N, False);
+         when Iir_Kind_Element_Declaration =>
+            Disp_Identifier (Ctxt, N);
+            Disp_Token (Ctxt, Tok_Colon);
+            Disp_Subtype_Indication
+              (Ctxt, Or_Else (Get_Subtype_Indication (N), Get_Type (N)));
+         when others =>
+            null;
+      end case;
+   end Print_String;
+
+   function Allocate_Handle return Vstring_Acc is
+   begin
+      return new Grt.Vstrings.Vstring;
+   end Allocate_Handle;
+
+   function Get_Length (Handle : Vstring_Acc) return Natural is
+   begin
+      return Grt.Vstrings.Length (Handle.all);
+   end Get_Length;
+
+   function Get_C_String (Handle : Vstring_Acc)
+                         return Grt.Types.Ghdl_C_String is
+   begin
+      return Grt.Vstrings.Get_C_String (Handle.all);
+   end Get_C_String;
+
+   procedure Free_Handle (Handle : Vstring_Acc)
+   is
+      procedure Deallocate is new Ada.Unchecked_Deallocation
+        (Grt.Vstrings.Vstring, Vstring_Acc);
+      Handle1 : Vstring_Acc;
+   begin
+      Grt.Vstrings.Free (Handle.all);
+      Handle1 := Handle;
+      Deallocate (Handle1);
+   end Free_Handle;
 
 end Vhdl.Prints;

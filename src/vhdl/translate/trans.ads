@@ -289,6 +289,7 @@ package Trans is
       --  Return the offset of field for CHILD in its parent scope.
       function Get_Scope_Offset (Child : Var_Scope_Type; Otype : O_Tnode)
                                  return O_Cnode;
+      function Get_Scope_Field (Child : Var_Scope_Type) return O_Fnode;
 
       --  Finish the building of the current instance and return the type
       --  built.
@@ -444,6 +445,7 @@ package Trans is
       --  Used only to generate RTI.
       function Is_Var_Field (Var : Var_Type) return Boolean;
       function Get_Var_Offset (Var : Var_Type; Otype : O_Tnode) return O_Cnode;
+      function Get_Var_Field (Var : Var_Type) return O_Fnode;
       function Get_Var_Label (Var : Var_Type) return O_Dnode;
 
       --  For package instantiation.
@@ -1855,12 +1857,13 @@ package Trans is
             Object_Rti      : O_Dnode := O_Dnode_Null;
 
          when Kind_Signal =>
-            --  The current value of the signal.
+            --  The current value of the signal, for signal declarations.
             --  Also the initial value of collapsed ports.
             Signal_Val      : Var_Type := Null_Var;
             --  Pointer to the value, for ports.
             Signal_Valp     : Var_Type := Null_Var;
             --  A pointer to the signal (contains meta data).
+            --  Always present.
             Signal_Sig      : Var_Type;
             --  Direct driver for signal (if any).
             Signal_Driver   : Var_Type := Null_Var;
@@ -1920,10 +1923,6 @@ package Trans is
 
             --  Subprogram for the process.
             Process_Subprg : O_Dnode;
-
-            --  Variable (in the frame) containing the current state (a
-            --  number) used to resume the process.
-            Process_State : Var_Type := Null_Var;
 
             --  Union containing local declarations for statements.
             Process_Locvar_Scope : aliased Var_Scope_Type;

@@ -19,7 +19,6 @@
 with Types; use Types;
 with Tables;
 
-with Grt.Types; use Grt.Types;
 with Grt.Vhdl_Types; use Grt.Vhdl_Types;
 
 with Vhdl.Nodes; use Vhdl.Nodes;
@@ -31,20 +30,11 @@ with Elab.Vhdl_Context; use Elab.Vhdl_Context;
 
 package Simul.Vhdl_Elab is
    procedure Gather_Processes (Top : Synth_Instance_Acc);
+   procedure Compute_Sources;
    procedure Elab_Processes;
 
    --  For the debugger.
    Top_Instance : Synth_Instance_Acc;
-
-   --  For each signals:
-   --  * drivers (process + area), sources
-   --  * sensitivity
-   --  * waveform assignments
-   --  * decomposition level: none, vectors, full.
-   --  * force/release
-   --  * need to track activity
-   --  * need to track events
-   procedure Elab_Drivers;
 
    --  Change the meaning of W (width) in T for simulation.
    procedure Convert_Type_Width (T : Type_Acc);
@@ -106,11 +96,6 @@ package Simul.Vhdl_Elab is
       --  Next connection for the actual.
       Actual_Link : Connect_Index_Type;
 
-      --  Whether it is a source for the actual or/and the actual.
-      --  The correct word is 'source'.
-      Drive_Formal : Boolean;
-      Drive_Actual : Boolean;
-
       --  If true, the connection is fully collapsed: formal is the same
       --  signal as actual.
       Collapsed : Boolean;
@@ -146,7 +131,15 @@ package Simul.Vhdl_Elab is
    type Nbr_Sources_Array is array (Uns32 range <>) of Nbr_Sources_Type;
    type Nbr_Sources_Arr_Acc is access Nbr_Sources_Array;
 
-   type Signal_Entry (Kind : Mode_Signal_Type := Mode_Signal) is record
+   type Signal_Kind is (Signal_User,
+                        Signal_Quiet, Signal_Stable,
+                        Signal_Transaction,
+                        Signal_Delayed,
+                        Signal_Above,
+                        Signal_Guard,
+                        Signal_None);
+
+   type Signal_Entry (Kind : Signal_Kind := Signal_User) is record
       Decl : Iir;
       Inst : Synth_Instance_Acc;
       Typ : Type_Acc;
@@ -163,20 +156,19 @@ package Simul.Vhdl_Elab is
       Connect : Connect_Index_Type;
 
       case Kind is
-         when Mode_Signal_User =>
+         when Signal_User =>
             Drivers : Driver_Index_Type;
             Disconnect : Disconnect_Index_Type;
             Nbr_Sources : Nbr_Sources_Arr_Acc;
-         when Mode_Quiet | Mode_Stable | Mode_Delayed
-           | Mode_Transaction =>
+         when Signal_Quiet | Signal_Stable | Signal_Delayed
+           | Signal_Transaction =>
             Time : Std_Time;
             Pfx : Sub_Signal_Type;
-         when Mode_Above =>
+         when Signal_Above =>
             null;
-         when Mode_Guard =>
+         when Signal_Guard =>
             null;
-         when Mode_Conv_In | Mode_Conv_Out | Mode_End =>
-            --  Unused.
+         when Signal_None =>
             null;
       end case;
    end record;

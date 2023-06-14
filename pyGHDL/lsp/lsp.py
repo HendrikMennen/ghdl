@@ -59,7 +59,7 @@ def normalize_rpc_file_uris(rpc):
     # Fixes a crash on windows where the underlying ada crashes
     # if paths to the same file are given with inconsistent
     # capitalization.
-    for (key, val) in rpc.items():
+    for key, val in rpc.items():
         # recurse into all leaf elements.
         if isinstance(val, dict):
             normalize_rpc_file_uris(val)
@@ -126,7 +126,7 @@ class LanguageProtocolServer(object):
             log.error("Unexpected reply for %s", tid)
             return
         params = msg.get("params", None)
-        # Fix capitalization issues on windws.
+        # Fix capitalization issues on windows.
         if is_windows:
             normalize_rpc_file_uris(msg)
         fmethod = self.handler.dispatcher.get(method, None)

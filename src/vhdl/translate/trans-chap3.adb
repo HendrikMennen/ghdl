@@ -2103,7 +2103,8 @@ package body Trans.Chap3 is
                   return V = 0;
                end if;
             end;
-         when Type_Mode_E8 =>
+         when Type_Mode_E8
+            | Type_Mode_E32 =>
             declare
                V         : Iir_Int32;
                Base_Type : Iir;
@@ -2700,8 +2701,9 @@ package body Trans.Chap3 is
    procedure Translate_Object_Subtype_Indication (Decl      : Iir;
                                                   With_Vars : Boolean := True)
    is
-      Def : Iir;
       Ind : Iir;
+      Ind_Type : Iir;
+      Def : Iir;
       Mark  : Id_Mark_Type;
       Mark2 : Id_Mark_Type;
    begin
@@ -2722,7 +2724,15 @@ package body Trans.Chap3 is
 
       Push_Identifier_Prefix (Mark, Get_Identifier (Decl));
 
-      Def := Get_Type (Decl);
+      Ind := Get_Subtype_Indication (Decl);
+
+      --  Object subtype indication (if a proper one).
+      if Ind /= Null_Iir and then Is_Proper_Subtype_Indication (Ind) then
+         Ind_Type := Get_Type_Of_Subtype_Indication (Ind);
+         Push_Identifier_Prefix (Mark2, "OT");
+         Chap3.Translate_Subtype_Definition (Ind_Type, With_Vars);
+         Pop_Identifier_Prefix (Mark2);
+      end if;
 
       --  2) Constants may have a type that is different from the subtype
       --     indication, when the subtype indication is not fully constrained.
@@ -2730,45 +2740,43 @@ package body Trans.Chap3 is
       --     add some constraints on the type mark and the initial value add
       --     even more constraints.
       if Get_Kind (Decl) = Iir_Kind_Constant_Declaration then
-         Ind := Get_Subtype_Indication (Decl);
-         Ind := Get_Type_Of_Subtype_Indication (Ind);
-         if Ind /= Def then
-            Push_Identifier_Prefix (Mark2, "OTI");
-            Chap3.Translate_Subtype_Definition (Ind, With_Vars);
+         Ind_Type := Get_Type_Of_Subtype_Indication (Ind);
+         Def := Get_Type (Decl);
+         if Def /= Ind_Type then
+            Push_Identifier_Prefix (Mark2, "OTD");
+            Chap3.Translate_Subtype_Definition (Def, With_Vars);
             Pop_Identifier_Prefix (Mark2);
          end if;
       end if;
-
-      Push_Identifier_Prefix (Mark2, "OT");
-      Chap3.Translate_Subtype_Definition (Def, With_Vars);
-      Pop_Identifier_Prefix (Mark2);
 
       Pop_Identifier_Prefix (Mark);
    end Translate_Object_Subtype_Indication;
 
    procedure Elab_Object_Subtype_Indication (Decl : Iir)
    is
-      Def : constant Iir := Get_Type (Decl);
+      Ind : Iir;
+      Ind_Type : Iir;
+      Def : Iir;
    begin
-      if not Is_Anonymous_Type_Definition (Def) then
-         --  The type refers to a declared type, so already handled.
+      --  See translate_Object_Subtype_Indication.
+      if Get_Is_Ref (Decl) then
          return;
       end if;
 
-      declare
-         Ind : constant Iir := Get_Subtype_Indication (Decl);
-      begin
-         if Ind /= Null_Iir
-           and then Get_Kind (Ind) = Iir_Kind_Subtype_Attribute
-         then
-            if Is_Fully_Constrained_Type (Get_Type (Get_Prefix (Ind))) then
-               return;
-            end if;
-            raise Internal_Error;
-         else
+      Ind := Get_Subtype_Indication (Decl);
+
+      if Ind /= Null_Iir and then Is_Proper_Subtype_Indication (Ind) then
+         Ind_Type := Get_Type_Of_Subtype_Indication (Ind);
+         Elab_Subtype_Definition (Ind_Type);
+      end if;
+
+      if Get_Kind (Decl) = Iir_Kind_Constant_Declaration then
+         Ind_Type := Get_Type_Of_Subtype_Indication (Ind);
+         Def := Get_Type (Decl);
+         if Def /= Ind_Type then
             Elab_Subtype_Definition (Def);
          end if;
-      end;
+      end if;
    end Elab_Object_Subtype_Indication;
 
    procedure Elab_Type_Declaration (Decl : Iir) is
@@ -3288,7 +3296,7 @@ package body Trans.Chap3 is
 
    procedure Elab_Array_Subtype (Arr_Type : Iir) is
    begin
-      Chap3.Elab_Composite_Subtype_Layout (Arr_Type);
+      Elab_Composite_Subtype_Layout (Arr_Type);
    end Elab_Array_Subtype;
 
    procedure Create_Composite_Subtype (Sub_Type : Iir; Elab : Boolean := True)
@@ -3407,6 +3415,16 @@ package body Trans.Chap3 is
    begin
       Copy_Bounds (M2Addr (Dest), M2Addr (Src), Obj_Type);
    end Copy_Bounds;
+
+   procedure Copy_Range_No_Length (Dest : Mnode; Src : Mnode) is
+   begin
+      New_Assign_Stmt (M2Lv (Range_To_Left (Dest)),
+                       M2E (Range_To_Left (Src)));
+      New_Assign_Stmt (M2Lv (Range_To_Right (Dest)),
+                       M2E (Range_To_Right (Src)));
+      New_Assign_Stmt (M2Lv (Range_To_Dir (Dest)),
+                       M2E (Range_To_Dir (Src)));
+   end Copy_Range_No_Length;
 
    procedure Translate_Object_Allocation
      (Res        : in out Mnode;

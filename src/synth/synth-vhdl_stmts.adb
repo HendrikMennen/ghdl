@@ -52,6 +52,8 @@ with Synth.Errors; use Synth.Errors;
 with Synth.Vhdl_Decls; use Synth.Vhdl_Decls;
 with Synth.Vhdl_Expr; use Synth.Vhdl_Expr;
 with Synth.Vhdl_Insts; use Synth.Vhdl_Insts;
+with Synth.Vhdl_Eval;
+with Synth.Vhdl_Foreign;
 with Synth.Source;
 with Synth.Vhdl_Static_Proc;
 with Synth.Flags;
@@ -83,11 +85,11 @@ package body Synth.Vhdl_Stmts is
          raise Internal_Error;
       end if;
       if Get_Chain (Wf) /= Null_Node then
-         --  Warning.
+         --  TODO: warning for multiple waveform elements.
          null;
       end if;
       if Get_Time (Wf) /= Null_Node then
-         --  Warning
+         --  TODO: warning for a time value.
          null;
       end if;
       if Targ_Type = null then
@@ -101,8 +103,128 @@ package body Synth.Vhdl_Stmts is
       end if;
    end Synth_Waveform;
 
+   procedure Synth_Assignment_Prefix_Indexed_Name
+     (Syn_Inst : Synth_Instance_Acc;
+      Pfx : Node;
+      Dest_Base : in out Valtyp;
+      Dest_Typ : in out Type_Acc;
+      Dest_Off : in out Value_Offsets;
+      Dest_Dyn : in out Dyn_Name)
+   is
+      El_Typ : Type_Acc;
+      Voff : Net;
+      Off : Value_Offsets;
+      Err : Boolean;
+   begin
+      if Dest_Base.Val /= null then
+         --  For individual associations, only the typ can be set.
+         Strip_Const (Dest_Base);
+      end if;
+      Synth_Indexed_Name (Syn_Inst, Pfx, Dest_Typ, El_Typ, Voff, Off, Err);
+
+      if Err then
+         Dest_Base := No_Valtyp;
+      elsif Voff = No_Net then
+         --  Static index.
+         Dest_Off := Dest_Off + Off;
+      else
+         --  Dynamic index.
+         if Dest_Dyn.Voff = No_Net then
+            --  The first one.
+            Dest_Dyn := (Pfx_Off => Dest_Off,
+                         Pfx_Typ => Dest_Typ,
+                         Voff => Voff);
+            Dest_Off := Off;
+         else
+            --  Nested one.
+            --  FIXME
+            Dest_Off := Dest_Off + Off;
+            --  if Dest_Off /= (0, 0) then
+            --     Error_Msg_Synth (+Pfx, "nested memory not supported");
+            --  end if;
+
+            Dest_Dyn.Voff := Build_Addidx
+              (Get_Build (Syn_Inst), Dest_Dyn.Voff, Voff);
+            Set_Location (Dest_Dyn.Voff, Pfx);
+         end if;
+      end if;
+
+      Dest_Typ := El_Typ;
+   end Synth_Assignment_Prefix_Indexed_Name;
+
+   procedure Synth_Assignment_Prefix_Selected_Name
+     (Syn_Inst : Synth_Instance_Acc;
+      Pfx : Node;
+      Dest_Base : in out Valtyp;
+      Dest_Typ : in out Type_Acc;
+      Dest_Off : in out Value_Offsets;
+      Dest_Dyn : in out Dyn_Name)
+   is
+      pragma Unreferenced (Syn_Inst, Dest_Base, Dest_Dyn);
+      Idx : constant Iir_Index32 :=
+        Get_Element_Position (Get_Named_Entity (Pfx));
+   begin
+      Dest_Off := Dest_Off + Dest_Typ.Rec.E (Idx + 1).Offs;
+      Dest_Typ := Dest_Typ.Rec.E (Idx + 1).Typ;
+   end Synth_Assignment_Prefix_Selected_Name;
+
+   procedure Synth_Assignment_Prefix_Slice_Name
+     (Syn_Inst : Synth_Instance_Acc;
+      Pfx : Node;
+      Dest_Base : in out Valtyp;
+      Dest_Typ : in out Type_Acc;
+      Dest_Off : in out Value_Offsets;
+      Dest_Dyn : in out Dyn_Name)
+   is
+      Pfx_Bnd : Bound_Type;
+      El_Typ : Type_Acc;
+      Res_Bnd : Bound_Type;
+      Sl_Voff : Net;
+      Sl_Off : Value_Offsets;
+      Err : Boolean;
+      Arr_Typ : Type_Acc;
+   begin
+      if Dest_Base.Val /= null then
+         Strip_Const (Dest_Base);
+      end if;
+
+      Get_Onedimensional_Array_Bounds (Dest_Typ, Pfx_Bnd, El_Typ);
+      Synth_Slice_Suffix (Syn_Inst, Pfx, Pfx_Bnd, Dest_Typ.Wkind, El_Typ,
+                          Res_Bnd, Sl_Voff, Sl_Off, Err);
+
+      if Err then
+         Dest_Base := No_Valtyp;
+         Dest_Typ := null;
+      elsif Sl_Voff = No_Net then
+         --  Fixed slice.
+         Dest_Typ := Create_Onedimensional_Array_Subtype
+           (Dest_Typ, Res_Bnd, El_Typ);
+         Dest_Off.Net_Off := Dest_Off.Net_Off + Sl_Off.Net_Off;
+         Dest_Off.Mem_Off := Dest_Off.Mem_Off + Sl_Off.Mem_Off;
+      else
+         --  Variable slice.
+         if Dest_Dyn.Voff = No_Net then
+            --  First one.
+            Dest_Dyn := (Pfx_Off => Dest_Off,
+                         Pfx_Typ => Dest_Typ,
+                         Voff => Sl_Voff);
+            Dest_Off := Sl_Off;
+         else
+            --  Nested.
+            if Dest_Off /= (0, 0) then
+               Error_Msg_Synth (Syn_Inst, Pfx, "nested memory not supported");
+            end if;
+
+            Dest_Dyn.Voff := Build_Addidx
+              (Get_Build (Syn_Inst), Dest_Dyn.Voff, Sl_Voff);
+            Set_Location (Dest_Dyn.Voff, Pfx);
+         end if;
+         Arr_Typ := Create_Array_Type (Res_Bnd, False, True, El_Typ);
+         Dest_Typ := Create_Slice_Type (Arr_Typ, Res_Bnd.Len, El_Typ);
+      end if;
+   end Synth_Assignment_Prefix_Slice_Name;
+
    procedure Synth_Assignment_Prefix (Syn_Inst : Synth_Instance_Acc;
-                                      Inter_Inst : Synth_Instance_Acc;
                                       Pfx : Node;
                                       Dest_Base : out Valtyp;
                                       Dest_Typ : out Type_Acc;
@@ -131,13 +253,14 @@ package body Synth.Vhdl_Stmts is
             | Iir_Kind_Selected_Name
             | Iir_Kind_Attribute_Name =>
             Synth_Assignment_Prefix
-              (Syn_Inst, Inter_Inst, Get_Named_Entity (Pfx),
+              (Syn_Inst, Get_Named_Entity (Pfx),
                Dest_Base, Dest_Typ, Dest_Off, Dest_Dyn);
          when Iir_Kind_Interface_Signal_Declaration
+           | Iir_Kind_Interface_View_Declaration
            | Iir_Kind_Interface_Variable_Declaration
            | Iir_Kind_Interface_Constant_Declaration
            | Iir_Kind_Interface_File_Declaration =>
-            Assign_Base (Inter_Inst);
+            Assign_Base (Syn_Inst);
          when Iir_Kind_Variable_Declaration
            | Iir_Kind_Signal_Declaration
            | Iir_Kind_Guard_Signal_Declaration
@@ -151,131 +274,41 @@ package body Synth.Vhdl_Stmts is
            | Iir_Kind_Dot_Attribute
            | Iir_Kinds_Signal_Attribute =>
             Assign_Base (Syn_Inst);
-         when Iir_Kind_Function_Call =>
-            Dest_Base := Synth_Expression (Syn_Inst, Pfx);
-            Dest_Typ := Dest_Base.Typ;
-            Dest_Off := (0, 0);
-            Dest_Dyn := No_Dyn_Name;
 
          when Iir_Kind_Indexed_Name =>
-            declare
-               El_Typ : Type_Acc;
-               Voff : Net;
-               Off : Value_Offsets;
-               Err : Boolean;
-            begin
-               Synth_Assignment_Prefix
-                 (Syn_Inst, Inter_Inst, Get_Prefix (Pfx),
-                  Dest_Base, Dest_Typ, Dest_Off, Dest_Dyn);
-               if Dest_Base.Val /= null then
-                  --  For individual associations, only the typ can be set.
-                  Strip_Const (Dest_Base);
-               end if;
-               Synth_Indexed_Name (Syn_Inst, Pfx, Dest_Typ,
-                                   El_Typ, Voff, Off, Err);
-
-               if Err then
-                  Dest_Base := No_Valtyp;
-               elsif Voff = No_Net then
-                  --  Static index.
-                  Dest_Off := Dest_Off + Off;
-               else
-                  --  Dynamic index.
-                  if Dest_Dyn.Voff = No_Net then
-                     --  The first one.
-                     Dest_Dyn := (Pfx_Off => Dest_Off,
-                                  Pfx_Typ => Dest_Typ,
-                                  Voff => Voff);
-                     Dest_Off := Off;
-                  else
-                     --  Nested one.
-                     --  FIXME
-                     Dest_Off := Dest_Off + Off;
-                  --  if Dest_Off /= (0, 0) then
-                  --     Error_Msg_Synth (+Pfx, "nested memory not supported");
-                  --  end if;
-
-                     Dest_Dyn.Voff := Build_Addidx
-                       (Get_Build (Syn_Inst), Dest_Dyn.Voff, Voff);
-                     Set_Location (Dest_Dyn.Voff, Pfx);
-                  end if;
-               end if;
-
-               Dest_Typ := El_Typ;
-            end;
+            Synth_Assignment_Prefix
+              (Syn_Inst, Get_Prefix (Pfx),
+               Dest_Base, Dest_Typ, Dest_Off, Dest_Dyn);
+            Synth_Assignment_Prefix_Indexed_Name
+              (Syn_Inst, Pfx, Dest_Base, Dest_Typ, Dest_Off, Dest_Dyn);
 
          when Iir_Kind_Selected_Element =>
-            declare
-               Idx : constant Iir_Index32 :=
-                 Get_Element_Position (Get_Named_Entity (Pfx));
-            begin
-               Synth_Assignment_Prefix
-                 (Syn_Inst, Inter_Inst, Get_Prefix (Pfx),
-                  Dest_Base, Dest_Typ, Dest_Off, Dest_Dyn);
-               Dest_Off := Dest_Off + Dest_Typ.Rec.E (Idx + 1).Offs;
-
-               Dest_Typ := Dest_Typ.Rec.E (Idx + 1).Typ;
-            end;
+            Synth_Assignment_Prefix
+              (Syn_Inst, Get_Prefix (Pfx),
+               Dest_Base, Dest_Typ, Dest_Off, Dest_Dyn);
+            Synth_Assignment_Prefix_Selected_Name
+              (Syn_Inst, Pfx, Dest_Base, Dest_Typ, Dest_Off, Dest_Dyn);
 
          when Iir_Kind_Slice_Name =>
-            declare
-               Pfx_Bnd : Bound_Type;
-               El_Typ : Type_Acc;
-               Res_Bnd : Bound_Type;
-               Sl_Voff : Net;
-               Sl_Off : Value_Offsets;
-            begin
-               Synth_Assignment_Prefix
-                 (Syn_Inst, Inter_Inst, Get_Prefix (Pfx),
-                  Dest_Base, Dest_Typ, Dest_Off, Dest_Dyn);
-               Strip_Const (Dest_Base);
+            Synth_Assignment_Prefix
+              (Syn_Inst, Get_Prefix (Pfx),
+               Dest_Base, Dest_Typ, Dest_Off, Dest_Dyn);
+            Synth_Assignment_Prefix_Slice_Name
+              (Syn_Inst, Pfx, Dest_Base, Dest_Typ, Dest_Off, Dest_Dyn);
 
-               Get_Onedimensional_Array_Bounds (Dest_Typ, Pfx_Bnd, El_Typ);
-               Synth_Slice_Suffix (Syn_Inst, Pfx, Pfx_Bnd, El_Typ,
-                                   Res_Bnd, Sl_Voff, Sl_Off);
-
-
-               if Sl_Voff = No_Net then
-                  --  Fixed slice.
-                  Dest_Typ := Create_Onedimensional_Array_Subtype
-                    (Dest_Typ, Res_Bnd, El_Typ);
-                  Dest_Off.Net_Off := Dest_Off.Net_Off + Sl_Off.Net_Off;
-                  Dest_Off.Mem_Off := Dest_Off.Mem_Off + Sl_Off.Mem_Off;
-               else
-                  --  Variable slice.
-                  if Dest_Dyn.Voff = No_Net then
-                     --  First one.
-                     Dest_Dyn := (Pfx_Off => Dest_Off,
-                                  Pfx_Typ => Dest_Typ,
-                                  Voff => Sl_Voff);
-                     Dest_Off := Sl_Off;
-                  else
-                     --  Nested.
-                     if Dest_Off /= (0, 0) then
-                        Error_Msg_Synth
-                          (Syn_Inst, Pfx, "nested memory not supported");
-                     end if;
-
-                     Dest_Dyn.Voff := Build_Addidx
-                       (Get_Build (Syn_Inst), Dest_Dyn.Voff, Sl_Voff);
-                     Set_Location (Dest_Dyn.Voff, Pfx);
-                  end if;
-                  Dest_Typ := Create_Slice_Type (Res_Bnd.Len, El_Typ);
-               end if;
-            end;
 
          when Iir_Kind_Implicit_Dereference
            | Iir_Kind_Dereference =>
             declare
                Acc : Memtyp;
-               Idx : Heap_Index;
+               Idx : Heap_Ptr;
             begin
                Synth_Assignment_Prefix
                  (Syn_Inst, Get_Prefix (Pfx), Dest_Base, Dest_Typ, Dest_Off);
                Acc := (Dest_Typ, Dest_Base.Val.Mem + Dest_Off.Mem_Off);
                Idx := Read_Access (Acc);
-               if Idx = Null_Heap_Index then
-                  Error_Msg_Synth (Syn_Inst, Pfx, "null access dereference");
+               if Idx = Null_Heap_Ptr then
+                  Error_Msg_Synth (Syn_Inst, Pfx, "NULL access dereferenced");
                   Dest_Base := No_Valtyp;
                   Dest_Typ := Dest_Typ.Acc_Acc;
                else
@@ -286,6 +319,14 @@ package body Synth.Vhdl_Stmts is
                Dest_Dyn := No_Dyn_Name;
                Dest_Off := No_Value_Offsets;
             end;
+
+         when Iir_Kind_Function_Call
+           | Iir_Kind_Image_Attribute =>
+            Dest_Base := Synth_Expression (Syn_Inst, Pfx);
+            Dest_Typ := Dest_Base.Typ;
+            Dest_Off := (0, 0);
+            Dest_Dyn := No_Dyn_Name;
+
          when others =>
             Error_Kind ("synth_assignment_prefix", Pfx);
       end case;
@@ -300,7 +341,7 @@ package body Synth.Vhdl_Stmts is
       Dyn : Dyn_Name;
    begin
       Synth_Assignment_Prefix
-        (Syn_Inst, Syn_Inst, Pfx, Dest_Base, Dest_Typ, Dest_Off, Dyn);
+        (Syn_Inst, Pfx, Dest_Base, Dest_Typ, Dest_Off, Dyn);
       pragma Assert (Dyn = No_Dyn_Name);
    end Synth_Assignment_Prefix;
 
@@ -373,10 +414,10 @@ package body Synth.Vhdl_Stmts is
       --  Compute the type.
       case Base_Typ.Kind is
          when Type_Unbounded_Vector =>
-            Res := Create_Vector_Type (Bnd, Base_Typ.Uarr_El);
+            Res := Create_Vector_Type (Bnd, False, Base_Typ.Uarr_El);
          when Type_Unbounded_Array =>
             pragma Assert (Base_Typ.Ulast);
-            Res := Create_Array_Type (Bnd, True, Base_Typ.Uarr_El);
+            Res := Create_Array_Type (Bnd, False, True, Base_Typ.Uarr_El);
          when others =>
             raise Internal_Error;
       end case;
@@ -433,7 +474,7 @@ package body Synth.Vhdl_Stmts is
                Dyn : Dyn_Name;
             begin
                Synth_Assignment_Prefix
-                 (Syn_Inst, Syn_Inst, Target, Base, Typ, Off, Dyn);
+                 (Syn_Inst, Target, Base, Typ, Off, Dyn);
                return To_Target_Info (Base, Typ, Off, Dyn);
             end;
          when others =>
@@ -795,14 +836,19 @@ package body Synth.Vhdl_Stmts is
    procedure Synth_Simple_Signal_Assignment
      (Syn_Inst : Synth_Instance_Acc; Stmt : Node)
    is
+      Wf : constant Node := Get_Waveform_Chain (Stmt);
       Marker : Mark_Type;
       Targ : Target_Info;
       Val : Valtyp;
    begin
+      if Get_Kind (Wf) = Iir_Kind_Unaffected_Waveform then
+         --  Ignore this useless statement.
+         return;
+      end if;
+
       Mark_Expr_Pool (Marker);
       Targ := Synth_Target (Syn_Inst, Get_Target (Stmt));
-      Val := Synth_Waveform
-        (Syn_Inst, Get_Waveform_Chain (Stmt), Targ.Targ_Type);
+      Val := Synth_Waveform (Syn_Inst, Wf, Targ.Targ_Type);
       Synth_Assignment (Syn_Inst, Targ, Val, Stmt);
       Release_Expr_Pool (Marker);
    end Synth_Simple_Signal_Assignment;
@@ -814,7 +860,7 @@ package body Synth.Vhdl_Stmts is
       Marker : Mark_Type;
       Targ : Target_Info;
       Cond : Node;
-      Cwf : Node;
+      Cwf, Next_Cwf, Wf : Node;
       Inp : Input;
       Val, Cond_Val : Valtyp;
       Cond_Net : Net;
@@ -823,51 +869,92 @@ package body Synth.Vhdl_Stmts is
    begin
       Mark_Expr_Pool (Marker);
       Targ := Synth_Target (Syn_Inst, Get_Target (Stmt));
-      Last := No_Net;
       Cwf := Get_Conditional_Waveform_Chain (Stmt);
-      Cond := Null_Node;
-      while Cwf /= Null_Node loop
-         Val := Synth_Waveform
-           (Syn_Inst, Get_Waveform_Chain (Cwf), Targ.Targ_Type);
-         if Val = No_Valtyp then
-            --  Mark the error, but try to continue.
-            Set_Error (Syn_Inst);
-         else
-            V := Get_Net (Ctxt, Val);
-            Cond := Get_Condition (Cwf);
-            if Cond /= Null_Node then
-               Cond_Val := Synth_Expression (Syn_Inst, Cond);
-               if Cond_Val = No_Valtyp then
-                  Cond_Net := Build_Const_UB32 (Ctxt, 0, 1);
-               else
-                  Cond_Net := Get_Net (Ctxt, Cond_Val);
+      Cond := Get_Condition (Cwf);
+      Next_Cwf := Get_Chain (Cwf);
+
+      --  Handle directly:
+      --   targ <= value when cond [else unaffected]
+      if Cond /= Null_Node
+        and then
+        (Next_Cwf = Null_Node
+           or else (Get_Kind (Get_Waveform_Chain (Next_Cwf))
+                      = Iir_Kind_Unaffected_Waveform))
+      then
+         declare
+            Phi_True : Phi_Type;
+            Phi_False : Phi_Type;
+         begin
+            Cond_Val := Synth_Expression (Syn_Inst, Cond);
+
+            Push_Phi;
+            Wf := Get_Waveform_Chain (Cwf);
+            Val := Synth_Waveform (Syn_Inst, Wf, Targ.Targ_Type);
+            Synth_Assignment (Syn_Inst, Targ, Val, Stmt);
+            Pop_Phi (Phi_True);
+
+            Push_Phi;
+            Pop_Phi (Phi_False);
+
+            Cond_Net := Get_Net (Ctxt, Cond_Val);
+            Merge_Phis
+              (Ctxt, Cond_Net, Phi_True, Phi_False, Get_Location (Stmt));
+         end;
+      else
+         Last := No_Net;
+         Cond := Null_Node;
+         while Cwf /= Null_Node loop
+            Wf := Get_Waveform_Chain (Cwf);
+            if Get_Kind (Wf) = Iir_Kind_Unaffected_Waveform then
+               --  For unaffected, read the current value.
+               Val := Synth_Read (Syn_Inst, Targ, Stmt);
+            else
+               Val := Synth_Waveform (Syn_Inst, Wf, Targ.Targ_Type);
+            end if;
+            if Val = No_Valtyp then
+               --  Mark the error, but try to continue.
+               Set_Error (Syn_Inst);
+            else
+               V := Get_Net (Ctxt, Val);
+               Cond := Get_Condition (Cwf);
+               if Cond /= Null_Node then
+                  --  Add a mux to make it conditional.
+                  Cond_Val := Synth_Expression (Syn_Inst, Cond);
+                  if Cond_Val = No_Valtyp then
+                     Cond_Net := Build_Const_UB32 (Ctxt, 0, 1);
+                  else
+                     Cond_Net := Get_Net (Ctxt, Cond_Val);
+                  end if;
+
+                  V := Build_Mux2 (Ctxt, Cond_Net, No_Net, V);
+                  Set_Location (V, Cwf);
                end if;
 
-               V := Build_Mux2 (Ctxt, Cond_Net, No_Net, V);
-               Set_Location (V, Cwf);
+               --  Append
+               if Last /= No_Net then
+                  Inp := Get_Input (Get_Net_Parent (Last), 1);
+                  Connect (Inp, V);
+               else
+                  First := V;
+               end if;
+               Last := V;
             end if;
-
-            if Last /= No_Net then
-               Inp := Get_Input (Get_Net_Parent (Last), 1);
-               Connect (Inp, V);
-            else
-               First := V;
+            Cwf := Get_Chain (Cwf);
+         end loop;
+         if Cond /= Null_Node then
+            --  If the last waveform has a condition, set the else branch.
+            pragma Assert (Last /= No_Net);
+            Inp := Get_Input (Get_Net_Parent (Last), 1);
+            if Get_Driver (Inp) = No_Net then
+               --  No else.
+               Val := Synth_Read (Syn_Inst, Targ, Stmt);
+               Connect (Inp, Get_Net (Ctxt, Val));
             end if;
-            Last := V;
          end if;
-         Cwf := Get_Chain (Cwf);
-      end loop;
-      if Cond /= Null_Node then
-         pragma Assert (Last /= No_Net);
-         Inp := Get_Input (Get_Net_Parent (Last), 1);
-         if Get_Driver (Inp) = No_Net then
-            --  No else.
-            Val := Synth_Read (Syn_Inst, Targ, Stmt);
-            Connect (Inp, Get_Net (Ctxt, Val));
-         end if;
+         Val := Create_Value_Net (First, Targ.Targ_Type);
+         Synth_Assignment (Syn_Inst, Targ, Val, Stmt);
       end if;
-      Val := Create_Value_Net (First, Targ.Targ_Type);
-      Synth_Assignment (Syn_Inst, Targ, Val, Stmt);
+
       Release_Expr_Pool (Marker);
    end Synth_Conditional_Signal_Assignment;
 
@@ -906,10 +993,11 @@ package body Synth.Vhdl_Stmts is
       Mark_Expr_Pool (Marker);
       Targ := Synth_Target (Inst, Get_Target (Stmt));
       Targ_Type := Targ.Targ_Type;
+
       First := No_Valtyp;
       Last := No_Net;
       Ce := Get_Conditional_Expression_Chain (Stmt);
-      while Ce /= Null_Node loop
+      loop
          --  First, evaluate the condition.
          Cond := Get_Condition (Ce);
          if Cond /= Null_Node then
@@ -966,8 +1054,21 @@ package body Synth.Vhdl_Stmts is
          exit when Cond_Tri = True;
 
          Ce := Get_Chain (Ce);
+         exit when Ce = Null_Node;
       end loop;
-      Synth_Assignment (Inst, Targ, First, Stmt);
+
+      if Last /= No_Net and then Cond_Tri /= True then
+         --  There is at least one Mux2, and its input-1 is not connected.
+         --  Implement missing assignment as a self-assignment.
+         Val := Synth_Read (Inst, Targ, Stmt);
+         Connect (Get_Input (Get_Net_Parent (Last), 1),
+                  Get_Net (Ctxt, Val));
+      end if;
+
+      if First /= No_Valtyp then
+         Synth_Assignment (Inst, Targ, First, Stmt);
+      end if;
+
       Release_Expr_Pool (Marker);
    end Synth_Conditional_Variable_Assignment;
 
@@ -1862,7 +1963,8 @@ package body Synth.Vhdl_Stmts is
    function Synth_Subprogram_Association (Subprg_Inst : Synth_Instance_Acc;
                                           Caller_Inst : Synth_Instance_Acc;
                                           Inter : Node;
-                                          Assoc : Node) return Valtyp
+                                          Assoc : Node;
+                                          Loc : Node) return Valtyp
    is
       Inter_Type : constant Node := Get_Type (Inter);
       Inter_Typ : Type_Acc;
@@ -1914,7 +2016,7 @@ package body Synth.Vhdl_Stmts is
             return Val;
          end if;
          Val := Synth_Subtype_Conversion
-           (Subprg_Inst, Val, Inter_Typ, True, Assoc);
+           (Subprg_Inst, Val, Inter_Typ, True, Loc);
          if Val = No_Valtyp then
             return Val;
          end if;
@@ -2023,6 +2125,8 @@ package body Synth.Vhdl_Stmts is
             return Info.Obj;
          when Iir_Kind_Interface_Quantity_Declaration =>
             raise Internal_Error;
+         when Iir_Kind_Interface_View_Declaration =>
+            raise Internal_Error;
       end case;
    end Synth_Subprogram_Association;
 
@@ -2047,6 +2151,198 @@ package body Synth.Vhdl_Stmts is
       end loop;
       return Count;
    end Count_Individual_Associations;
+
+   function Copy_Unbounded_Type (Typ : Type_Acc; Base : Type_Acc)
+                                return Type_Acc is
+   begin
+      case Typ.Kind is
+         when Type_All_Discrete
+           | Type_Float
+           | Type_Vector
+           | Type_Array
+           | Type_Record
+           | Type_Access
+           | Type_File
+           | Type_Protected =>
+            return Unshare_Type_Instance (Typ, Base);
+         when Type_Unbounded_Record =>
+            declare
+               Els : Rec_El_Array_Acc;
+            begin
+               Els := Create_Rec_El_Array (Typ.Rec.Len);
+               for I in Els.E'Range loop
+                  Els.E (I) :=
+                    (Offs => Typ.Rec.E (I).Offs,
+                     Typ => Copy_Unbounded_Type (Typ.Rec.E (I).Typ,
+                                                 Base.Rec.E (I).Typ));
+               end loop;
+               return Create_Unbounded_Record (Typ.Rec_Base, Els);
+            end;
+         when Type_Unbounded_Array =>
+            return Create_Unbounded_Array
+              (Typ.Uarr_Idx, Typ.Ulast, Copy_Unbounded_Type (Typ.Uarr_El,
+                                                             Base.Uarr_El));
+         when Type_Array_Unbounded =>
+            return Create_Array_Unbounded_Type
+              (Typ.Abound, Typ.Is_Bnd_Static, Typ.Alast,
+               Copy_Unbounded_Type (Typ.Uarr_El, Base.Uarr_El));
+         when Type_Unbounded_Vector =>
+            return Create_Unbounded_Vector (Typ.Uarr_Idx, Typ.Uarr_El);
+         when Type_Slice =>
+            raise Internal_Error;
+      end case;
+   end Copy_Unbounded_Type;
+
+   procedure Synth_Individual_Formal (Syn_Inst : Synth_Instance_Acc;
+                                      Formal : Type_Acc;
+                                      Pfx : Node;
+                                      Dest_Typ : out Type_Acc;
+                                      Dest_Off : out Value_Offsets) is
+   begin
+      case Get_Kind (Pfx) is
+         when Iir_Kind_Simple_Name
+            | Iir_Kind_Selected_Name =>
+            Synth_Individual_Formal
+              (Syn_Inst, Formal, Get_Named_Entity (Pfx), Dest_Typ, Dest_Off);
+         when Iir_Kind_Interface_Signal_Declaration
+           | Iir_Kind_Interface_Variable_Declaration
+           | Iir_Kind_Interface_Constant_Declaration
+           | Iir_Kind_Interface_File_Declaration =>
+            Dest_Typ := Formal;
+            Dest_Off := No_Value_Offsets;
+
+         when Iir_Kind_Indexed_Name =>
+            Synth_Individual_Formal
+              (Syn_Inst, Formal, Get_Prefix (Pfx), Dest_Typ, Dest_Off);
+            declare
+               Dest_Base : Valtyp;
+               Dest_Dyn : Dyn_Name;
+            begin
+               Dest_Dyn := No_Dyn_Name;
+               Synth_Assignment_Prefix_Indexed_Name
+                 (Syn_Inst, Pfx, Dest_Base, Dest_Typ, Dest_Off, Dest_Dyn);
+               pragma Assert (Dest_Dyn = No_Dyn_Name);
+            end;
+
+         when Iir_Kind_Selected_Element =>
+            Synth_Individual_Formal
+              (Syn_Inst, Formal, Get_Prefix (Pfx), Dest_Typ, Dest_Off);
+            declare
+               Dest_Base : Valtyp;
+               Dest_Dyn : Dyn_Name;
+            begin
+               Dest_Dyn := No_Dyn_Name;
+               Synth_Assignment_Prefix_Selected_Name
+                 (Syn_Inst, Pfx, Dest_Base, Dest_Typ, Dest_Off, Dest_Dyn);
+               pragma Assert (Dest_Dyn = No_Dyn_Name);
+            end;
+
+         when Iir_Kind_Slice_Name =>
+            Synth_Individual_Formal
+              (Syn_Inst, Formal, Get_Prefix (Pfx), Dest_Typ, Dest_Off);
+            declare
+               Dest_Base : Valtyp;
+               Dest_Dyn : Dyn_Name;
+            begin
+               Dest_Dyn := No_Dyn_Name;
+               Synth_Assignment_Prefix_Slice_Name
+                 (Syn_Inst, Pfx, Dest_Base, Dest_Typ, Dest_Off, Dest_Dyn);
+               pragma Assert (Dest_Dyn = No_Dyn_Name);
+            end;
+
+         when others =>
+            Error_Kind ("synth_individual_formal", Pfx);
+      end case;
+   end Synth_Individual_Formal;
+
+   --  INTER_TYP is the interface type.
+   function Synth_Individual_Get_Formal_Type
+     (Inter_Typ : Type_Acc; Pfx : Node) return Type_Acc
+   is
+      Parent_Typ : Type_Acc;
+   begin
+      case Get_Kind (Pfx) is
+         when Iir_Kind_Simple_Name
+            | Iir_Kind_Selected_Name =>
+            return Synth_Individual_Get_Formal_Type
+              (Inter_Typ, Get_Named_Entity (Pfx));
+         when Iir_Kind_Interface_Signal_Declaration
+           | Iir_Kind_Interface_Variable_Declaration
+           | Iir_Kind_Interface_Constant_Declaration
+           | Iir_Kind_Interface_File_Declaration =>
+            return Inter_Typ;
+
+         when Iir_Kind_Indexed_Name =>
+            Parent_Typ := Synth_Individual_Get_Formal_Type
+              (Inter_Typ, Get_Prefix (Pfx));
+            return Get_Array_Element (Parent_Typ);
+
+         when Iir_Kind_Selected_Element =>
+            declare
+               Idx : constant Iir_Index32 :=
+                 Get_Element_Position (Get_Named_Entity (Pfx));
+            begin
+               Parent_Typ := Synth_Individual_Get_Formal_Type
+                 (Inter_Typ, Get_Prefix (Pfx));
+               return Parent_Typ.Rec.E (Idx + 1).Typ;
+            end;
+
+         when Iir_Kind_Slice_Name =>
+            Parent_Typ := Synth_Individual_Get_Formal_Type
+              (Inter_Typ, Get_Prefix (Pfx));
+            return Parent_Typ;
+
+         when others =>
+            Error_Kind ("synth_individual_get_formal_type", Pfx);
+      end case;
+   end Synth_Individual_Get_Formal_Type;
+
+   --  If TOP, substitute or check.
+   --  INTER_TYP is initially the interface type.
+   procedure Synth_Individual_Formal_Type (Syn_Inst : Synth_Instance_Acc;
+                                           Inter_Typ : Type_Acc;
+                                           Pfx : Node;
+                                           Pfx_Typ : Type_Acc)
+   is
+      pragma Unreferenced (Syn_Inst);
+      Parent_Typ : Type_Acc;
+   begin
+      Parent_Typ := Synth_Individual_Get_Formal_Type
+        (Inter_Typ, Get_Prefix (Pfx));
+
+      case Get_Kind (Pfx) is
+         when Iir_Kind_Indexed_Name
+            | Iir_Kind_Slice_Name =>
+            declare
+               Sub_Inter : constant Type_Acc :=
+                 Get_Array_Element (Parent_Typ);
+            begin
+               if not Is_Bounded_Type (Sub_Inter) then
+                  Parent_Typ.Arr_El := Pfx_Typ;
+               else
+                  --  Check shape ?
+                  null;
+               end if;
+            end;
+
+         when Iir_Kind_Selected_Element =>
+            declare
+               Idx : constant Iir_Index32 :=
+                 Get_Element_Position (Get_Named_Entity (Pfx));
+               Sub_Inter : constant Type_Acc := Parent_Typ.Rec.E (Idx + 1).Typ;
+            begin
+               if not Is_Bounded_Type (Sub_Inter) then
+                  Parent_Typ.Rec.E (Idx + 1).Typ := Pfx_Typ;
+               else
+                  --  check shape ?
+                  null;
+               end if;
+            end;
+
+         when others =>
+            Error_Kind ("synth_individual_formal_type", Pfx);
+      end case;
+   end Synth_Individual_Formal_Type;
 
    type Assoc_Array_Acc is access Assoc_Array;
    procedure Free_Assoc_Array is new Ada.Unchecked_Deallocation
@@ -2076,9 +2372,10 @@ package body Synth.Vhdl_Stmts is
 
       Formal_Typ := Synth_Subtype_Indication
         (Caller_Inst, Get_Actual_Type (First_Assoc));
-      Formal_Typ := Unshare_Type_Instance (Formal_Typ, Inter_Typ);
+      Formal_Typ := Copy_Unbounded_Type (Formal_Typ, Inter_Typ);
+--      Formal_Typ := Unshare_Type_Instance (Formal_Typ, Inter_Typ);
 
-      Create_Object (Subprg_Inst, Inter, (Formal_Typ, null));
+      Res := (Formal_Typ, null);
 
       Assoc := Get_Chain (First_Assoc);
       Static := True;
@@ -2086,40 +2383,34 @@ package body Synth.Vhdl_Stmts is
          declare
             Actual : constant Node := Get_Actual (Assoc);
             Formal : constant Node := Get_Formal (Assoc);
-            Form_Base : Valtyp;
             Form_Typ : Type_Acc;
             Form_Off : Value_Offsets;
-            Dyn : Dyn_Name;
             Act_Base : Valtyp;
             Act_Typ : Type_Acc;
             Act_Off : Value_Offsets;
             Act_Dyn : Dyn_Name;
             Cb_Val : Valtyp;
          begin
-            Synth_Assignment_Prefix
-              (Caller_Inst, Subprg_Inst,
-               Formal, Form_Base, Form_Typ, Form_Off, Dyn);
-            pragma Assert (Dyn = No_Dyn_Name);
-            pragma Assert (Form_Base = (Formal_Typ, null));
+            Synth_Individual_Formal
+              (Caller_Inst, Formal_Typ, Formal, Form_Typ, Form_Off);
 
             if Inter_Kind = Iir_Kind_Interface_Constant_Declaration then
-               Act_Base := Synth_Expression (Caller_Inst, Actual);
+               Act_Base := Synth_Expression_With_Type
+                 (Caller_Inst, Actual, Form_Typ);
                Act_Typ := Act_Base.Typ;
                Act_Off := No_Value_Offsets;
                Act_Dyn := No_Dyn_Name;
             else
                Synth_Assignment_Prefix
-                 (Caller_Inst, Subprg_Inst,
-                  Actual, Act_Base, Act_Typ, Act_Off, Act_Dyn);
+                 (Caller_Inst, Actual, Act_Base, Act_Typ, Act_Off, Act_Dyn);
             end if;
             if Get_Actual_Conversion (Assoc) /= Null_Node then
                --  TODO
                raise Internal_Error;
             end if;
-            if Act_Typ.Kind in Type_Composite then
-               --  TODO: reshape
-               null;
-            end if;
+            --  Reshape or add bounds to the formal type.
+            Synth_Individual_Formal_Type
+              (Caller_Inst, Formal_Typ, Formal, Act_Typ);
             Assocs (I) := (Formal => Formal,
                            Form_Off => Form_Off,
                            Act_Base => Act_Base,
@@ -2138,6 +2429,43 @@ package body Synth.Vhdl_Stmts is
          end;
          Assoc := Get_Chain (Assoc);
       end loop;
+
+      if not Is_Bounded_Type (Formal_Typ) then
+         case Type_Composite (Formal_Typ.Kind) is
+            when Type_Unbounded_Record =>
+               --  TODO: unbounded record with unbounded elements.
+               Formal_Typ := Create_Record_Type (Formal_Typ, Formal_Typ.Rec);
+            when Type_Unbounded_Array
+              | Type_Unbounded_Vector =>
+               raise Internal_Error;
+            when Type_Array_Unbounded =>
+               pragma Assert (Formal_Typ.Alast); --  TODO.
+               Formal_Typ := Create_Array_Type
+                 (Formal_Typ.Abound, False, Formal_Typ.Alast,
+                  Formal_Typ.Arr_El);
+            when Type_Array
+              | Type_Vector
+              | Type_Record =>
+               raise Internal_Error;
+         end case;
+
+         --  Re-evaluate the formals to re-compute the offset.
+         Assoc := Get_Chain (First_Assoc);
+         for I in 1 .. Count loop
+            declare
+               Formal : constant Node := Get_Formal (Assoc);
+               Form_Typ : Type_Acc;
+               Form_Off : Value_Offsets;
+            begin
+               Synth_Individual_Formal
+                 (Caller_Inst, Formal_Typ, Formal, Form_Typ, Form_Off);
+               Assocs (I).Form_Off := Form_Off;
+            end;
+            Assoc := Get_Chain (Assoc);
+         end loop;
+      end if;
+
+      Formal_Typ := Unshare_Type_Instance (Formal_Typ, Inter_Typ);
 
       --  4. If static: build mem, if in: build net, if out: build concat
       if Static then
@@ -2159,16 +2487,6 @@ package body Synth.Vhdl_Stmts is
          raise Internal_Error;
       end if;
 
-      --  Destroy the object.  It will be recreated by
-      --  Synth_Subprogram_Association.
-      declare
-         D : Destroy_Type;
-      begin
-         Destroy_Init (D, Subprg_Inst);
-         Destroy_Object (D, Inter);
-         Destroy_Finish (D);
-      end;
-
       Free_Assoc_Array (Assocs);
 
       return Res;
@@ -2176,13 +2494,15 @@ package body Synth.Vhdl_Stmts is
 
    procedure Synth_Subprogram_Associations (Subprg_Inst : Synth_Instance_Acc;
                                             Caller_Inst : Synth_Instance_Acc;
-                                            Init : Association_Iterator_Init)
+                                            Init : Association_Iterator_Init;
+                                            Call_Loc : Node)
    is
       Inter : Node;
       Assoc : Node;
       Iterator : Association_Iterator;
       Marker : Mark_Type;
       Val : Valtyp;
+      Loc : Node;
    begin
       Set_Instance_Const (Subprg_Inst, True);
 
@@ -2201,8 +2521,13 @@ package body Synth.Vhdl_Stmts is
             Val := Synth_Individual_Association
               (Subprg_Inst, Caller_Inst, Inter, Assoc);
          else
+            if Assoc = Null_Node then
+               Loc := Call_Loc;
+            else
+               Loc := Assoc;
+            end if;
             Val := Synth_Subprogram_Association
-              (Subprg_Inst, Caller_Inst, Inter, Assoc);
+              (Subprg_Inst, Caller_Inst, Inter, Assoc, Loc);
             if Val /= No_Valtyp then
                Val := Unshare (Val, Instance_Pool);
             end if;
@@ -2221,12 +2546,13 @@ package body Synth.Vhdl_Stmts is
    procedure Synth_Subprogram_Associations (Subprg_Inst : Synth_Instance_Acc;
                                             Caller_Inst : Synth_Instance_Acc;
                                             Inter_Chain : Node;
-                                            Assoc_Chain : Node)
+                                            Assoc_Chain : Node;
+                                            Call_Loc : Node)
    is
       Init : Association_Iterator_Init;
    begin
       Init := Association_Iterator_Build (Inter_Chain, Assoc_Chain);
-      Synth_Subprogram_Associations (Subprg_Inst, Caller_Inst, Init);
+      Synth_Subprogram_Associations (Subprg_Inst, Caller_Inst, Init, Call_Loc);
    end Synth_Subprogram_Associations;
 
    --  Create wires for out and inout interface variables.
@@ -2270,7 +2596,19 @@ package body Synth.Vhdl_Stmts is
    begin
       case Get_Kind (Func) is
          when Iir_Kind_Function_Call =>
-            Res := Exec_Resolution_Call (Inst, Get_Implementation (Func), Val);
+            declare
+               Imp : constant Node := Get_Implementation (Func);
+               Obj : constant Node := Get_Method_Object (Func);
+               Mt : Memtyp;
+            begin
+               if Get_Implicit_Definition (Imp) = Iir_Predefined_None then
+                  Res := Exec_Resolution_Call (Inst, Imp, Obj, Val);
+               else
+                  Mt := Synth.Vhdl_Eval.Eval_Static_Predefined_Function_Call
+                    (Inst, Get_Memtyp (Val), Null_Memtyp, Res_Typ, Func);
+                  Res := Create_Value_Memtyp (Mt);
+               end if;
+            end;
          when Iir_Kind_Type_Conversion =>
             declare
                Conv_Typ : constant Type_Acc :=
@@ -2385,6 +2723,12 @@ package body Synth.Vhdl_Stmts is
       Wire_Mark : Wire_Id;
       Subprg_Phi : Phi_Type;
    begin
+      if Get_Foreign_Flag (Imp) then
+         Error_Msg_Synth
+           (Syn_Inst, Call, "cannot synthesize FOREIGN %n", +Imp);
+         return No_Valtyp;
+      end if;
+
       Mark (Wire_Mark);
       C := (Mode => Mode_Dynamic,
             Inst => Sub_Inst,
@@ -2495,6 +2839,11 @@ package body Synth.Vhdl_Stmts is
       Res : Valtyp;
       C : Seq_Context (Mode_Static);
    begin
+      if Get_Foreign_Flag (Imp) then
+         return Synth.Vhdl_Foreign.Call_Subprogram
+           (Syn_Inst, Sub_Inst, Imp, Loc);
+      end if;
+
       C := (Mode_Static,
             Inst => Sub_Inst,
             Cur_Loop => null,
@@ -2599,6 +2948,35 @@ package body Synth.Vhdl_Stmts is
       return Res;
    end Synth_Protected_Call_Instance;
 
+   --  Copy the result of a function EXPR to the expr_pool, so that if a local
+   --  value is returned, it is saved before the local instance is destroyed.
+   function Unshare_Result (Expr : Valtyp) return Valtyp
+   is
+      Res : Valtyp;
+   begin
+      if Expr.Val.Kind = Value_Alias then
+         --  If the result is an alias, extract the value (on the right pool).
+         declare
+            Val : constant Value_Acc := Expr.Val.A_Obj;
+            Mt : Memtyp;
+         begin
+            case Val.Kind is
+               when Value_Memory =>
+                  Mt := Get_Value_Memtyp ((Expr.Val.A_Typ, Val));
+                  Res := Create_Value_Memory (Expr.Typ, Expr_Pool'Access);
+                  Copy_Memory (Res.Val.Mem, Mt.Mem + Expr.Val.A_Off.Mem_Off,
+                               Expr.Typ.Sz);
+                  return Res;
+               when others =>
+                  --  Is it possible ?
+                  raise Internal_Error;
+            end case;
+         end;
+      else
+         return Unshare (Expr, Expr_Pool'Access);
+      end if;
+   end Unshare_Result;
+
    function Synth_Subprogram_Call (Syn_Inst : Synth_Instance_Acc;
                                    Call : Node;
                                    Init : Association_Iterator_Init)
@@ -2636,7 +3014,7 @@ package body Synth.Vhdl_Stmts is
          Set_Extra (Sub_Inst, Syn_Inst, New_Internal_Name (Ctxt));
       end if;
 
-      Synth_Subprogram_Associations (Sub_Inst, Syn_Inst, Init);
+      Synth_Subprogram_Associations (Sub_Inst, Syn_Inst, Init, Call);
 
       if Is_Error (Sub_Inst) then
          Res := No_Valtyp;
@@ -2675,8 +3053,11 @@ package body Synth.Vhdl_Stmts is
       Free_Instance (Sub_Inst);
 
       if Res /= No_Valtyp then
-         --  Protect return value from being deallocated
-         Res := Unshare (Res, Expr_Pool'Access);
+         --  Copy a result of the function call.
+         --  The result can be a local variable which will be released.
+         --  It can also be an alias of a local variable.
+         Res := Unshare_Result (Res);
+         --  The type can have been created in the function.
          Ret_Typ := Get_Subtype_Object (Syn_Inst, Get_Type (Imp));
          Res.Typ := Unshare_Type_Expr (Res.Typ, Ret_Typ);
       end if;
@@ -2741,7 +3122,7 @@ package body Synth.Vhdl_Stmts is
          Set_Extra (Sub_Inst, Syn_Inst, New_Internal_Name (Ctxt));
       end if;
 
-      Synth_Subprogram_Associations (Sub_Inst, Syn_Inst, Init);
+      Synth_Subprogram_Associations (Sub_Inst, Syn_Inst, Init, Call);
 
       Synth.Vhdl_Static_Proc.Synth_Static_Procedure (Sub_Inst, Imp, Call);
 
@@ -2773,16 +3154,22 @@ package body Synth.Vhdl_Stmts is
    end Synth_Procedure_Call;
 
    function Exec_Resolution_Call (Syn_Inst : Synth_Instance_Acc;
-                                  Func : Node;
+                                  Imp : Node;
+                                  Obj : Node;
                                   Arg : Valtyp) return Valtyp
    is
-      Bod : constant Node := Vhdl.Sem_Inst.Get_Subprogram_Body_Origin (Func);
-      Inter : constant Node := Get_Interface_Declaration_Chain (Func);
+      Bod : constant Node := Vhdl.Sem_Inst.Get_Subprogram_Body_Origin (Imp);
+      Inter : constant Node := Get_Interface_Declaration_Chain (Imp);
       Init : Association_Iterator_Init;
       Res : Valtyp;
       Sub_Inst : Synth_Instance_Acc;
    begin
-      Sub_Inst := Synth_Subprogram_Call_Instance (Syn_Inst, Func, Bod);
+      if Obj /= Null_Node then
+         Sub_Inst := Synth_Protected_Call_Instance (Syn_Inst, Obj, Imp, Bod);
+      else
+         Sub_Inst := Synth_Subprogram_Call_Instance (Syn_Inst, Imp, Bod);
+      end if;
+
       Set_Instance_Const (Sub_Inst, True);
 
       Create_Object (Sub_Inst, Inter, Arg);
@@ -2790,7 +3177,7 @@ package body Synth.Vhdl_Stmts is
       Init := Association_Iterator_Build (Inter, Null_Node);
 
       Res := Synth_Static_Subprogram_Call
-        (Syn_Inst, Sub_Inst, Func, Bod, Init, Func);
+        (Syn_Inst, Sub_Inst, Imp, Bod, Init, Imp);
 
       Free_Instance (Sub_Inst);
 
@@ -3391,7 +3778,7 @@ package body Synth.Vhdl_Stmts is
    is
       use Simple_IO;
       Rep_Expr : constant Node := Get_Report_Expression (Stmt);
-      Sev_Expr : constant Node := Get_Severity_Expression (Stmt);
+      Sev_Expr : Node;
       Marker : Mark_Type;
       Rep : Valtyp;
       Sev : Valtyp;
@@ -3408,31 +3795,38 @@ package body Synth.Vhdl_Stmts is
          end if;
          Strip_Const (Rep);
       end if;
-      if Sev_Expr /= Null_Node then
-         Sev := Synth_Expression (Syn_Inst, Sev_Expr);
-         if Sev = No_Valtyp then
-            Set_Error (Syn_Inst);
-            Release_Expr_Pool (Marker);
-            return;
-         end if;
-         Strip_Const (Sev);
-      end if;
 
-      if Sev = No_Valtyp then
-         case Get_Kind (Stmt) is
-            when Iir_Kind_Report_Statement
-              | Iir_Kind_Psl_Cover_Directive =>
-               Sev_V := Note_Severity;
-            when Iir_Kind_Assertion_Statement
-              | Iir_Kind_Concurrent_Assertion_Statement
-              | Iir_Kind_Psl_Assert_Directive
-              | Iir_Kind_Psl_Assume_Directive =>
-               Sev_V := Error_Severity;
-            when others =>
-               raise Internal_Error;
-         end case;
+      if Get_Kind (Stmt) /= Iir_Kind_Psl_Cover_Directive then
+         Sev_Expr := Get_Severity_Expression (Stmt);
+
+         if Sev_Expr /= Null_Node then
+            Sev := Synth_Expression (Syn_Inst, Sev_Expr);
+            if Sev = No_Valtyp then
+               Set_Error (Syn_Inst);
+               Release_Expr_Pool (Marker);
+               return;
+            end if;
+            Strip_Const (Sev);
+         end if;
+
+         if Sev = No_Valtyp then
+            case Get_Kind (Stmt) is
+               when Iir_Kind_Report_Statement
+                 | Iir_Kind_Psl_Cover_Directive =>
+                  Sev_V := Note_Severity;
+               when Iir_Kind_Assertion_Statement
+                 | Iir_Kind_Concurrent_Assertion_Statement
+                 | Iir_Kind_Psl_Assert_Directive
+                 | Iir_Kind_Psl_Assume_Directive =>
+                  Sev_V := Error_Severity;
+               when others =>
+                  raise Internal_Error;
+            end case;
+         else
+            Sev_V := Natural (Read_Discrete (Sev));
+         end if;
       else
-         Sev_V := Natural (Read_Discrete (Sev));
+         Sev_V := Note_Severity;
       end if;
 
       if Assertion_Report_Handler /= null then
@@ -3639,6 +4033,8 @@ package body Synth.Vhdl_Stmts is
                Synth_Simple_Signal_Assignment (C.Inst, Stmt);
             when Iir_Kind_Conditional_Signal_Assignment_Statement =>
                Synth_Conditional_Signal_Assignment (C.Inst, Stmt);
+            when Iir_Kind_Selected_Waveform_Assignment_Statement =>
+               Synth_Selected_Signal_Assignment (C.Inst, Stmt);
             when Iir_Kind_Variable_Assignment_Statement =>
                Synth_Variable_Assignment (C.Inst, Stmt);
             when Iir_Kind_Conditional_Variable_Assignment_Statement =>
@@ -4396,6 +4792,21 @@ package body Synth.Vhdl_Stmts is
       end if;
    end Synth_Psl_Assert_Directive;
 
+   procedure Synth_Psl_Endpoint_Declaration
+     (Syn_Inst : Synth_Instance_Acc; Stmt : Node)
+   is
+      pragma Unreferenced (Syn_Inst, Stmt);
+   begin
+      if not Flags.Flag_Formal then
+         return;
+      end if;
+
+      --  TODO
+      --  Mutate object to a net
+      --  Assign the net.
+      raise Internal_Error;
+   end Synth_Psl_Endpoint_Declaration;
+
    procedure Synth_Generate_Statement_Body
      (Syn_Inst : Synth_Instance_Acc; Bod : Node)
    is
@@ -4691,6 +5102,8 @@ package body Synth.Vhdl_Stmts is
                Synth_Psl_Restrict_Directive (Syn_Inst, Item);
             when Iir_Kind_Psl_Cover_Directive =>
                Synth_Psl_Cover_Directive (Syn_Inst, Item);
+            when Iir_Kind_Psl_Endpoint_Declaration =>
+               Synth_Psl_Endpoint_Declaration (Syn_Inst, Item);
             when Iir_Kind_Signal_Declaration
                | Iir_Kind_Constant_Declaration
                | Iir_Kind_Function_Declaration

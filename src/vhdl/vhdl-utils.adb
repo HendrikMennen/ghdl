@@ -248,6 +248,7 @@ package body Vhdl.Utils is
                | Iir_Kind_Interface_Package_Declaration
                | Iir_Kind_Interface_Function_Declaration
                | Iir_Kind_Interface_Procedure_Declaration
+               | Iir_Kind_Mode_View_Declaration
                | Iir_Kind_External_Signal_Name
                | Iir_Kind_External_Constant_Name
                | Iir_Kind_External_Variable_Name =>
@@ -321,6 +322,8 @@ package body Vhdl.Utils is
                | Iir_Kinds_Subnature_Definition
                | Iir_Kind_Wildcard_Type_Definition
                | Iir_Kind_Subtype_Definition
+               | Iir_Kind_Record_Mode_View_Indication
+               | Iir_Kind_Array_Mode_View_Indication
                | Iir_Kind_Group_Template_Declaration
                | Iir_Kind_Group_Declaration
                | Iir_Kind_Attribute_Implicit_Declaration
@@ -336,6 +339,7 @@ package body Vhdl.Utils is
                | Iir_Kinds_Subprogram_Body
                | Iir_Kind_Protected_Type_Body
                | Iir_Kind_Generate_Statement_Body
+               | Iir_Kind_Package_Instantiation_Body
                | Iir_Kind_Procedure_Call
                | Iir_Kind_Aggregate_Info
                | Iir_Kind_Entity_Class
@@ -363,6 +367,7 @@ package body Vhdl.Utils is
                | Iir_Kind_Record_Element_Resolution
                | Iir_Kind_Element_Declaration
                | Iir_Kind_Nature_Element_Declaration
+               | Iir_Kinds_Mode_View_Element_Definition
                | Iir_Kind_Psl_Endpoint_Declaration
                | Iir_Kind_Psl_Boolean_Parameter
                | Iir_Kind_Psl_Declaration
@@ -414,7 +419,8 @@ package body Vhdl.Utils is
            | Iir_Kind_Interface_Variable_Declaration
            | Iir_Kind_Interface_Signal_Declaration
            | Iir_Kind_Interface_File_Declaration
-           | Iir_Kind_Interface_Quantity_Declaration =>
+           | Iir_Kind_Interface_Quantity_Declaration
+           | Iir_Kind_Interface_View_Declaration =>
             return Name;
 
          --  An implicit signak GUARD defined by the guard expression of a
@@ -562,6 +568,13 @@ package body Vhdl.Utils is
       end if;
    end Is_Quantity_Name;
 
+   function Is_Signal_Parameter (Obj : Iir) return Boolean is
+   begin
+      return Get_Kind (Obj) = Iir_Kind_Interface_Signal_Declaration
+        and then
+        Get_Kind (Get_Parent (Obj)) in Iir_Kinds_Subprogram_Declaration;
+   end Is_Signal_Parameter;
+
    function Get_Interface_Of_Formal (Formal : Iir) return Iir
    is
       El : Iir;
@@ -690,6 +703,65 @@ package body Vhdl.Utils is
          return False;
       end if;
    end Is_Copyback_Parameter;
+
+   procedure Set_Interface_Associated (Inter_Chain : Iir; Assoc_Chain : Iir)
+   is
+      Inter, Assoc_Inter, Assoc : Iir;
+   begin
+      Assoc := Assoc_Chain;
+      Assoc_Inter := Inter_Chain;
+      while Assoc /= Null_Node loop
+         Inter := Get_Association_Interface (Assoc, Assoc_Inter);
+         case Iir_Kinds_Interface_Declaration (Get_Kind (Inter)) is
+            when Iir_Kind_Interface_Type_Declaration =>
+               declare
+                  Tdef : constant Iir := Get_Interface_Type_Definition (Inter);
+               begin
+                  pragma Assert (Get_Associated_Type (Tdef) = Null_Iir);
+                  Set_Associated_Type (Tdef, Get_Actual_Type (Assoc));
+               end;
+               --  TODO: subprograms ?
+            when Iir_Kind_Interface_Package_Declaration =>
+               pragma Assert (Get_Associated_Package (Inter) = Null_Iir);
+               Set_Associated_Package
+                 (Inter, Get_Named_Entity (Get_Actual (Assoc)));
+            when Iir_Kinds_Interface_Subprogram_Declaration =>
+               pragma Assert (Get_Associated_Subprogram (Inter) = Null_Iir);
+               Set_Associated_Subprogram
+                 (Inter, Get_Named_Entity (Get_Actual (Assoc)));
+            when Iir_Kinds_Interface_Object_Declaration
+               | Iir_Kind_Interface_Terminal_Declaration =>
+               null;
+         end case;
+         Next_Association_Interface (Assoc, Assoc_Inter);
+      end loop;
+   end Set_Interface_Associated;
+
+   procedure Clear_Interface_Associated (Inter_Chain : Iir)
+   is
+      Inter : Iir;
+   begin
+      Inter := Inter_Chain;
+      while Inter /= Null_Node loop
+         case Iir_Kinds_Interface_Declaration (Get_Kind (Inter)) is
+            when Iir_Kind_Interface_Type_Declaration =>
+               declare
+                  Tdef : constant Iir := Get_Interface_Type_Definition (Inter);
+               begin
+                  Set_Associated_Type (Tdef, Null_Iir);
+               end;
+               --  TODO: subprograms ?
+            when Iir_Kind_Interface_Package_Declaration =>
+               Set_Associated_Package (Inter, Null_Iir);
+            when Iir_Kinds_Interface_Subprogram_Declaration =>
+               Set_Associated_Subprogram (Inter, Null_Iir);
+            when Iir_Kinds_Interface_Object_Declaration
+               | Iir_Kind_Interface_Terminal_Declaration =>
+               null;
+         end case;
+         Inter := Get_Chain (Inter);
+      end loop;
+   end Clear_Interface_Associated;
 
    function Find_Name_In_Flist (List : Iir_Flist; Lit : Name_Id) return Iir
    is
@@ -1065,15 +1137,17 @@ package body Vhdl.Utils is
       return Get_Type_Declarator (Def) = Null_Iir;
    end Is_Anonymous_Type_Definition;
 
-   function Is_Anonymous_Nature_Definition (Def : Iir) return Boolean is
-   begin
-      return Get_Nature_Declarator (Def) = Null_Iir;
-   end Is_Anonymous_Nature_Definition;
-
    function Is_Array_Type (Def : Iir) return Boolean is
    begin
       return Get_Kind (Def) in Iir_Kinds_Array_Type_Definition;
    end Is_Array_Type;
+
+   function Is_Record_Type (Def : Iir) return Boolean is
+   begin
+      return Kind_In (Def,
+                      Iir_Kind_Record_Type_Definition,
+                      Iir_Kind_Record_Subtype_Definition);
+   end Is_Record_Type;
 
    function Is_Fully_Constrained_Type (Def : Iir) return Boolean is
    begin
@@ -1263,6 +1337,53 @@ package body Vhdl.Utils is
             Error_Kind ("get_nature_of_subnature_indication", Ind);
       end case;
    end Get_Nature_Of_Subnature_Indication;
+
+   function Is_Proper_Subtype_Indication (Def : Iir) return Boolean is
+   begin
+      case Get_Kind (Def) is
+         when Iir_Kinds_Subtype_Definition =>
+            return True;
+         when Iir_Kinds_Denoting_Name
+           | Iir_Kind_Element_Attribute
+           | Iir_Kind_Subtype_Attribute =>
+            return False;
+         when others =>
+            Error_Kind ("is_proper_subtype_indication", Def);
+      end case;
+   end Is_Proper_Subtype_Indication;
+
+   function Is_Proper_Subnature_Indication (Def : Iir) return Boolean is
+   begin
+      case Get_Kind (Def) is
+         when Iir_Kinds_Subnature_Definition =>
+            return True;
+         when Iir_Kinds_Denoting_Name =>
+            return False;
+         when others =>
+            Error_Kind ("is_proper_subnature_indication", Def);
+      end case;
+   end Is_Proper_Subnature_Indication;
+
+   function Has_Owned_Subtype_Indication (Decl : Iir) return Boolean
+   is
+      Def : Iir;
+   begin
+      --  Subtype indication is shared with a previous declaration, like in:
+      --    signal a, b : std_logic_vector (7 downto 0);
+      if Get_Is_Ref (Decl) then
+         return False;
+      end if;
+
+      Def := Get_Subtype_Indication (Decl);
+      --  Implicit functions don't have subtype indication.
+      --  TODO: make them regular ?
+      --  Also, object aliases may not have a subtype indication.
+      if Def = Null_Iir then
+         return False;
+      end if;
+
+      return Is_Proper_Subtype_Indication (Def);
+   end Has_Owned_Subtype_Indication;
 
    function Get_Index_Type (Indexes : Iir_Flist; Idx : Natural) return Iir
    is
@@ -1782,6 +1903,7 @@ package body Vhdl.Utils is
       Set_Type_Declarator (Res, Null_Iir);
       Set_Resolved_Flag (Res, True);
       Set_Signal_Type_Flag (Res, True);
+      Set_Type (Res, Std_Package.Error_Type);
       return Res;
    end Create_Error_Type;
 
@@ -2020,6 +2142,110 @@ package body Vhdl.Utils is
             Error_Kind ("get_file_signature", Def);
       end case;
    end Get_File_Signature;
+
+   function Get_Converse_Mode (Mode : Iir_Mode) return Iir_Mode is
+   begin
+      case Mode is
+         when Iir_In_Mode =>
+            return Iir_Out_Mode;
+         when Iir_Out_Mode
+           | Iir_Buffer_Mode =>
+            return Iir_In_Mode;
+         when Iir_Inout_Mode =>
+            return Iir_Inout_Mode;
+         when Iir_Linkage_Mode
+           | Iir_Unknown_Mode =>
+            --  Not supported
+            return Mode;
+      end case;
+   end Get_Converse_Mode;
+
+   procedure Extract_Mode_View_Name
+     (Name : Iir; View : out Iir; Reversed : out Boolean)
+   is
+      Pfx : Iir;
+   begin
+      Pfx := Name;
+      Reversed := False;
+
+      loop
+         case Get_Kind (Pfx) is
+            when Iir_Kinds_Denoting_Name =>
+               Pfx := Get_Named_Entity (Pfx);
+            when Iir_Kind_Mode_View_Declaration
+              | Iir_Kind_Simple_Mode_View_Element =>
+               View := Pfx;
+               exit;
+            when Iir_Kind_Converse_Attribute =>
+               Reversed := not Reversed;
+               Pfx := Get_Prefix (Pfx);
+            when Iir_Kind_Record_Mode_View_Indication
+              | Iir_Kind_Array_Mode_View_Indication =>
+               Pfx := Get_Name (Pfx);
+            when others =>
+               Error_Kind ("extract_mode_view_name", Pfx);
+         end case;
+      end loop;
+   end Extract_Mode_View_Name;
+
+   procedure Update_Mode_View_By_Pos (Sub_View : out Iir;
+                                      Sub_Reversed : out Boolean;
+                                      View : Iir;
+                                      Reversed : Boolean;
+                                      Pos : Natural)
+   is
+      Def_List : constant Iir_Flist := Get_Elements_Definition_List (View);
+      El_Name : constant Iir := Get_Nth_Element (Def_List, Pos);
+      Reversed1 : Boolean;
+   begin
+      case Iir_Kinds_Mode_View_Element_Definition (Get_Kind (El_Name)) is
+         when Iir_Kind_Simple_Mode_View_Element =>
+            Sub_View := El_Name;
+            Sub_Reversed := Reversed;
+         when Iir_Kind_Array_Mode_View_Element
+           | Iir_Kind_Record_Mode_View_Element =>
+            Extract_Mode_View_Name
+              (Get_Mode_View_Name (El_Name), Sub_View, Reversed1);
+            Sub_Reversed := Reversed xor Reversed1;
+      end case;
+   end Update_Mode_View_By_Pos;
+
+   procedure Update_Mode_View_Selected_Name
+     (View : in out Iir; Reversed : in out Boolean; El : Iir)
+   is
+      pragma Assert (Get_Kind (View) = Iir_Kind_Mode_View_Declaration);
+      Pos : constant Natural := Natural (Get_Element_Position (El));
+      Sub_View : Iir;
+      Sub_Reversed : Boolean;
+   begin
+      Update_Mode_View_By_Pos (Sub_View, Sub_Reversed, View, Reversed, Pos);
+      View := Sub_View;
+      Reversed := Sub_Reversed;
+   end Update_Mode_View_Selected_Name;
+
+   procedure Get_Mode_View_From_Name
+     (Name : Iir; View : out Iir; Reversed : out Boolean) is
+   begin
+      case Get_Kind (Name) is
+         when Iir_Kinds_Denoting_Name =>
+            Get_Mode_View_From_Name (Get_Named_Entity (Name), View, Reversed);
+         when Iir_Kind_Interface_View_Declaration =>
+            Extract_Mode_View_Name
+              (Get_Mode_View_Indication (Name), View, Reversed);
+         when Iir_Kind_Selected_Element =>
+            Get_Mode_View_From_Name
+              (Get_Prefix (Name), View, Reversed);
+            if Get_Kind (View) = Iir_Kind_Simple_Mode_View_Element then
+               return;
+            end if;
+            pragma Assert (Get_Kind (View) = Iir_Kind_Mode_View_Declaration);
+
+            Update_Mode_View_Selected_Name
+              (View, Reversed, Get_Named_Entity (Name));
+         when others =>
+            Error_Kind ("get_mode_view_from_name", Name);
+      end case;
+   end Get_Mode_View_From_Name;
 
    function Get_Source_Identifier (Decl : Iir) return Name_Id
    is

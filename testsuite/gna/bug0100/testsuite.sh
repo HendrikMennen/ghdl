@@ -34,6 +34,9 @@ analyze_failure --force-analysis inst2.vhdl
 analyze_failure arr_err1.vhdl
 analyze_failure --force-analysis oper1.vhdl
 analyze_failure --force-analysis emptyrec.vhdl
+analyze_failure nameparen.vhdl
+analyze_failure inter1.vhdl
+analyze_failure --force-analysis inter1.vhdl
 
 if analyze_failure --force-analysis notype1.vhdl 2>&1 | grep -q "indexed name"; then
   :

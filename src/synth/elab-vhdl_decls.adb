@@ -53,21 +53,27 @@ package body Elab.Vhdl_Decls is
                             Decl : Node;
                             Typ : Type_Acc)
    is
-      Def : constant Iir := Get_Default_Value (Decl);
+      Def : Iir;
       Expr_Mark : Mark_Type;
       Init : Valtyp;
    begin
       pragma Assert (Typ.Is_Global);
 
-      if Is_Valid (Def) then
-         Mark_Expr_Pool (Expr_Mark);
-         Init := Synth_Expression_With_Type (Syn_Inst, Def, Typ);
-         Init := Exec_Subtype_Conversion (Init, Typ, False, Decl);
-         Init := Unshare (Init, Instance_Pool);
-         Release_Expr_Pool (Expr_Mark);
-      else
+      if Get_Kind (Decl) = Iir_Kind_Interface_View_Declaration then
          Init := No_Valtyp;
+      else
+         Def := Get_Default_Value (Decl);
+         if Is_Valid (Def) then
+            Mark_Expr_Pool (Expr_Mark);
+            Init := Synth_Expression_With_Type (Syn_Inst, Def, Typ);
+            Init := Exec_Subtype_Conversion (Init, Typ, False, Decl);
+            Init := Unshare (Init, Instance_Pool);
+            Release_Expr_Pool (Expr_Mark);
+         else
+            Init := No_Valtyp;
+         end if;
       end if;
+
       Create_Signal (Syn_Inst, Decl, Typ, Init.Val);
    end Create_Signal;
 
@@ -100,13 +106,19 @@ package body Elab.Vhdl_Decls is
          --  Note: Obj_Typ is bounded.
          Init.Typ := Obj_Typ;
       else
-         if Force_Init then
-            Current_Pool := Instance_Pool;
-            Init := Create_Value_Default (Obj_Typ);
-            Current_Pool := Expr_Pool'Access;
+         --  Always create shared variables, as they might be referenced
+         --  during elaboration.
+         if (Force_Init or else Get_Shared_Flag (Decl)) then
+            if Obj_Typ.Kind /= Type_Protected then
+               Current_Pool := Instance_Pool;
+               Init := Create_Value_Default (Obj_Typ);
+               Current_Pool := Expr_Pool'Access;
+            else
+               Init := Synth.Vhdl_Decls.Create_Protected_Object
+                 (Syn_Inst, Decl, Obj_Typ);
+               Init := Unshare (Init, Instance_Pool);
+            end if;
          else
-            --  For synthesis, no need to set a value for a shared variable
-            --  (they will certainly become a memory).
             Init := (Typ => Obj_Typ, Val => null);
          end if;
       end if;
@@ -302,7 +314,8 @@ package body Elab.Vhdl_Decls is
             Elab_Anonymous_Type_Definition
               (Syn_Inst, Get_Type_Definition (Decl),
                Get_Subtype_Definition (Decl));
-         when Iir_Kind_Subtype_Declaration =>
+         when Iir_Kind_Subtype_Declaration
+           | Iir_Kind_Mode_View_Declaration =>
             declare
                T : Type_Acc;
             begin
@@ -316,6 +329,8 @@ package body Elab.Vhdl_Decls is
 
          when Iir_Kind_Package_Instantiation_Declaration =>
             Vhdl_Insts.Elab_Package_Instantiation (Syn_Inst, Decl);
+         when Iir_Kind_Package_Instantiation_Body =>
+            Vhdl_Insts.Elab_Package_Instantiation_Body (Syn_Inst, Decl);
          when Iir_Kind_Package_Declaration =>
             Vhdl_Insts.Elab_Package_Declaration (Syn_Inst, Decl);
          when Iir_Kind_Package_Body =>

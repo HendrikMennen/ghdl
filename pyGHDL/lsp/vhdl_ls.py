@@ -17,13 +17,16 @@ class VhdlLanguageServer(object):
             "shutdown": self.shutdown,
             "$/setTraceNotification": self.setTraceNotification,
             "$/setTrace": self.setTrace,
+            "$/cancelRequest": self.cancelRequest,
             "textDocument/didOpen": self.textDocument_didOpen,
             "textDocument/didChange": self.textDocument_didChange,
             "textDocument/didClose": self.textDocument_didClose,
             "textDocument/didSave": self.textDocument_didSave,
-            # 'textDocument/hover': self.hover,
+            "textDocument/hover": self.textDocument_hover,
             "textDocument/definition": self.textDocument_definition,
+            "textDocument/implementation": self.textDocument_implementation,
             "textDocument/documentSymbol": self.textDocument_documentSymbol,
+            "textDocument/codeAction": self.textDocument_codeAction,
             # 'textDocument/completion': self.completion,
             "textDocument/rangeFormatting": self.textDocument_rangeFormatting,
             "workspace/xShowAllFiles": self.workspace_xShowAllFiles,
@@ -43,6 +46,9 @@ class VhdlLanguageServer(object):
     def setTrace(self, value):
         pass
 
+    def cancelRequest(self, id):
+        pass
+
     def capabilities(self):
         server_capabilities = {
             "textDocumentSync": {
@@ -50,12 +56,13 @@ class VhdlLanguageServer(object):
                 "change": lsp.TextDocumentSyncKind.INCREMENTAL,
                 "save": {"includeText": True},
             },
-            "hoverProvider": False,
+            "hoverProvider": True,
             #            'completionProvider': False,
             #            'signatureHelpProvider': {
             #                'triggerCharacters': ['(', ',']
             #            },
             "definitionProvider": True,
+            "implementationProvider": True,
             "referencesProvider": False,
             "documentHighlightProvider": False,
             "documentSymbolProvider": True,
@@ -112,6 +119,9 @@ class VhdlLanguageServer(object):
     def textDocument_definition(self, textDocument=None, position=None):
         return self.workspace.goto_definition(textDocument["uri"], position)
 
+    def textDocument_implementation(self, textDocument=None, position=None):
+        return self.workspace.goto_implementation(textDocument["uri"], position)
+
     def textDocument_documentSymbol(self, textDocument=None):
         doc = self.workspace.get_or_create_document(textDocument["uri"])
         return doc.document_symbols()
@@ -124,6 +134,16 @@ class VhdlLanguageServer(object):
         if res is not None:
             self.lint(doc_uri)
         return res
+
+    def textDocument_hover(self, textDocument=None, position=None):
+        return self.workspace.hover(textDocument["uri"], position)
+
+    def textDocument_codeAction(self, textDocument=None, range=None, context=None):
+        # Not yet implemented.
+        # * reorder associations (but keep comments !)
+        # * add missing associations (all or only IN)
+        # * add formal in assocs
+        return None
 
     def m_workspace__did_change_configuration(self, _settings=None):
         for doc_uri in self.workspace.documents:

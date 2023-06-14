@@ -28,6 +28,7 @@ with Netlists.Gates;
 
 with Vhdl.Errors;
 with Vhdl.Utils; use Vhdl.Utils;
+with Vhdl.Sem_Inst;
 with Vhdl.Std_Package;
 
 with Elab.Memtype;
@@ -399,7 +400,8 @@ package body Synth.Vhdl_Decls is
       use Elab.Memtype;
       Prev_Instance_Pool : constant Areapools.Areapool_Acc := Instance_Pool;
       Decl_Type : constant Node := Get_Type (Var);
-      Bod : constant Node := Get_Protected_Type_Body (Decl_Type);
+      Bod : constant Node :=
+        Vhdl.Sem_Inst.Get_Protected_Type_Body_Origin (Decl_Type);
       Obj_Inst : Synth_Instance_Acc;
       Obj_Hand : Protected_Index;
       Mem : Memory_Ptr;
@@ -408,7 +410,11 @@ package body Synth.Vhdl_Decls is
       Res : Valtyp;
       Last_Type : Node;
    begin
-      Parent := Get_Instance_By_Scope (Inst, Get_Parent_Scope (Bod));
+      --  Get instance scope.  Use the protected type definition as the
+      --  instance for the body is the same, but the body can be shared in
+      --  within an instantiated package.
+      Parent := Get_Instance_By_Scope (Inst, Get_Parent_Scope (Decl_Type));
+
       Obj_Inst := Make_Elab_Instance (Parent, Var, Bod, Null_Node);
       Obj_Hand := Elab.Vhdl_Prot.Create (Obj_Inst);
 
@@ -420,7 +426,9 @@ package body Synth.Vhdl_Decls is
             when Iir_Kind_Type_Declaration
               | Iir_Kind_Anonymous_Type_Declaration
               | Iir_Kind_Subtype_Declaration
-              | Iir_Kind_Variable_Declaration =>
+              | Iir_Kind_Constant_Declaration
+              | Iir_Kind_Variable_Declaration
+              | Iir_Kind_File_Declaration =>
                Elab.Vhdl_Decls.Elab_Declaration
                  (Obj_Inst, Decl, True, Last_Type);
             when Iir_Kind_Function_Declaration
@@ -534,13 +542,14 @@ package body Synth.Vhdl_Decls is
       if Init.Typ.Kind = Type_Protected then
          Error_Msg_Synth (Syn_Inst, Decl, "protected type not supported");
          Set_Error (Syn_Inst);
-      else
-         if Init.Val = null then
-            Mark_Expr_Pool (Marker);
-            Init := Create_Value_Default (Init.Typ);
-            Init := Unshare (Init, Instance_Pool);
-            Release_Expr_Pool (Marker);
-         end if;
+         return;
+      end if;
+
+      if Init.Val = null then
+         Mark_Expr_Pool (Marker);
+         Init := Create_Value_Default (Init.Typ);
+         Init := Unshare (Init, Instance_Pool);
+         Release_Expr_Pool (Marker);
       end if;
 
       Val := Create_Var_Wire (Syn_Inst, Decl, Wire_Variable, Init);
@@ -650,12 +659,12 @@ package body Synth.Vhdl_Decls is
          if Aval.Val.Kind = Value_Net then
             --  Object is a net if it is not writable.  Extract the
             --  bits for the alias.
-            Current_Pool := Instance_Pool;
-            Aval := Create_Value_Net
-              (Build2_Extract (Get_Build (Syn_Inst), Get_Value_Net (Aval.Val),
-                               Off, Val.Typ.W),
-               Val.Typ);
-            Current_Pool := Expr_Pool'Access;
+            Aval := (Val.Typ,
+                     Create_Value_Net (Build2_Extract
+                                         (Get_Build (Syn_Inst),
+                                          Get_Value_Net (Aval.Val),
+                                          Off, Val.Typ.W),
+                                       Instance_Pool));
             Val.Val.A_Off := (0, 0);
          else
             Aval := Unshare (Aval, Instance_Pool);
@@ -835,6 +844,14 @@ package body Synth.Vhdl_Decls is
       Finalize_Assignment (Get_Build (Syn_Inst), W);
 
       Gate_Net := Get_Wire_Gate (W);
+
+      Free_Wire (W);
+
+      --  Replace the wire with a net so that external names can refer to it.
+      Mutate_Object
+        (Syn_Inst, Decl,
+         (Vt.Typ, Create_Value_Net (Gate_Net, Process_Pool'Access)));
+
       Gate := Get_Net_Parent (Gate_Net);
       case Get_Id (Gate) is
          when Id_Signal
@@ -874,8 +891,6 @@ package body Synth.Vhdl_Decls is
          --  The value of an undriven signal is its initial value.
          Connect (Get_Input (Gate, 0), Def_Val);
       end if;
-
-      Free_Wire (W);
    end Finalize_Signal;
 
    procedure Finalize_Declaration
@@ -924,6 +939,8 @@ package body Synth.Vhdl_Decls is
             null;
          when Iir_Kind_Attribute_Implicit_Declaration =>
             --  Not supported by synthesis.
+            null;
+         when Iir_Kind_Protected_Type_Body =>
             null;
 
          when Iir_Kind_Package_Declaration =>

@@ -39,79 +39,85 @@ This module contains all DOM classes for VHDL's design units (:class:`context <E
 
 
 """
-from typing import Iterable, Union
+from typing import Iterable
 
 from pyTooling.Decorators import export
 
-from pyVHDLModel import (
-    ContextUnion as VHDLModel_ContextUnion,
-    LibraryClause as VHDLModel_LibraryClause,
-    UseClause as VHDLModel_UseClause,
-    ContextReference as VHDLModel_ContextReference,
-    Name,
-    ContextUnion,
-)
-from pyVHDLModel.SyntaxModel import (
-    Entity as VHDLModel_Entity,
-    Architecture as VHDLModel_Architecture,
-    Package as VHDLModel_Package,
-    PackageBody as VHDLModel_PackageBody,
-    PackageInstantiation as VHDLModel_PackageInstantiation,
-    Context as VHDLModel_Context,
-    Configuration as VHDLModel_Configuration,
-    Component as VHDLModel_Component,
-    GenericInterfaceItem,
-    PortInterfaceItem,
-    ConcurrentStatement,
-)
+from pyVHDLModel.Symbol import Symbol
+from pyVHDLModel.Instantiation import PackageInstantiation as VHDLModel_PackageInstantiation
+from pyVHDLModel.Interface import GenericInterfaceItem, PortInterfaceItem
+from pyVHDLModel.Concurrent import ConcurrentStatement
+from pyVHDLModel.DesignUnit import Context as VHDLModel_Context
+from pyVHDLModel.DesignUnit import Package as VHDLModel_Package
+from pyVHDLModel.DesignUnit import PackageBody as VHDLModel_PackageBody
+from pyVHDLModel.DesignUnit import Entity as VHDLModel_Entity
+from pyVHDLModel.DesignUnit import Architecture as VHDLModel_Architecture
+from pyVHDLModel.DesignUnit import Component as VHDLModel_Component
+from pyVHDLModel.DesignUnit import Configuration as VHDLModel_Configuration
+from pyVHDLModel.DesignUnit import LibraryClause as VHDLModel_LibraryClause
+from pyVHDLModel.DesignUnit import UseClause as VHDLModel_UseClause
+from pyVHDLModel.DesignUnit import ContextReference as VHDLModel_ContextReference
+from pyVHDLModel.DesignUnit import ContextUnion as VHDLModel_ContextUnion
 
 from pyGHDL.libghdl import utils
 from pyGHDL.libghdl._types import Iir
 from pyGHDL.libghdl.vhdl import nodes
 from pyGHDL.dom import DOMMixin, Position, DOMException
-from pyGHDL.dom._Utils import GetNameOfNode, GetDocumentationOfNode, GetPackageMemberSymbol, GetContextSymbol
-from pyGHDL.dom._Translate import (
-    GetGenericsFromChainedNodes,
-    GetPortsFromChainedNodes,
-    GetDeclaredItemsFromChainedNodes,
-    GetConcurrentStatementsFromChainedNodes,
+from pyGHDL.dom._Utils import GetNameOfNode, GetDocumentationOfNode
+from pyGHDL.dom._Translate import GetGenericsFromChainedNodes, GetPortsFromChainedNodes, GetName
+from pyGHDL.dom._Translate import GetDeclaredItemsFromChainedNodes, GetConcurrentStatementsFromChainedNodes
+from pyGHDL.dom.Names import SimpleName, AllName
+from pyGHDL.dom.Symbol import (
+    EntitySymbol,
+    ContextReferenceSymbol,
+    LibraryReferenceSymbol,
+    PackageSymbol,
+    PackageMemberReferenceSymbol,
+    AllPackageMembersReferenceSymbol,
 )
-from pyGHDL.dom.Symbol import EntitySymbol, ContextReferenceSymbol, LibraryReferenceSymbol, PackageSymbol
 
 
 @export
 class LibraryClause(VHDLModel_LibraryClause, DOMMixin):
-    def __init__(self, libraryNode: Iir, symbols: Iterable[Name]):
+    def __init__(self, libraryNode: Iir, symbols: Iterable[Symbol]):
         super().__init__(symbols)
         DOMMixin.__init__(self, libraryNode)
 
 
 @export
 class UseClause(VHDLModel_UseClause, DOMMixin):
-    def __init__(self, useNode: Iir, symbols: Iterable[Name]):
+    def __init__(self, useNode: Iir, symbols: Iterable[Symbol]):
         super().__init__(symbols)
         DOMMixin.__init__(self, useNode)
 
     @classmethod
     def parse(cls, useNode: Iir):
-        uses = [GetPackageMemberSymbol(nodes.Get_Selected_Name(useNode))]
+        nameNode = nodes.Get_Selected_Name(useNode)
+        name = GetName(nameNode)
+        symbolType = AllPackageMembersReferenceSymbol if isinstance(name, AllName) else PackageMemberReferenceSymbol
+        uses = [symbolType(nameNode, name)]
         for use in utils.chain_iter(nodes.Get_Use_Clause_Chain(useNode)):
-            uses.append(GetPackageMemberSymbol(nodes.Get_Selected_Name(use)))
+            nameNode = nodes.Get_Selected_Name(use)
+            name = GetName(nameNode)
+            symbolType = AllPackageMembersReferenceSymbol if isinstance(name, AllName) else PackageMemberReferenceSymbol
+            uses.append(symbolType(nameNode, name))
 
         return cls(useNode, uses)
 
 
 @export
 class ContextReference(VHDLModel_ContextReference, DOMMixin):
-    def __init__(self, contextNode: Iir, symbols: Iterable[Name]):
+    def __init__(self, contextNode: Iir, symbols: Iterable[Symbol]):
         super().__init__(symbols)
         DOMMixin.__init__(self, contextNode)
 
     @classmethod
     def parse(cls, contextNode: Iir):
-        contexts = [GetContextSymbol(nodes.Get_Selected_Name(contextNode))]
+        nameNode = nodes.Get_Selected_Name(contextNode)
+        contexts = [ContextReferenceSymbol(nameNode, GetName(nameNode))]
         for context in utils.chain_iter(nodes.Get_Context_Reference_Chain(contextNode)):
-            contexts.append(GetContextSymbol(nodes.Get_Selected_Name(context)))
+            nameNode = nodes.Get_Selected_Name(context)
+            contexts.append(ContextReferenceSymbol(nameNode, GetName(nameNode)))
 
         return cls(contextNode, contexts)
 
@@ -168,7 +174,7 @@ class Architecture(VHDLModel_Architecture, DOMMixin):
         name = GetNameOfNode(architectureNode)
         documentation = GetDocumentationOfNode(architectureNode)
         entityNameNode = nodes.Get_Entity_Name(architectureNode)
-        entitySymbol = EntitySymbol(entityNameNode, GetNameOfNode(entityNameNode))
+        entitySymbol = EntitySymbol(entityNameNode, GetName(entityNameNode))
         declaredItems = GetDeclaredItemsFromChainedNodes(
             nodes.Get_Declaration_Chain(architectureNode), "architecture", name
         )
@@ -251,11 +257,11 @@ class PackageBody(VHDLModel_PackageBody, DOMMixin):
 
     @classmethod
     def parse(cls, packageBodyNode: Iir, contextItems: Iterable[VHDLModel_ContextUnion]):
-        packageName = GetNameOfNode(packageBodyNode)
-        packageSymbol = PackageSymbol(packageBodyNode, packageName)
+        packageIdentifier = GetNameOfNode(packageBodyNode)
+        packageSymbol = PackageSymbol(packageBodyNode, SimpleName(packageBodyNode, packageIdentifier))
         documentation = GetDocumentationOfNode(packageBodyNode)
         declaredItems = GetDeclaredItemsFromChainedNodes(
-            nodes.Get_Declaration_Chain(packageBodyNode), "package", packageName
+            nodes.Get_Declaration_Chain(packageBodyNode), "package", packageIdentifier
         )
 
         # FIXME: read use clauses
@@ -269,7 +275,7 @@ class PackageInstantiation(VHDLModel_PackageInstantiation, DOMMixin):
         self,
         node: Iir,
         identifier: str,
-        uninstantiatedPackageName: Name,
+        uninstantiatedPackageName: Symbol,
         #        genericItems: List[GenericInterfaceItem] = None,
         documentation: str = None,
     ):
@@ -296,7 +302,7 @@ class Context(VHDLModel_Context, DOMMixin):
         self,
         node: Iir,
         identifier: str,
-        references: Iterable[ContextUnion] = None,
+        references: Iterable[VHDLModel_ContextUnion] = None,
         documentation: str = None,
     ):
         super().__init__(identifier, references, documentation)
@@ -315,7 +321,7 @@ class Context(VHDLModel_Context, DOMMixin):
             kind = GetIirKindOfNode(item)
             if kind is nodes.Iir_Kind.Library_Clause:
                 libraryIdentifier = GetNameOfNode(item)
-                names.append(LibraryReferenceSymbol(item, libraryIdentifier))
+                names.append(LibraryReferenceSymbol(item, SimpleName(item, libraryIdentifier)))
                 if nodes.Get_Has_Identifier_List(item):
                     continue
 

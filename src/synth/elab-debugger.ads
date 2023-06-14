@@ -41,7 +41,7 @@ package Elab.Debugger is
    procedure Debug_Leave (Inst : Synth_Instance_Acc);
 
    --  Debug on a time breakpoint.
-   procedure Debug_Time;
+   procedure Debug_Time (Top : Synth_Instance_Acc);
 
    --  To be called in case of execution error, like:
    --  * index out of bounds.
@@ -53,7 +53,9 @@ package Elab.Debugger is
    pragma Convention (C, Error_Hook_Type);
    Error_Hook : Error_Hook_Type;
 
-   function Debug_Current_Instance return Synth_Instance_Acc;
+   --  Get the current location.
+   procedure Get_Debug_Loc (Inst : out Synth_Instance_Acc;
+                            Loc : out Node);
 
    type Menu_Procedure is access procedure (Line : String);
    type Cst_String_Acc is access constant String;

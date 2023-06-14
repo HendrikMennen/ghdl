@@ -38,6 +38,7 @@ with Elab.Vhdl_Values; use Elab.Vhdl_Values;
 with Elab.Vhdl_Values.Debug; use Elab.Vhdl_Values.Debug;
 with Simul.Vhdl_Elab; use Simul.Vhdl_Elab;
 with Simul.Vhdl_Simul;
+with Simul.Main;
 
 with Grt.Types; use Grt.Types;
 with Grt.Vhdl_Types; use Grt.Vhdl_Types;
@@ -126,15 +127,9 @@ package body Simul.Vhdl_Debug is
       New_Line;
       Put ("     formal: ");
       Disp_Conn_Endpoint (C.Formal);
-      if C.Drive_Formal then
-         Put (" [drive]");
-      end if;
       New_Line;
       Put ("     actual: ");
       Disp_Conn_Endpoint (C.Actual);
-      if C.Drive_Actual then
-         Put (" [drive]");
-      end if;
       New_Line;
    end Disp_Conn_Entry;
 
@@ -227,6 +222,8 @@ package body Simul.Vhdl_Debug is
       Disp_Value (Sig.Value_Ptr, Sig.Mode, Stype);
       Put ("; drv=");
       Disp_Value (Sig.Driving_Value, Sig.Mode, Stype);
+      Put ("; last_val=");
+      Disp_Value (Sig.Last_Value, Sig.Mode, Stype);
       if Sig.Nbr_Ports > 0 then
          Put (';');
          Put_Int32 (Int32 (Sig.Nbr_Ports));
@@ -343,7 +340,7 @@ package body Simul.Vhdl_Debug is
          return;
       end if;
       Put_Addr (Sig.all'Address);
-      Put (' ');
+      Put (':');
       Ev := Sig.Event_List;
       while Ev /= null loop
          Ctxt := Get_Rti_Context (Ev.Proc);
@@ -359,6 +356,9 @@ package body Simul.Vhdl_Debug is
 
    type Info_Signal_Options is record
       Value : Boolean;
+      Conn : Boolean;
+      Types : Boolean;
+      Sources : Boolean;
       Drivers : Boolean;
       Actions : Boolean;
    end record;
@@ -369,7 +369,6 @@ package body Simul.Vhdl_Debug is
       use Elab.Memtype;
       S : Signal_Entry renames Signals_Table.Table (Idx);
       Nbr_Drv : Int32;
-      Nbr_Conn_Drv : Int32;
       Nbr_Sens : Int32;
       Sens : Sensitivity_Index_Type;
       Driver : Driver_Index_Type;
@@ -409,66 +408,52 @@ package body Simul.Vhdl_Debug is
          when others =>
             raise Internal_Error;
       end case;
+
+      if Opts.Value = False then
+         Put (" = ");
+         Disp_Memtyp ((S.Typ, S.Val), Get_Type (S.Decl));
+      end if;
       New_Line;
 
-      Put ("  type: ");
-      Debug_Type_Short (S.Typ);
-      Put (", len: ");
-      Put_Uns32 (S.Typ.W);
-      New_Line;
-
-      if S.Kind in Mode_Signal_User then
-         Nbr_Conn_Drv := 0;
-         Conn := S.Connect;
-         while Conn /= No_Connect_Index loop
-            declare
-               C : Connect_Entry renames Connect_Table.Table (Conn);
-            begin
-               if C.Formal.Base = Idx then
-                  if C.Drive_Formal then
-                     Nbr_Conn_Drv := Nbr_Conn_Drv + 1;
-                  end if;
-                  Conn := C.Formal_Link;
-               else
-                  pragma Assert (C.Actual.Base = Idx);
-                  if C.Drive_Actual then
-                     Nbr_Conn_Drv := Nbr_Conn_Drv + 1;
-                  end if;
-                  Conn := C.Actual_Link;
-               end if;
-            end;
-         end loop;
-
-         Nbr_Drv := 0;
-         Driver := S.Drivers;
-         while Driver /= No_Driver_Index loop
-            Nbr_Drv := Nbr_Drv + 1;
-            Driver := Drivers_Table.Table (Driver).Prev_Sig;
-         end loop;
-         Put ("  nbr drivers: ");
-         Put_Int32 (Nbr_Drv);
-         Put (", nbr conn srcs: ");
-         Put_Int32 (Nbr_Conn_Drv);
-         Put (", ");
-      else
-         Put ("  ");
+      if Opts.Types then
+         Put ("  type: ");
+         Debug_Type_Short (S.Typ);
+         Put (", len: ");
+         Put_Uns32 (S.Typ.W);
+         New_Line;
       end if;
 
-      Nbr_Sens := 0;
-      Sens := S.Sensitivity;
-      while Sens /= No_Sensitivity_Index loop
-         Nbr_Sens := Nbr_Sens + 1;
-         Sens := Sensitivity_Table.Table (Sens).Prev_Sig;
-      end loop;
+      if Opts.Conn then
+         if S.Kind = Signal_User then
+            Nbr_Drv := 0;
+            Driver := S.Drivers;
+            while Driver /= No_Driver_Index loop
+               Nbr_Drv := Nbr_Drv + 1;
+               Driver := Drivers_Table.Table (Driver).Prev_Sig;
+            end loop;
+            Put ("  nbr drivers: ");
+            Put_Int32 (Nbr_Drv);
+            Put (", ");
+         else
+            Put ("  ");
+         end if;
 
-      Put ("nbr sensitivity: ");
-      Put_Int32 (Nbr_Sens);
+         Nbr_Sens := 0;
+         Sens := S.Sensitivity;
+         while Sens /= No_Sensitivity_Index loop
+            Nbr_Sens := Nbr_Sens + 1;
+            Sens := Sensitivity_Table.Table (Sens).Prev_Sig;
+         end loop;
 
-      Put (", collapsed_by: ");
-      Put_Uns32 (Uns32 (S.Collapsed_By));
-      New_Line;
+         Put ("nbr sensitivity: ");
+         Put_Int32 (Nbr_Sens);
 
-      if Boolean'(True) and then S.Kind in Mode_Signal_User then
+         Put (", collapsed_by: ");
+         Put_Uns32 (Uns32 (S.Collapsed_By));
+         New_Line;
+      end if;
+
+      if Opts.Sources and then S.Kind = Signal_User then
          Put ("  nbr sources (drv + conn : total):");
          New_Line;
          for I in 0 .. S.Typ.W - 1 loop
@@ -484,8 +469,8 @@ package body Simul.Vhdl_Debug is
          end loop;
       end if;
 
-      if Opts.Value then
-         if S.Kind in Mode_Signal_User then
+      if Opts.Conn then
+         if S.Kind = Signal_User then
             Driver := S.Drivers;
             while Driver /= No_Driver_Index loop
                declare
@@ -529,7 +514,9 @@ package body Simul.Vhdl_Debug is
                Sens := D.Prev_Sig;
             end;
          end loop;
+      end if;
 
+      if Opts.Value then
          Put ("value (");
          Put_Addr (S.Val.all'Address);
          Put ("): ");
@@ -546,7 +533,7 @@ package body Simul.Vhdl_Debug is
       end if;
 
       if Opts.Actions and then S.Sig /= null then
-         Put_Line ("actions:");
+         Put_Line ("actions (for each scalar):");
          Info_Signal_Action ((S.Typ, S.Sig), Get_Type (S.Decl));
       end if;
    end Info_Signal_Opts;
@@ -580,6 +567,9 @@ package body Simul.Vhdl_Debug is
             Put_Line (" -v   disp values");
             Put_Line (" -d   disp drivers");
             Put_Line (" -a   disp actions");
+            Put_Line (" -c   disp connections");
+            Put_Line (" -t   disp types");
+            Put_Line (" -s   disp sources");
             return;
          elsif Line (F .. L) = "-v" then
             Opts.Value := True;
@@ -587,6 +577,12 @@ package body Simul.Vhdl_Debug is
             Opts.Drivers := True;
          elsif Line (F .. L) = "-a" then
             Opts.Actions := True;
+         elsif Line (F .. L) = "-c" then
+            Opts.Conn := True;
+         elsif Line (F .. L) = "-s" then
+            Opts.Sources := True;
+         elsif Line (F .. L) = "-t" then
+            Opts.Types := True;
          elsif Line (F) in '0' .. '9' then
             To_Num (Line (F .. L), Idx, Valid);
             if not Valid
@@ -746,6 +742,9 @@ package body Simul.Vhdl_Debug is
          Put_Fp64 (Fp64 (Current_Time_AMS));
       end if;
       New_Line;
+      Put ("delta: ");
+      Put_Uns32 (Uns32 (Current_Delta));
+      New_Line;
       Put ("next time: ");
       Put_Time (Grt.Processes.Next_Time);
       New_Line;
@@ -754,16 +753,22 @@ package body Simul.Vhdl_Debug is
    procedure Run_Proc (Line : String)
    is
       Delta_Time : Std_Time;
-      P : Positive;
+      P, L : Positive;
    begin
       P := Skip_Blanks (Line);
       if P <= Line'Last then
-         Delta_Time := Grt.Options.Parse_Time (Line (P .. Line'Last));
-         if Delta_Time = -1 then
-            return;
+         L := Get_Word (Line, P);
+         if Line (P .. L) = "-s" then
+            Simul.Main.Break_Step := True;
+         else
+            Delta_Time := Grt.Options.Parse_Time (Line (P .. L));
+            if Delta_Time = -1 then
+               --  Error, ignore command.
+               return;
+            end if;
+            Simul.Main.Break_Time := Current_Time + Delta_Time;
+            Grt.Processes.Next_Time := Current_Time + Delta_Time;
          end if;
-         Simul.Vhdl_Simul.Break_Time := Current_Time + Delta_Time;
-         Grt.Processes.Next_Time := Current_Time + Delta_Time;
       end if;
 
       Elab.Debugger.Prepare_Continue;
@@ -791,14 +796,14 @@ package body Simul.Vhdl_Debug is
    begin
       Fn := Skip_Blanks (Line, Line'First);
       if Fn > Line'Last then
-         Put ("missing trace name");
+         Put_Line ("missing trace name");
          return;
       end if;
       Ln := Get_Word (Line, Fn);
 
       Fv := Skip_Blanks (Line, Ln + 1);
       if Fv > Line'Last then
-         Put ("missing on/off/0/1");
+         Put_Line ("missing on/off/0/1");
          return;
       end if;
       Lv := Get_Word (Line, Fv);
@@ -807,7 +812,7 @@ package body Simul.Vhdl_Debug is
       elsif Line (Fv .. Lv) = "off" or Line (Fv .. Lv) = "0" then
          State := False;
       else
-         Put ("expect on/off/0/1");
+         Put_Line ("expect on/off/0/1");
          return;
       end if;
 

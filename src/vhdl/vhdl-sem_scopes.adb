@@ -879,7 +879,6 @@ package body Vhdl.Sem_Scopes is
                -- FIXME: this should have been handled at the start of
                -- this subprogram.
                raise Internal_Error;
-               return;
             end if;
 
             --  LRM08 12.3 Visibility
@@ -1025,6 +1024,7 @@ package body Vhdl.Sem_Scopes is
            | Iir_Kind_Attribute_Declaration
            | Iir_Kind_Group_Template_Declaration
            | Iir_Kind_Group_Declaration
+           | Iir_Kind_Mode_View_Declaration
            | Iir_Kind_Nature_Declaration
            | Iir_Kind_Subnature_Declaration
            | Iir_Kinds_Quantity_Declaration
@@ -1289,10 +1289,16 @@ package body Vhdl.Sem_Scopes is
    begin
       El := Get_Concurrent_Statement_Chain (Parent);
       while El /= Null_Iir loop
-         Label := Get_Label (El);
-         if Label /= Null_Identifier then
-            Add_Name (El, Get_Identifier (El), False);
-         end if;
+         case Get_Kind (El) is
+            when Iir_Kind_Psl_Default_Clock =>
+               --  Not a statement with label.
+               null;
+            when others =>
+               Label := Get_Label (El);
+               if Label /= Null_Identifier then
+                  Add_Name (El, Get_Identifier (El), False);
+               end if;
+         end case;
          El := Get_Chain (El);
       end loop;
    end Add_Declarations_Of_Concurrent_Statement;
@@ -1327,8 +1333,11 @@ package body Vhdl.Sem_Scopes is
    procedure Add_Package_Declarations
      (Decl: Iir_Package_Declaration; Potentially : Boolean)
    is
+      Prev_Hide : constant Boolean := Is_Warning_Enabled (Warnid_Hide);
       Header : constant Iir := Get_Package_Header (Decl);
    begin
+      Enable_Warning (Warnid_Hide, False);
+
       --  LRM08 12.1 Declarative region
       --  d) A package declaration together with the corresponding body
       --
@@ -1341,6 +1350,8 @@ package body Vhdl.Sem_Scopes is
       end if;
 
       Add_Declarations (Get_Declaration_Chain (Decl), Potentially);
+
+      Enable_Warning (Warnid_Hide, Prev_Hide);
    end Add_Package_Declarations;
 
    procedure Add_Package_Instantiation_Declarations

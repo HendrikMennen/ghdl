@@ -46,7 +46,7 @@ def show_diffs(name, ref, res):
         for i in range(max(len(ref), len(res))):
             if i >= len(res):
                 print(f"{name}[{i}]: missing element:")
-                print(f" {res[i]}")
+                print(f" {ref[i]}")
             elif i >= len(ref):
                 print(f"{name}[{i}]: extra elements")
             else:
@@ -238,6 +238,12 @@ class Test010_ls_28(JSONTest):
 
 class Test011_closediag(JSONTest):
     subdir = Path("011closediag")
+
+    def test_Request_Response(self):
+        self._RequestResponse("cmds.json", "replies.json")
+
+class Test012_library(JSONTest):
+    subdir = Path("012library")
 
     def test_Request_Response(self):
         self._RequestResponse("cmds.json", "replies.json")

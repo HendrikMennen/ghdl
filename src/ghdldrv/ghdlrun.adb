@@ -17,100 +17,46 @@ with System; use System;
 
 with Ada.Unchecked_Conversion;
 with Ada.Command_Line;
-with GNAT.OS_Lib; use GNAT.OS_Lib;
 
 with Interfaces;
 with Interfaces.C;
 
+with Types; use Types;
 with Ghdlmain; use Ghdlmain;
 with Ghdllocal; use Ghdllocal;
 with Simple_IO; use Simple_IO;
 
-with Hash;
-with Interning;
-with Name_Table;
 with Flags;
 with Options;
 with Errorout; use Errorout;
 
 with Vhdl.Nodes; use Vhdl.Nodes;
 with Vhdl.Std_Package;
-with Vhdl.Errors; use Vhdl.Errors;
 with Vhdl.Canon;
 with Vhdl.Ieee.Std_Logic_1164;
+with Vhdl.Back_End;
+with Vhdl.Nodes_GC;
 with Ortho_Jit;
 with Ortho_Nodes; use Ortho_Nodes;
 with Trans_Decls;
-with Trans_Be;
 with Translation;
+with Trans_Link;
+with Trans_Foreign;
 
 with Grt.Main;
 with Grt.Modules;
-with Grt.Dynload; use Grt.Dynload;
-with Grt.Lib;
-with Grt.Processes;
-with Grt.Rtis;
-with Grt.Files;
-with Grt.Signals;
 with Grt.Options;
 with Grt.Types;
-with Grt.Vhdl_Types; use Grt.Vhdl_Types;
-with Grt.Images;
-with Grt.Values;
-with Grt.Names;
-with Grt.Std_Logic_1164;
 with Grt.Errors;
 with Grt.Backtraces.Jit;
 with Grt.Analog_Solver;
 
 with Ghdlcomp; use Ghdlcomp;
-with Foreigns;
 with Grtlink;
 
 package body Ghdlrun is
-   --  Elaboration mode.
-   type Elab_Mode_Type is
-     (--  Static elaboration (or pre-elaboration).
-      Elab_Static,
-
-      --  Dynamic elaboration: design is elaborated just before being run.
-      Elab_Dynamic);
-
-   --  Default elaboration mode is dynamic.
-   Elab_Mode : constant Elab_Mode_Type := Elab_Dynamic;
-
-   type Shlib_Object_Type is record
-      Name : String_Access;
-      Handler : Address;
-   end record;
-
-   function Shlib_Build (Name : String) return Shlib_Object_Type
-   is
-      Name_Acc : constant String_Access := new String'(Name);
-      C_Name : constant String := Name & Nul;
-      Handler : Address;
-   begin
-      Handler :=
-        Grt_Dynload_Open (Grt.Types.To_Ghdl_C_String (C_Name'Address));
-      return (Name => Name_Acc,
-              Handler => Handler);
-   end Shlib_Build;
-
-   function Shlib_Equal (Obj : Shlib_Object_Type; Param : String)
-                        return Boolean is
-   begin
-      return Obj.Name.all = Param;
-   end Shlib_Equal;
-
-   package Shlib_Interning is new Interning
-     (Params_Type => String,
-      Object_Type => Shlib_Object_Type,
-      Hash => Hash.String_Hash,
-      Build => Shlib_Build,
-      Equal => Shlib_Equal);
-
    procedure Foreign_Hook (Decl : Iir;
-                           Info : Translation.Foreign_Info_Type;
+                           Info : Vhdl.Back_End.Foreign_Info_Type;
                            Ortho : O_Dnode);
 
    subtype F64_C_Arr_Ptr is Grt.Analog_Solver.F64_C_Arr_Ptr;
@@ -145,7 +91,7 @@ package body Ghdlrun is
       end if;
 
       Translation.Foreign_Hook := Foreign_Hook'Access;
-      Shlib_Interning.Init;
+      Trans_Foreign.Init;
 
       --  FIXME: add a flag to force unnesting.
       --  Translation.Flag_Unnest_Subprograms := True;
@@ -153,19 +99,11 @@ package body Ghdlrun is
       --  The design is always analyzed in whole.
       Flags.Flag_Whole_Analyze := True;
 
-      case Elab_Mode is
-         when Elab_Static =>
-            Vhdl.Canon.Canon_Flag_Add_Labels := True;
-            Vhdl.Canon.Canon_Flag_Sequentials_Stmts := True;
-            Vhdl.Canon.Canon_Flag_Expressions := True;
-            Vhdl.Canon.Canon_Flag_All_Sensitivity := True;
-         when Elab_Dynamic =>
-            Vhdl.Canon.Canon_Flag_Add_Labels := True;
-      end case;
+      Vhdl.Canon.Canon_Flag_Add_Labels := True;
    end Compile_Init;
 
    procedure Compile_Elab
-     (Cmd_Name : String; Args : Argument_List; Opt_Arg : out Natural)
+     (Cmd_Name : String; Args : String_Acc_Array; Opt_Arg : out Natural)
    is
       Config : Iir;
    begin
@@ -199,22 +137,21 @@ package body Ghdlrun is
 
       Translation.Initialize;
 
-      case Elab_Mode is
-         when Elab_Static =>
-            raise Program_Error;
-         when Elab_Dynamic =>
-            Translation.Elaborate (Config, True);
-      end case;
+      Translation.Elaborate (Config, True);
 
       if Errorout.Nbr_Errors > 0 then
          --  This may happen (bad entity for example).
          raise Compilation_Error;
       end if;
+
+      if Flags.Check_Ast_Level > 0 then
+         Vhdl.Nodes_GC.Report_Unreferenced;
+      end if;
    end Compile_Elab;
 
    --  Set options.
    --  This is a little bit over-kill: from C to Ada and then again to C...
-   procedure Set_Run_Options (Args : Argument_List)
+   procedure Set_Run_Options (Args : String_Acc_Array)
    is
       use Interfaces.C;
       use Grt.Options;
@@ -258,79 +195,15 @@ package body Ghdlrun is
      renames Ortho_Jit.Set_Address;
 
    procedure Foreign_Hook (Decl : Iir;
-                           Info : Translation.Foreign_Info_Type;
+                           Info : Vhdl.Back_End.Foreign_Info_Type;
                            Ortho : O_Dnode)
    is
-      use Translation;
       Res : Address;
    begin
-      case Info.Kind is
-         when Foreign_Vhpidirect =>
-            declare
-               Name : constant String :=
-                 Info.Subprg_Name (1 .. Info.Subprg_Len);
-               Lib : constant String :=
-                 Info.Lib_Name (1 .. Info.Lib_Len);
-               Shlib : Shlib_Object_Type;
-            begin
-               if Info.Lib_Len = 0
-                 or else Lib = "null"
-               then
-                  Res := Foreigns.Find_Foreign (Name);
-                  if Res = Null_Address then
-                     Error_Msg_Sem
-                       (+Decl, "unknown foreign VHPIDIRECT '" & Name & "'");
-                     return;
-                  end if;
-               else
-                  Shlib := Shlib_Interning.Get (Lib);
-                  if Shlib.Handler = Null_Address then
-                     Error_Msg_Sem
-                       (+Decl, "cannot load VHPIDIRECT shared library '" &
-                          Lib & "'");
-                     return;
-                  end if;
-
-                  declare
-                     C_Name : constant String := Name & Nul;
-                  begin
-                     Res := Grt_Dynload_Symbol
-                       (Shlib.Handler,
-                        Grt.Types.To_Ghdl_C_String (C_Name'Address));
-                  end;
-                  if Res = Null_Address then
-                     Error_Msg_Sem
-                       (+Decl, "cannot resolve VHPIDIRECT symbol '"
-                          & Name & "'");
-                     return;
-                  end if;
-               end if;
-               Def (Ortho, Res);
-            end;
-         when Foreign_Intrinsic =>
-
-            declare
-               Name : constant String :=
-                 Name_Table.Image (Get_Identifier (Decl));
-            begin
-               if Name = "untruncated_text_read" then
-                  Def (Ortho, Grt.Files.Ghdl_Untruncated_Text_Read'Address);
-               elsif Name = "textio_read_real" then
-                  Def (Ortho, Grt.Lib.Textio_Read_Real'Address);
-               elsif Name = "textio_write_real" then
-                  Def (Ortho, Grt.Lib.Textio_Write_Real'Address);
-               elsif Name = "control_simulation" then
-                  Def (Ortho, Grt.Lib.Ghdl_Control_Simulation'Address);
-               elsif Name = "get_resolution_limit" then
-                  Def (Ortho, Grt.Lib.Ghdl_Get_Resolution_Limit'Address);
-               else
-                  Error_Msg_Sem
-                    (+Decl, "unknown foreign intrinsic %i", +Decl);
-               end if;
-            end;
-         when Foreign_Unknown =>
-            null;
-      end case;
+      Res := Trans_Foreign.Get_Foreign_Address (Decl, Info);
+      if Res /= Null_Address then
+         Def (Ortho, Res);
+      end if;
    end Foreign_Hook;
 
    procedure Run
@@ -344,432 +217,7 @@ package body Ghdlrun is
          Put_Line ("Linking in memory");
       end if;
 
-      Def (Trans_Decls.Ghdl_Memcpy,
-           Grt.Lib.Ghdl_Memcpy'Address);
-      Def (Trans_Decls.Ghdl_Bound_Check_Failed,
-           Grt.Lib.Ghdl_Bound_Check_Failed'Address);
-      Def (Trans_Decls.Ghdl_Direction_Check_Failed,
-           Grt.Lib.Ghdl_Direction_Check_Failed'Address);
-      Def (Trans_Decls.Ghdl_Access_Check_Failed,
-           Grt.Lib.Ghdl_Access_Check_Failed'Address);
-      Def (Trans_Decls.Ghdl_Integer_Index_Check_Failed,
-           Grt.Lib.Ghdl_Integer_Index_Check_Failed'Address);
-
-      Def (Trans_Decls.Ghdl_Malloc0,
-           Grt.Lib.Ghdl_Malloc0'Address);
-      Def (Trans_Decls.Ghdl_Std_Ulogic_To_Boolean_Array,
-           Grt.Lib.Ghdl_Std_Ulogic_To_Boolean_Array'Address);
-
-      Def (Trans_Decls.Ghdl_Report,
-           Grt.Lib.Ghdl_Report'Address);
-      Def (Trans_Decls.Ghdl_Assert_Failed,
-           Grt.Lib.Ghdl_Assert_Failed'Address);
-      Def (Trans_Decls.Ghdl_Ieee_Assert_Failed,
-           Grt.Lib.Ghdl_Ieee_Assert_Failed'Address);
-      Def (Trans_Decls.Ghdl_Psl_Assert_Failed,
-           Grt.Lib.Ghdl_Psl_Assert_Failed'Address);
-      Def (Trans_Decls.Ghdl_Psl_Assume_Failed,
-           Grt.Lib.Ghdl_Psl_Assume_Failed'Address);
-      Def (Trans_Decls.Ghdl_Psl_Cover,
-           Grt.Lib.Ghdl_Psl_Cover'Address);
-      Def (Trans_Decls.Ghdl_Psl_Cover_Failed,
-           Grt.Lib.Ghdl_Psl_Cover_Failed'Address);
-      Def (Trans_Decls.Ghdl_Program_Error,
-           Grt.Lib.Ghdl_Program_Error'Address);
-      Def (Trans_Decls.Ghdl_Malloc,
-           Grt.Lib.Ghdl_Malloc'Address);
-      Def (Trans_Decls.Ghdl_Deallocate,
-           Grt.Lib.Ghdl_Deallocate'Address);
-      Def (Trans_Decls.Ghdl_Real_Exp,
-           Grt.Lib.Ghdl_Real_Exp'Address);
-      Def (Trans_Decls.Ghdl_I32_Exp,
-           Grt.Lib.Ghdl_I32_Exp'Address);
-      Def (Trans_Decls.Ghdl_I64_Exp,
-           Grt.Lib.Ghdl_I64_Exp'Address);
-      Def (Trans_Decls.Ghdl_I32_Div,
-           Grt.Lib.Ghdl_I32_Div'Address);
-      Def (Trans_Decls.Ghdl_I64_Div,
-           Grt.Lib.Ghdl_I64_Div'Address);
-      Def (Trans_Decls.Ghdl_I32_Mod,
-           Grt.Lib.Ghdl_I32_Mod'Address);
-      Def (Trans_Decls.Ghdl_I64_Mod,
-           Grt.Lib.Ghdl_I64_Mod'Address);
-      Def (Trans_Decls.Ghdl_Check_Stack_Allocation,
-           Grt.Lib.Ghdl_Check_Stack_Allocation'Address);
-
-      Def (Trans_Decls.Ghdl_Sensitized_Process_Register,
-           Grt.Processes.Ghdl_Sensitized_Process_Register'Address);
-      Def (Trans_Decls.Ghdl_Process_Register,
-           Grt.Processes.Ghdl_Process_Register'Address);
-      Def (Trans_Decls.Ghdl_Postponed_Sensitized_Process_Register,
-           Grt.Processes.Ghdl_Postponed_Sensitized_Process_Register'Address);
-      Def (Trans_Decls.Ghdl_Postponed_Process_Register,
-           Grt.Processes.Ghdl_Postponed_Process_Register'Address);
-      Def (Trans_Decls.Ghdl_Finalize_Register,
-           Grt.Processes.Ghdl_Finalize_Register'Address);
-
-      Def (Trans_Decls.Ghdl_Stack2_Allocate,
-           Grt.Processes.Ghdl_Stack2_Allocate'Address);
-      Def (Trans_Decls.Ghdl_Stack2_Mark,
-           Grt.Processes.Ghdl_Stack2_Mark'Address);
-      Def (Trans_Decls.Ghdl_Stack2_Release,
-           Grt.Processes.Ghdl_Stack2_Release'Address);
-      Def (Trans_Decls.Ghdl_Process_Wait_Exit,
-           Grt.Processes.Ghdl_Process_Wait_Exit'Address);
-      Def (Trans_Decls.Ghdl_Process_Wait_Suspend,
-           Grt.Processes.Ghdl_Process_Wait_Suspend'Address);
-      Def (Trans_Decls.Ghdl_Process_Wait_Timed_Out,
-           Grt.Processes.Ghdl_Process_Wait_Timed_Out'Address);
-      Def (Trans_Decls.Ghdl_Process_Wait_Timeout,
-           Grt.Processes.Ghdl_Process_Wait_Timeout'Address);
-      Def (Trans_Decls.Ghdl_Process_Wait_Set_Timeout,
-           Grt.Processes.Ghdl_Process_Wait_Set_Timeout'Address);
-      Def (Trans_Decls.Ghdl_Process_Wait_Add_Sensitivity,
-           Grt.Processes.Ghdl_Process_Wait_Add_Sensitivity'Address);
-      Def (Trans_Decls.Ghdl_Process_Wait_Close,
-           Grt.Processes.Ghdl_Process_Wait_Close'Address);
-
-      Def (Trans_Decls.Ghdl_Process_Add_Sensitivity,
-           Grt.Processes.Ghdl_Process_Add_Sensitivity'Address);
-
-      Def (Trans_Decls.Ghdl_Now,
-           Grt.Vhdl_Types.Current_Time'Address);
-
-      Def (Trans_Decls.Ghdl_Process_Add_Driver,
-           Grt.Signals.Ghdl_Process_Add_Driver'Address);
-      Def (Trans_Decls.Ghdl_Signal_Add_Direct_Driver,
-           Grt.Signals.Ghdl_Signal_Add_Direct_Driver'Address);
-
-      Def (Trans_Decls.Ghdl_Signal_Add_Source,
-           Grt.Signals.Ghdl_Signal_Add_Source'Address);
-      Def (Trans_Decls.Ghdl_Signal_In_Conversion,
-           Grt.Signals.Ghdl_Signal_In_Conversion'Address);
-      Def (Trans_Decls.Ghdl_Signal_Out_Conversion,
-           Grt.Signals.Ghdl_Signal_Out_Conversion'Address);
-      Def (Trans_Decls.Ghdl_Signal_Effective_Value,
-           Grt.Signals.Ghdl_Signal_Effective_Value'Address);
-      Def (Trans_Decls.Ghdl_Signal_Create_Resolution,
-           Grt.Signals.Ghdl_Signal_Create_Resolution'Address);
-
-      Def (Trans_Decls.Ghdl_Signal_Disconnect,
-           Grt.Signals.Ghdl_Signal_Disconnect'Address);
-      Def (Trans_Decls.Ghdl_Signal_Set_Disconnect,
-           Grt.Signals.Ghdl_Signal_Set_Disconnect'Address);
-      Def (Trans_Decls.Ghdl_Signal_Merge_Rti,
-           Grt.Signals.Ghdl_Signal_Merge_Rti'Address);
-      Def (Trans_Decls.Ghdl_Signal_Name_Rti,
-           Grt.Signals.Ghdl_Signal_Name_Rti'Address);
-      Def (Trans_Decls.Ghdl_Signal_Read_Port,
-           Grt.Signals.Ghdl_Signal_Read_Port'Address);
-      Def (Trans_Decls.Ghdl_Signal_Read_Driver,
-           Grt.Signals.Ghdl_Signal_Read_Driver'Address);
-
-      Def (Trans_Decls.Ghdl_Signal_Driving,
-           Grt.Signals.Ghdl_Signal_Driving'Address);
-      Def (Trans_Decls.Ghdl_Signal_Driving_Value_B1,
-           Grt.Signals.Ghdl_Signal_Driving_Value_B1'Address);
-      Def (Trans_Decls.Ghdl_Signal_Driving_Value_E8,
-           Grt.Signals.Ghdl_Signal_Driving_Value_E8'Address);
-      Def (Trans_Decls.Ghdl_Signal_Driving_Value_E32,
-           Grt.Signals.Ghdl_Signal_Driving_Value_E32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Driving_Value_I32,
-           Grt.Signals.Ghdl_Signal_Driving_Value_I32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Driving_Value_I64,
-           Grt.Signals.Ghdl_Signal_Driving_Value_I64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Driving_Value_F64,
-           Grt.Signals.Ghdl_Signal_Driving_Value_F64'Address);
-
-      Def (Trans_Decls.Ghdl_Signal_Create_Guard,
-           Grt.Signals.Ghdl_Signal_Create_Guard'Address);
-      Def (Trans_Decls.Ghdl_Signal_Guard_Dependence,
-           Grt.Signals.Ghdl_Signal_Guard_Dependence'Address);
-
-      Def (Trans_Decls.Ghdl_Signal_Simple_Assign_Error,
-           Grt.Signals.Ghdl_Signal_Simple_Assign_Error'Address);
-      Def (Trans_Decls.Ghdl_Signal_Start_Assign_Error,
-           Grt.Signals.Ghdl_Signal_Start_Assign_Error'Address);
-      Def (Trans_Decls.Ghdl_Signal_Next_Assign_Error,
-           Grt.Signals.Ghdl_Signal_Next_Assign_Error'Address);
-
-      Def (Trans_Decls.Ghdl_Signal_Start_Assign_Null,
-           Grt.Signals.Ghdl_Signal_Start_Assign_Null'Address);
-
-      Def (Trans_Decls.Ghdl_Signal_Direct_Assign,
-           Grt.Signals.Ghdl_Signal_Direct_Assign'Address);
-
-      Def (Trans_Decls.Ghdl_Signal_Release_Eff,
-           Grt.Signals.Ghdl_Signal_Release_Eff'Address);
-      Def (Trans_Decls.Ghdl_Signal_Release_Drv,
-           Grt.Signals.Ghdl_Signal_Release_Drv'Address);
-
-      Def (Trans_Decls.Ghdl_Create_Signal_B1,
-           Grt.Signals.Ghdl_Create_Signal_B1'Address);
-      Def (Trans_Decls.Ghdl_Signal_Init_B1,
-           Grt.Signals.Ghdl_Signal_Init_B1'Address);
-      Def (Trans_Decls.Ghdl_Signal_Simple_Assign_B1,
-           Grt.Signals.Ghdl_Signal_Simple_Assign_B1'Address);
-      Def (Trans_Decls.Ghdl_Signal_Start_Assign_B1,
-           Grt.Signals.Ghdl_Signal_Start_Assign_B1'Address);
-      Def (Trans_Decls.Ghdl_Signal_Next_Assign_B1,
-           Grt.Signals.Ghdl_Signal_Next_Assign_B1'Address);
-      Def (Trans_Decls.Ghdl_Signal_Associate_B1,
-           Grt.Signals.Ghdl_Signal_Associate_B1'Address);
-      Def (Trans_Decls.Ghdl_Signal_Add_Port_Driver_B1,
-           Grt.Signals.Ghdl_Signal_Add_Port_Driver_B1'Address);
-      Def (Trans_Decls.Ghdl_Signal_Force_Drv_B1,
-           Grt.Signals.Ghdl_Signal_Force_Driving_B1'Address);
-      Def (Trans_Decls.Ghdl_Signal_Force_Eff_B1,
-           Grt.Signals.Ghdl_Signal_Force_Effective_B1'Address);
-
-      Def (Trans_Decls.Ghdl_Create_Signal_E8,
-           Grt.Signals.Ghdl_Create_Signal_E8'Address);
-      Def (Trans_Decls.Ghdl_Signal_Init_E8,
-           Grt.Signals.Ghdl_Signal_Init_E8'Address);
-      Def (Trans_Decls.Ghdl_Signal_Simple_Assign_E8,
-           Grt.Signals.Ghdl_Signal_Simple_Assign_E8'Address);
-      Def (Trans_Decls.Ghdl_Signal_Start_Assign_E8,
-           Grt.Signals.Ghdl_Signal_Start_Assign_E8'Address);
-      Def (Trans_Decls.Ghdl_Signal_Next_Assign_E8,
-           Grt.Signals.Ghdl_Signal_Next_Assign_E8'Address);
-      Def (Trans_Decls.Ghdl_Signal_Associate_E8,
-           Grt.Signals.Ghdl_Signal_Associate_E8'Address);
-      Def (Trans_Decls.Ghdl_Signal_Add_Port_Driver_E8,
-           Grt.Signals.Ghdl_Signal_Add_Port_Driver_E8'Address);
-      Def (Trans_Decls.Ghdl_Signal_Force_Drv_E8,
-           Grt.Signals.Ghdl_Signal_Force_Driving_E8'Address);
-      Def (Trans_Decls.Ghdl_Signal_Force_Eff_E8,
-           Grt.Signals.Ghdl_Signal_Force_Effective_E8'Address);
-
-      Def (Trans_Decls.Ghdl_Create_Signal_E32,
-           Grt.Signals.Ghdl_Create_Signal_E32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Init_E32,
-           Grt.Signals.Ghdl_Signal_Init_E32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Simple_Assign_E32,
-           Grt.Signals.Ghdl_Signal_Simple_Assign_E32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Start_Assign_E32,
-           Grt.Signals.Ghdl_Signal_Start_Assign_E32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Next_Assign_E32,
-           Grt.Signals.Ghdl_Signal_Next_Assign_E32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Associate_E32,
-           Grt.Signals.Ghdl_Signal_Associate_E32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Add_Port_Driver_E32,
-           Grt.Signals.Ghdl_Signal_Add_Port_Driver_E32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Force_Drv_E32,
-           Grt.Signals.Ghdl_Signal_Force_Driving_E32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Force_Eff_E32,
-           Grt.Signals.Ghdl_Signal_Force_Effective_E32'Address);
-
-      Def (Trans_Decls.Ghdl_Create_Signal_I32,
-           Grt.Signals.Ghdl_Create_Signal_I32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Init_I32,
-           Grt.Signals.Ghdl_Signal_Init_I32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Simple_Assign_I32,
-           Grt.Signals.Ghdl_Signal_Simple_Assign_I32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Start_Assign_I32,
-           Grt.Signals.Ghdl_Signal_Start_Assign_I32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Next_Assign_I32,
-           Grt.Signals.Ghdl_Signal_Next_Assign_I32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Associate_I32,
-           Grt.Signals.Ghdl_Signal_Associate_I32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Add_Port_Driver_I32,
-           Grt.Signals.Ghdl_Signal_Add_Port_Driver_I32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Force_Drv_I32,
-           Grt.Signals.Ghdl_Signal_Force_Driving_I32'Address);
-      Def (Trans_Decls.Ghdl_Signal_Force_Eff_I32,
-           Grt.Signals.Ghdl_Signal_Force_Effective_I32'Address);
-
-      Def (Trans_Decls.Ghdl_Create_Signal_I64,
-           Grt.Signals.Ghdl_Create_Signal_I64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Init_I64,
-           Grt.Signals.Ghdl_Signal_Init_I64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Simple_Assign_I64,
-           Grt.Signals.Ghdl_Signal_Simple_Assign_I64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Start_Assign_I64,
-           Grt.Signals.Ghdl_Signal_Start_Assign_I64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Next_Assign_I64,
-           Grt.Signals.Ghdl_Signal_Next_Assign_I64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Associate_I64,
-           Grt.Signals.Ghdl_Signal_Associate_I64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Add_Port_Driver_I64,
-           Grt.Signals.Ghdl_Signal_Add_Port_Driver_I64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Force_Drv_I64,
-           Grt.Signals.Ghdl_Signal_Force_Driving_I64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Force_Eff_I64,
-           Grt.Signals.Ghdl_Signal_Force_Effective_I64'Address);
-
-      Def (Trans_Decls.Ghdl_Create_Signal_F64,
-           Grt.Signals.Ghdl_Create_Signal_F64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Init_F64,
-           Grt.Signals.Ghdl_Signal_Init_F64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Simple_Assign_F64,
-           Grt.Signals.Ghdl_Signal_Simple_Assign_F64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Start_Assign_F64,
-           Grt.Signals.Ghdl_Signal_Start_Assign_F64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Next_Assign_F64,
-           Grt.Signals.Ghdl_Signal_Next_Assign_F64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Associate_F64,
-           Grt.Signals.Ghdl_Signal_Associate_F64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Add_Port_Driver_F64,
-           Grt.Signals.Ghdl_Signal_Add_Port_Driver_F64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Force_Drv_F64,
-           Grt.Signals.Ghdl_Signal_Force_Driving_F64'Address);
-      Def (Trans_Decls.Ghdl_Signal_Force_Eff_F64,
-           Grt.Signals.Ghdl_Signal_Force_Effective_F64'Address);
-
-      Def (Trans_Decls.Ghdl_Signal_Attribute_Register_Prefix,
-           Grt.Signals.Ghdl_Signal_Attribute_Register_Prefix'Address);
-      Def (Trans_Decls.Ghdl_Create_Stable_Signal,
-           Grt.Signals.Ghdl_Create_Stable_Signal'Address);
-      Def (Trans_Decls.Ghdl_Create_Quiet_Signal,
-           Grt.Signals.Ghdl_Create_Quiet_Signal'Address);
-      Def (Trans_Decls.Ghdl_Create_Transaction_Signal,
-           Grt.Signals.Ghdl_Create_Transaction_Signal'Address);
-      Def (Trans_Decls.Ghdl_Create_Delayed_Signal,
-           Grt.Signals.Ghdl_Create_Delayed_Signal'Address);
-
-      Def (Trans_Decls.Ghdl_Rti_Add_Package,
-           Grt.Rtis.Ghdl_Rti_Add_Package'Address);
-      Def (Trans_Decls.Ghdl_Rti_Add_Top,
-           Grt.Rtis.Ghdl_Rti_Add_Top'Address);
-
-      Def (Trans_Decls.Ghdl_Init_Top_Generics,
-           Grt.Main.Ghdl_Init_Top_Generics'Address);
-
-      Def (Trans_Decls.Ghdl_Protected_Enter,
-           Grt.Processes.Ghdl_Protected_Enter'Address);
-      Def (Trans_Decls.Ghdl_Protected_Leave,
-           Grt.Processes.Ghdl_Protected_Leave'Address);
-      Def (Trans_Decls.Ghdl_Protected_Init,
-           Grt.Processes.Ghdl_Protected_Init'Address);
-      Def (Trans_Decls.Ghdl_Protected_Fini,
-           Grt.Processes.Ghdl_Protected_Fini'Address);
-
-      Def (Trans_Decls.Ghdl_Text_File_Elaborate,
-           Grt.Files.Ghdl_Text_File_Elaborate'Address);
-      Def (Trans_Decls.Ghdl_Text_File_Finalize,
-           Grt.Files.Ghdl_Text_File_Finalize'Address);
-      Def (Trans_Decls.Ghdl_Text_File_Open,
-           Grt.Files.Ghdl_Text_File_Open'Address);
-      Def (Trans_Decls.Ghdl_Text_File_Open_Status,
-           Grt.Files.Ghdl_Text_File_Open_Status'Address);
-      Def (Trans_Decls.Ghdl_Text_Write,
-           Grt.Files.Ghdl_Text_Write'Address);
-      Def (Trans_Decls.Ghdl_Text_Read_Length,
-           Grt.Files.Ghdl_Text_Read_Length'Address);
-      Def (Trans_Decls.Ghdl_Text_File_Close,
-           Grt.Files.Ghdl_Text_File_Close'Address);
-
-      Def (Trans_Decls.Ghdl_File_Elaborate,
-           Grt.Files.Ghdl_File_Elaborate'Address);
-      Def (Trans_Decls.Ghdl_File_Finalize,
-           Grt.Files.Ghdl_File_Finalize'Address);
-      Def (Trans_Decls.Ghdl_File_Open,
-           Grt.Files.Ghdl_File_Open'Address);
-      Def (Trans_Decls.Ghdl_File_Open_Status,
-           Grt.Files.Ghdl_File_Open_Status'Address);
-      Def (Trans_Decls.Ghdl_File_Close,
-           Grt.Files.Ghdl_File_Close'Address);
-      Def (Trans_Decls.Ghdl_File_Flush,
-           Grt.Files.Ghdl_File_Flush'Address);
-      Def (Trans_Decls.Ghdl_Write_Scalar,
-           Grt.Files.Ghdl_Write_Scalar'Address);
-      Def (Trans_Decls.Ghdl_Read_Scalar,
-           Grt.Files.Ghdl_Read_Scalar'Address);
-
-      Def (Trans_Decls.Ghdl_File_Endfile,
-           Grt.Files.Ghdl_File_Endfile'Address);
-
-      Def (Trans_Decls.Ghdl_Image_B1,
-           Grt.Images.Ghdl_Image_B1'Address);
-      Def (Trans_Decls.Ghdl_Image_E8,
-           Grt.Images.Ghdl_Image_E8'Address);
-      Def (Trans_Decls.Ghdl_Image_E32,
-           Grt.Images.Ghdl_Image_E32'Address);
-      Def (Trans_Decls.Ghdl_Image_I32,
-           Grt.Images.Ghdl_Image_I32'Address);
-      Def (Trans_Decls.Ghdl_Image_I64,
-           Grt.Images.Ghdl_Image_I64'Address);
-      Def (Trans_Decls.Ghdl_Image_F64,
-           Grt.Images.Ghdl_Image_F64'Address);
-      Def (Trans_Decls.Ghdl_Image_P64,
-           Grt.Images.Ghdl_Image_P64'Address);
-      Def (Trans_Decls.Ghdl_Image_P32,
-           Grt.Images.Ghdl_Image_P32'Address);
-
-      Def (Trans_Decls.Ghdl_Value_B1,
-           Grt.Values.Ghdl_Value_B1'Address);
-      Def (Trans_Decls.Ghdl_Value_E8,
-           Grt.Values.Ghdl_Value_E8'Address);
-      Def (Trans_Decls.Ghdl_Value_E32,
-           Grt.Values.Ghdl_Value_E32'Address);
-      Def (Trans_Decls.Ghdl_Value_I32,
-           Grt.Values.Ghdl_Value_I32'Address);
-      Def (Trans_Decls.Ghdl_Value_I64,
-           Grt.Values.Ghdl_Value_I64'Address);
-      Def (Trans_Decls.Ghdl_Value_F64,
-           Grt.Values.Ghdl_Value_F64'Address);
-      Def (Trans_Decls.Ghdl_Value_P32,
-           Grt.Values.Ghdl_Value_P32'Address);
-      Def (Trans_Decls.Ghdl_Value_P64,
-           Grt.Values.Ghdl_Value_P64'Address);
-
-      Def (Trans_Decls.Ghdl_Get_Path_Name,
-           Grt.Names.Ghdl_Get_Path_Name'Address);
-      Def (Trans_Decls.Ghdl_Get_Instance_Name,
-           Grt.Names.Ghdl_Get_Instance_Name'Address);
-
-      Def (Trans_Decls.Ghdl_Std_Ulogic_Match_Eq,
-           Grt.Std_Logic_1164.Ghdl_Std_Ulogic_Match_Eq'Address);
-      Def (Trans_Decls.Ghdl_Std_Ulogic_Match_Ne,
-           Grt.Std_Logic_1164.Ghdl_Std_Ulogic_Match_Ne'Address);
-      Def (Trans_Decls.Ghdl_Std_Ulogic_Match_Lt,
-           Grt.Std_Logic_1164.Ghdl_Std_Ulogic_Match_Lt'Address);
-      Def (Trans_Decls.Ghdl_Std_Ulogic_Match_Le,
-           Grt.Std_Logic_1164.Ghdl_Std_Ulogic_Match_Le'Address);
-      Def (Trans_Decls.Ghdl_Std_Ulogic_Match_Ge,
-           Grt.Std_Logic_1164.Ghdl_Std_Ulogic_Match_Ge'Address);
-      Def (Trans_Decls.Ghdl_Std_Ulogic_Match_Gt,
-           Grt.Std_Logic_1164.Ghdl_Std_Ulogic_Match_Gt'Address);
-
-      Def (Trans_Decls.Ghdl_Std_Ulogic_Array_Match_Eq,
-           Grt.Std_Logic_1164.Ghdl_Std_Ulogic_Array_Match_Eq'Address);
-      Def (Trans_Decls.Ghdl_Std_Ulogic_Array_Match_Ne,
-           Grt.Std_Logic_1164.Ghdl_Std_Ulogic_Array_Match_Ne'Address);
-
-      Def (Trans_Decls.Ghdl_To_String_I32,
-           Grt.Images.Ghdl_To_String_I32'Address);
-      Def (Trans_Decls.Ghdl_To_String_I64,
-           Grt.Images.Ghdl_To_String_I64'Address);
-      Def (Trans_Decls.Ghdl_To_String_F64,
-           Grt.Images.Ghdl_To_String_F64'Address);
-      Def (Trans_Decls.Ghdl_To_String_F64_Digits,
-           Grt.Images.Ghdl_To_String_F64_Digits'Address);
-      Def (Trans_Decls.Ghdl_To_String_F64_Format,
-           Grt.Images.Ghdl_To_String_F64_Format'Address);
-      Def (Trans_Decls.Ghdl_To_String_B1,
-           Grt.Images.Ghdl_To_String_B1'Address);
-      Def (Trans_Decls.Ghdl_To_String_E8,
-           Grt.Images.Ghdl_To_String_E8'Address);
-      Def (Trans_Decls.Ghdl_To_String_E32,
-           Grt.Images.Ghdl_To_String_E32'Address);
-      Def (Trans_Decls.Ghdl_To_String_Char,
-           Grt.Images.Ghdl_To_String_Char'Address);
-      Def (Trans_Decls.Ghdl_To_String_P32,
-           Grt.Images.Ghdl_To_String_P32'Address);
-      Def (Trans_Decls.Ghdl_To_String_P64,
-           Grt.Images.Ghdl_To_String_P64'Address);
-      Def (Trans_Decls.Ghdl_Time_To_String_Unit,
-           Grt.Images.Ghdl_Time_To_String_Unit'Address);
-      Def (Trans_Decls.Ghdl_BV_To_Ostring,
-           Grt.Images.Ghdl_BV_To_Ostring'Address);
-      Def (Trans_Decls.Ghdl_BV_To_Hstring,
-           Grt.Images.Ghdl_BV_To_Hstring'Address);
-      Def (Trans_Decls.Ghdl_Array_Char_To_String_B1,
-           Grt.Images.Ghdl_Array_Char_To_String_B1'Address);
-      Def (Trans_Decls.Ghdl_Array_Char_To_String_E8,
-           Grt.Images.Ghdl_Array_Char_To_String_E8'Address);
-      Def (Trans_Decls.Ghdl_Array_Char_To_String_E32,
-           Grt.Images.Ghdl_Array_Char_To_String_E32'Address);
+      Trans_Link.Link;
 
       Ortho_Jit.Link (Err);
       if Err then
@@ -820,7 +268,8 @@ package body Ghdlrun is
                            return Boolean;
    function Get_Short_Help (Cmd : Command_Run_Help) return String;
    procedure Perform_Action (Cmd : in out Command_Run_Help;
-                             Args : Argument_List);
+                             Args : String_Acc_Array;
+                             Success : out Boolean);
 
    function Decode_Command (Cmd : Command_Run_Help; Name : String)
                            return Boolean
@@ -841,12 +290,14 @@ package body Ghdlrun is
    end Get_Short_Help;
 
    procedure Perform_Action (Cmd : in out Command_Run_Help;
-                             Args : Argument_List)
+                             Args : String_Acc_Array;
+                             Success : out Boolean)
    is
       pragma Unreferenced (Cmd);
    begin
       if Args'Length /= 0 then
          Error ("warning: command 'run-help' does not accept any argument");
+         Success := False;
       end if;
       Put_Line ("These options can only be placed at [RUNOPTS]");
       --  Register modules, since they add commands.
@@ -854,6 +305,7 @@ package body Ghdlrun is
       --  Bypass usual help header.
       Grt.Options.Argc := 0;
       Grt.Options.Help;
+      Success := True;
    end Perform_Action;
 
    procedure Register_Commands
@@ -867,6 +319,6 @@ package body Ghdlrun is
                          Ortho_Jit.Disp_Help'Access);
       Ghdlcomp.Register_Commands;
       Register_Command (new Command_Run_Help);
-      Trans_Be.Register_Translation_Back_End;
+      Translation.Register_Translation_Back_End;
    end Register_Commands;
 end Ghdlrun;

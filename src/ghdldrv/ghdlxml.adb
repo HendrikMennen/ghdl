@@ -14,10 +14,10 @@
 --  You should have received a copy of the GNU General Public License
 --  along with this program.  If not, see <gnu.org/licenses>.
 
-with GNAT.OS_Lib; use GNAT.OS_Lib;
 with Simple_IO; use Simple_IO;
 
 with Types; use Types;
+with Flags;
 with Name_Table; use Name_Table;
 with Vhdl.Nodes_Meta; use Vhdl.Nodes_Meta;
 with Files_Map;
@@ -514,7 +514,8 @@ package body Ghdlxml is
    function Get_Short_Help (Cmd : Command_File_To_Xml) return String;
 
    procedure Perform_Action (Cmd : in out Command_File_To_Xml;
-                             Files_Name : Argument_List);
+                             Files_Name : String_Acc_Array;
+                             Success : out Boolean);
 
    function Decode_Command (Cmd : Command_File_To_Xml; Name : String)
                            return Boolean
@@ -534,8 +535,9 @@ package body Ghdlxml is
         & ASCII.LF & "  alias: --file-to-xml";
    end Get_Short_Help;
 
-   procedure Perform_Action
-     (Cmd : in out Command_File_To_Xml; Files_Name : Argument_List)
+   procedure Perform_Action (Cmd : in out Command_File_To_Xml;
+                             Files_Name : String_Acc_Array;
+                             Success : out Boolean)
    is
       pragma Unreferenced (Cmd);
 
@@ -552,10 +554,14 @@ package body Ghdlxml is
 
       Files : File_Data_Array;
    begin
+      Success := False;
+
       --  Load work library.
       if not Setup_Libraries (True) then
          return;
       end if;
+
+      Flags.Flag_Elaborate_With_Outdated := True;
 
       --  Parse all files.
       for I in Files'Range loop
@@ -589,6 +595,8 @@ package body Ghdlxml is
       Put_Stag_End;
       Disp_Iir_Chain_Elements (Libraries.Get_Libraries_Chain);
       Put_Etag ("root");
+
+      Success := True;
    exception
       when Compilation_Error =>
          Error ("xml dump failed due to compilation error");

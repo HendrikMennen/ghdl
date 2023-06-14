@@ -21,7 +21,7 @@ with Ada.Unchecked_Deallocation;
 with Types; use Types;
 with Areapools; use Areapools;
 
-with Grt.Files_Operations;
+with Grt.Files;
 
 with Vhdl.Nodes; use Vhdl.Nodes;
 
@@ -70,13 +70,10 @@ package Elab.Vhdl_Values is
 
    type Value_Acc is access Value_Type;
 
-   type Heap_Index is new Uns32;
-   Null_Heap_Index : constant Heap_Index := 0;
-
    type Protected_Index is new Uns32;
    No_Protected_Index : constant Protected_Index := 0;
 
-   subtype File_Index is Grt.Files_Operations.Ghdl_File_Index;
+   subtype File_Index is Grt.Files.Ghdl_File_Index;
 
    type Signal_Index_Type is new Uns32;
    No_Signal_Index : constant Signal_Index_Type := 0;
@@ -143,7 +140,8 @@ package Elab.Vhdl_Values is
    function Is_Equal (L, R : Valtyp) return Boolean;
 
    --  Create a Value_Net.
-   function Create_Value_Net (S : Uns32) return Value_Acc;
+   function Create_Value_Net (S : Uns32; Pool : Areapool_Acc)
+                             return Value_Acc;
 
    --  Create a Value_Wire.
    function Create_Value_Wire (S : Uns32; Pool : Areapool_Acc)
@@ -164,7 +162,7 @@ package Elab.Vhdl_Values is
    function Create_Value_Discrete (Val : Int64; Vtype : Type_Acc)
                                   return Valtyp;
 
-   function Create_Value_Access (Val : Heap_Index; Acc_Typ : Type_Acc)
+   function Create_Value_Access (Val : Heap_Ptr; Acc_Typ : Type_Acc)
                                 return Valtyp;
 
    function Create_Value_Float (Val : Fp64; Vtype : Type_Acc) return Valtyp;
@@ -228,9 +226,9 @@ package Elab.Vhdl_Values is
    procedure Write_Discrete (Vt : Valtyp; Val : Int64);
    function Read_Discrete (Vt : Valtyp) return Int64;
 
-   procedure Write_Access (Mem : Memory_Ptr; Val : Heap_Index);
-   function Read_Access (Mt : Memtyp) return Heap_Index;
-   function Read_Access (Vt : Valtyp) return Heap_Index;
+   procedure Write_Access (Mem : Memory_Ptr; Val : Heap_Ptr);
+   function Read_Access (Mt : Memtyp) return Heap_Ptr;
+   function Read_Access (Vt : Valtyp) return Heap_Ptr;
 
    procedure Write_Protected (Mem : Memory_Ptr; Idx : Protected_Index);
    function Read_Protected (Mem : Memory_Ptr) return Protected_Index;

@@ -42,6 +42,7 @@ with Vhdl.Sem_Expr;
 with Vhdl.Canon;
 with Vhdl.Std_Package;
 with Vhdl.Prints;
+with Vhdl.Configuration;
 
 package body Elab.Vhdl_Debug is
    procedure Put_Stmt_Trace (Stmt : Iir)
@@ -242,13 +243,13 @@ package body Elab.Vhdl_Debug is
             Disp_Value_Record (M, Vtype);
          when Type_Access =>
             declare
-               Idx : constant Heap_Index := Read_Access (M);
+               Ptr : constant Heap_Ptr := Read_Access (M);
             begin
-               if Idx = Null_Heap_Index then
+               if Ptr = Null_Heap_Ptr then
                   Put ("null");
                else
                   Put ("@");
-                  Put_Uns32 (Uns32 (Idx));
+                  Put_Uns32 (Uns32 (Elab.Vhdl_Heap.Get_Index (Ptr)));
                end if;
             end;
          when Type_Protected =>
@@ -397,6 +398,19 @@ package body Elab.Vhdl_Debug is
            | Iir_Kind_Procedure_Body
            | Iir_Kind_Component_Declaration =>
             null;
+         when Iir_Kind_Package_Declaration
+           | Iir_Kind_Package_Body =>
+            declare
+               Sub_Inst : constant Synth_Instance_Acc :=
+                 Get_Package_Object (Instance, Decl);
+            begin
+               Put_Indent (Indent);
+               Put (Vhdl.Errors.Disp_Node (Decl));
+               Put (":");
+               New_Line;
+               Disp_Declaration_Objects
+                 (Sub_Inst, Get_Declaration_Chain (Decl), Indent + 1);
+            end;
          when Iir_Kind_Suspend_State_Declaration =>
             declare
                Val : constant Valtyp := Get_Value (Instance, Decl);
@@ -560,12 +574,26 @@ package body Elab.Vhdl_Debug is
               | Iir_Kind_Concurrent_Procedure_Call_Statement
               | Iir_Kind_Simple_Simultaneous_Statement =>
                null;
+            when Iir_Kind_Psl_Default_Clock
+              | Iir_Kind_Psl_Assert_Directive
+              | Iir_Kind_Psl_Endpoint_Declaration =>
+               null;
             when Iir_Kinds_Process_Statement =>
                --  Note: processes are not elaborated.
                if Cfg.With_Objs then
                   Put_Indent (Cfg.Indent);
                   Put (Image (Get_Label (Stmt)));
                   Put_Line (": process");
+                  declare
+                     Sub_Inst : constant Synth_Instance_Acc :=
+                       Get_Sub_Instance (Inst, Stmt);
+                  begin
+                     if Sub_Inst /= null then
+                        Disp_Declaration_Objects
+                          (Sub_Inst, Get_Declaration_Chain (Stmt),
+                           Cfg.Indent + 1);
+                     end if;
+                  end;
                end if;
             when others =>
                Vhdl.Errors.Error_Kind ("disp_hierarchy_statement", Stmt);
@@ -607,10 +635,10 @@ package body Elab.Vhdl_Debug is
                        (Inst, Get_Generic_Chain (Ent), Cfg.Indent);
                      Disp_Declaration_Objects
                        (Inst, Get_Port_Chain (Ent), Cfg.Indent);
-                     Put_Indent (Cfg.Indent);
-                     Put_Line ("[architecture]");
                      Disp_Declaration_Objects
                        (Inst, Get_Declaration_Chain (Ent), Cfg.Indent);
+                     Put_Indent (Cfg.Indent);
+                     Put_Line ("[architecture]");
                      Disp_Declaration_Objects
                        (Inst, Get_Declaration_Chain (N), Cfg.Indent);
                   end if;
@@ -630,6 +658,8 @@ package body Elab.Vhdl_Debug is
                Put ("generate statement body");
                --  TODO: disp label or index ?
                New_Line;
+               Disp_Declaration_Objects
+                 (Inst, Get_Declaration_Chain (N), Cfg.Indent + 1);
                Disp_Hierarchy_Statements
                  (Inst, Get_Concurrent_Statement_Chain (N), Cfg);
             when Iir_Kind_Block_Statement =>
@@ -639,6 +669,9 @@ package body Elab.Vhdl_Debug is
                New_Line;
                Disp_Hierarchy_Statements
                  (Inst, Get_Concurrent_Statement_Chain (N), Cfg);
+            when Iir_Kind_Process_Statement
+              | Iir_Kind_Sensitized_Process_Statement =>
+               Disp_Hierarchy_Statement (Inst, N, Cfg);
             when others =>
                Vhdl.Errors.Error_Kind ("disp_hierarchy", N);
          end case;
@@ -1309,24 +1342,24 @@ package body Elab.Vhdl_Debug is
    is
       use Vhdl.Tokens;
       use Errorout;
-      Cur_Inst : constant Synth_Instance_Acc := Debug_Current_Instance;
       Prev_Nbr_Errors : constant Natural := Nbr_Errors;
       Index_Str : String := Natural'Image (Buffer_Index);
       File : Source_File_Entry;
       Expr : Iir;
       Res : Valtyp;
       P : Natural;
-      Opt_Value : Boolean := False;
       Opt_Name : Boolean := False;
+      Opt_Type : Boolean := False;
       Marker : Mark_Type;
+      Cur_Inst : Synth_Instance_Acc;
       Cur_Scope : Node;
    begin
       --  Decode options: /v
       P := Line'First;
       loop
          P := Skip_Blanks (Line (P .. Line'Last));
-         if P + 2 < Line'Last and then Line (P .. P + 1) = "/v" then
-            Opt_Value := True;
+         if P + 2 < Line'Last and then Line (P .. P + 1) = "/t" then
+            Opt_Type := True;
             P := P + 2;
          elsif P + 2 < Line'Last and then Line (P .. P + 1) = "/n" then
             Opt_Name := True;
@@ -1335,8 +1368,6 @@ package body Elab.Vhdl_Debug is
             exit;
          end if;
       end loop;
-
-      pragma Unreferenced (Opt_Value);
 
       Buffer_Index := Buffer_Index + 1;
       Index_Str (Index_Str'First) := '*';
@@ -1356,7 +1387,13 @@ package body Elab.Vhdl_Debug is
          return;
       end if;
 
-      Cur_Scope := Elab.Vhdl_Context.Get_Source_Scope (Cur_Inst);
+      Get_Debug_Loc (Cur_Inst, Cur_Scope);
+      if Cur_Scope = Null_Node
+        or else Get_Kind (Cur_Scope) not in Iir_Kinds_Sequential_Statement
+      then
+         Cur_Scope := Elab.Vhdl_Context.Get_Source_Scope (Cur_Inst);
+      end if;
+
       Enter_Scope (Cur_Scope);
       Expr := Vhdl.Sem_Expr.Sem_Expression_Universal (Expr);
       Leave_Scope (Cur_Scope);
@@ -1401,6 +1438,9 @@ package body Elab.Vhdl_Debug is
             Elab.Vhdl_Values.Debug.Debug_Valtyp (Res);
          end if;
          New_Line;
+         if Opt_Type then
+            Debug_Typ (Res.Typ);
+         end if;
       end if;
 
       --  Free value
@@ -1412,6 +1452,7 @@ package body Elab.Vhdl_Debug is
       F : Natural;
       Idx : Uns32;
       Valid : Boolean;
+      Ptr : Heap_Ptr;
       Mt : Memtyp;
    begin
       F := Skip_Blanks (Line, Line'First);
@@ -1420,9 +1461,83 @@ package body Elab.Vhdl_Debug is
          Put_Line ("invalid heap index");
          return;
       end if;
-      Mt := Elab.Vhdl_Heap.Synth_Dereference (Heap_Index (Idx));
-      Debug_Memtyp (Mt);
+      Ptr := Elab.Vhdl_Heap.Get_Pointer (Elab.Vhdl_Heap.Heap_Slot (Idx));
+      if Ptr = Null_Heap_Ptr then
+         Put_Line ("invalid heap index");
+      else
+         Mt := Elab.Vhdl_Heap.Synth_Dereference (Ptr);
+         Debug_Memtyp (Mt);
+      end if;
    end Print_Heap_Proc;
+
+   procedure Info_Lib_Proc (Line : String)
+   is
+      use Libraries;
+      F, L : Natural;
+      Lib : Node;
+      Id : Name_Id;
+   begin
+      Lib := Get_Libraries_Chain;
+
+      F := Skip_Blanks (Line, Line'First);
+      L := Get_Word (Line, F);
+      if F >= Line'Last then
+         --  No arguments, disp all libraries.
+         while Lib /= Null_Node loop
+            Put (Name_Table.Image (Get_Identifier (Lib)));
+            if Lib = Work_Library then
+               Put (" (work)");
+            end if;
+            New_Line;
+            Lib := Get_Chain (Lib);
+         end loop;
+      else
+         Id := Get_Identifier_No_Create (Line (F .. L));
+         if Id = Null_Identifier then
+            Put ("no library '");
+            Put (Line (F .. L));
+            Put_Line ("'");
+            return;
+         end if;
+         while Lib /= Null_Node loop
+            if Get_Identifier (Lib) = Id then
+               declare
+                  File : Node;
+                  Unit : Node;
+               begin
+                  File := Get_Design_File_Chain (Lib);
+                  while File /= Null_Node loop
+                     Unit := Get_First_Design_Unit (File);
+                     while Unit /= Null_Node loop
+                        Put_Line
+                          (Vhdl.Errors.Disp_Node (Get_Library_Unit (Unit)));
+                        Unit := Get_Chain (Unit);
+                     end loop;
+                     File := Get_Chain (File);
+                  end loop;
+               end;
+               return;
+            end if;
+            Lib := Get_Chain (Lib);
+         end loop;
+         Put ("library '");
+         Put (Line (F .. L));
+         Put ("' is not known, try 'info lib'");
+         New_Line;
+      end if;
+   end Info_Lib_Proc;
+
+   procedure Info_Units_Proc (Line : String)
+   is
+      pragma Unreferenced (Line);
+      use Vhdl.Configuration;
+      Unit : Node;
+   begin
+      for I in Design_Units.First .. Design_Units.Last loop
+         Unit := Design_Units.Table (I);
+         Put_Line (Vhdl.Errors.Disp_Node (Get_Library_Unit (Unit)));
+      end loop;
+   end Info_Units_Proc;
 
    procedure Append_Commands is
    begin
@@ -1434,6 +1549,14 @@ package body Elab.Vhdl_Debug is
         (Name => new String'("ph*eap"),
          Help => new String'("print heap index"),
          Proc => Print_Heap_Proc'Access);
+      Append_Info_Command
+        (new String'("lib*raries"),
+         new String'("display libraries"),
+         Info_Lib_Proc'Access);
+      Append_Info_Command
+        (new String'("units"),
+         new String'("display units used in the design"),
+         Info_Units_Proc'Access);
    end Append_Commands;
 
 end Elab.Vhdl_Debug;

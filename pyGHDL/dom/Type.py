@@ -32,24 +32,24 @@
 # ============================================================================
 from typing import List, Union, Iterator, Tuple, Iterable
 
+from pyGHDL.dom.Names import SimpleName
 from pyTooling.Decorators import export
 
-from pyVHDLModel.SyntaxModel import (
-    AnonymousType as VHDLModel_AnonymousType,
-    PhysicalType as VHDLModel_PhysicalType,
-    IntegerType as VHDLModel_IntegerType,
-    EnumeratedType as VHDLModel_EnumeratedType,
-    ArrayType as VHDLModel_ArrayType,
-    RecordTypeElement as VHDLModel_RecordTypeElement,
-    RecordType as VHDLModel_RecordType,
-    AccessType as VHDLModel_AccessType,
-    FileType as VHDLModel_FileType,
-    ProtectedType as VHDLModel_ProtectedType,
-    ProtectedTypeBody as VHDLModel_ProtectedTypeBody,
-    Subtype as VHDLModel_Subtype,
-    SubtypeOrSymbol,
-    Name,
-)
+from pyVHDLModel.Name import Name
+from pyVHDLModel.Symbol import Symbol
+from pyVHDLModel.Type import Subtype as VHDLModel_Subtype
+from pyVHDLModel.Type import AnonymousType as VHDLModel_AnonymousType
+from pyVHDLModel.Type import EnumeratedType as VHDLModel_EnumeratedType
+from pyVHDLModel.Type import IntegerType as VHDLModel_IntegerType
+from pyVHDLModel.Type import PhysicalType as VHDLModel_PhysicalType
+from pyVHDLModel.Type import ArrayType as VHDLModel_ArrayType
+from pyVHDLModel.Type import RecordTypeElement as VHDLModel_RecordTypeElement
+from pyVHDLModel.Type import RecordType as VHDLModel_RecordType
+from pyVHDLModel.Type import ProtectedType as VHDLModel_ProtectedType
+from pyVHDLModel.Type import ProtectedTypeBody as VHDLModel_ProtectedTypeBody
+from pyVHDLModel.Type import AccessType as VHDLModel_AccessType
+from pyVHDLModel.Type import FileType as VHDLModel_FileType
+
 from pyGHDL.libghdl import utils
 from pyGHDL.libghdl._types import Iir
 from pyGHDL.libghdl.vhdl import nodes, flists
@@ -115,7 +115,7 @@ class PhysicalType(VHDLModel_PhysicalType, DOMMixin):
     @classmethod
     def parse(cls, typeName: str, typeDefinitionNode: Iir) -> "PhysicalType":
         from pyGHDL.dom._Utils import GetIirKindOfNode, GetNameOfNode
-        from pyGHDL.dom._Translate import GetRangeFromNode, GetNameFromNode
+        from pyGHDL.dom._Translate import GetRangeFromNode, GetName
 
         rangeConstraint = nodes.Get_Range_Constraint(typeDefinitionNode)
         rangeKind = GetIirKindOfNode(rangeConstraint)
@@ -125,7 +125,7 @@ class PhysicalType(VHDLModel_PhysicalType, DOMMixin):
             nodes.Iir_Kind.Attribute_Name,
             nodes.Iir_Kind.Parenthesis_Name,
         ):
-            rng = GetNameFromNode(rangeConstraint)
+            rng = GetName(rangeConstraint)
         else:
             pos = Position.parse(typeDefinitionNode)
             raise DOMException(f"Unknown range kind '{rangeKind.name}' in physical type definition at line {pos.Line}.")
@@ -148,7 +148,7 @@ class PhysicalType(VHDLModel_PhysicalType, DOMMixin):
 
 @export
 class ArrayType(VHDLModel_ArrayType, DOMMixin):
-    def __init__(self, node: Iir, identifier: str, indices: List, elementSubtype: SubtypeOrSymbol):
+    def __init__(self, node: Iir, identifier: str, indices: List, elementSubtype: Symbol):
         super().__init__(identifier, indices, elementSubtype)
         DOMMixin.__init__(self, node)
 
@@ -180,7 +180,7 @@ class ArrayType(VHDLModel_ArrayType, DOMMixin):
 
 @export
 class RecordTypeElement(VHDLModel_RecordTypeElement, DOMMixin):
-    def __init__(self, node: Iir, identifiers: List[str], subtype: SubtypeOrSymbol):
+    def __init__(self, node: Iir, identifiers: List[str], subtype: Symbol):
         super().__init__(identifiers, subtype)
         DOMMixin.__init__(self, node)
 
@@ -288,7 +288,7 @@ class ProtectedTypeBody(VHDLModel_ProtectedTypeBody, DOMMixin):
 
 @export
 class AccessType(VHDLModel_AccessType, DOMMixin):
-    def __init__(self, node: Iir, identifier: str, designatedSubtype: SubtypeOrSymbol):
+    def __init__(self, node: Iir, identifier: str, designatedSubtype: Symbol):
         super().__init__(identifier, designatedSubtype)
         DOMMixin.__init__(self, node)
 
@@ -304,7 +304,7 @@ class AccessType(VHDLModel_AccessType, DOMMixin):
 
 @export
 class FileType(VHDLModel_FileType, DOMMixin):
-    def __init__(self, node: Iir, identifier: str, designatedSubtype: SubtypeOrSymbol):
+    def __init__(self, node: Iir, identifier: str, designatedSubtype: Symbol):
         super().__init__(identifier, designatedSubtype)
         DOMMixin.__init__(self, node)
 
@@ -314,7 +314,9 @@ class FileType(VHDLModel_FileType, DOMMixin):
 
         designatedSubtypeMark = nodes.Get_File_Type_Mark(typeDefinitionNode)
         designatedSubtypeName = GetNameOfNode(designatedSubtypeMark)
-        designatedSubtype = SimpleSubtypeSymbol(typeDefinitionNode, designatedSubtypeName)
+        designatedSubtype = SimpleSubtypeSymbol(
+            typeDefinitionNode, SimpleName(designatedSubtypeMark, designatedSubtypeName)
+        )
 
         return cls(typeDefinitionNode, typeName, designatedSubtype)
 

@@ -17,22 +17,25 @@ with System;
 
 with Ada.Unchecked_Conversion;
 with Ada.Command_Line;
-with GNAT.OS_Lib; use GNAT.OS_Lib;
 
 with Interfaces;
 with Interfaces.C;
 
+with Types; use Types;
 with Ghdllocal; use Ghdllocal;
 
 with Flags;
 with Errorout;
 with Simple_IO;
+with Options;
 
 with Vhdl.Nodes; use Vhdl.Nodes;
 with Vhdl.Std_Package;
 with Vhdl.Sem;
 with Vhdl.Canon;
 with Vhdl.Configuration;
+with Vhdl.Utils;
+with Vhdl.Back_End;
 
 with Grt.Options;
 with Grt.Types;
@@ -49,19 +52,22 @@ with Elab.Debugger;
 
 with Synth.Flags;
 with Synth.Errors;
+with Synth.Vhdl_Foreign;
+
 with Simul.Vhdl_Elab;
 with Simul.Vhdl_Simul;
+with Simul.Main;
 
 package body Ghdlsimul is
    procedure Compile_Init (Analyze_Only : Boolean) is
    begin
       Common_Compile_Init (Analyze_Only);
+
+      Vhdl.Back_End.Sem_Foreign := Vhdl.Back_End.Sem_Foreign_Wrapper'Access;
+
       if Analyze_Only then
          return;
       end if;
-
-      --  FIXME: add a flag to force unnesting.
-      --  Translation.Flag_Unnest_Subprograms := True;
 
       --  The design is always analyzed in whole.
       Flags.Flag_Whole_Analyze := True;
@@ -73,14 +79,35 @@ package body Ghdlsimul is
    end Compile_Init;
 
    procedure Compile_Elab
-     (Cmd_Name : String; Args : Argument_List; Opt_Arg : out Natural)
+     (Cmd_Name : String; Args : String_Acc_Array; Opt_Arg : out Natural)
    is
       use Elab.Vhdl_Context;
       Config : Node;
       Lib_Unit : Node;
       Inst : Synth_Instance_Acc;
+      Top : Node;
    begin
       Common_Compile_Elab (Cmd_Name, Args, True, Opt_Arg, Config);
+
+      --  For compatibility, also handle '-gGEN=VAL' options after the
+      --  top-level unit.
+      --  Handle --expect-failure
+      for I in Opt_Arg .. Args'Last loop
+         declare
+            Arg : String renames Args (I).all;
+            Res : Options.Option_State;
+            pragma Unreferenced (Res);
+         begin
+            if Arg'Length > 3
+              and then Arg (Arg'First + 1) = 'g'
+              and then Is_Generic_Override_Option (Arg)
+            then
+               Res := Decode_Generic_Override_Option (Arg);
+            elsif Arg = "--expect-failure" then
+               Flag_Expect_Failure := True;
+            end if;
+         end;
+      end loop;
 
       --  If all design units are loaded, late semantic checks can be
       --  performed.
@@ -99,16 +126,32 @@ package body Ghdlsimul is
          end if;
       end;
 
-      for I in Opt_Arg .. Args'Last loop
-         if Args (I).all = "--expect-failure" then
-            Flag_Expect_Failure := True;
-            exit;
+      --  Handle automatic time resolution.
+      --  Must be done before elaboration, as time value could be computed.
+      if Time_Resolution = 'a' then
+         Time_Resolution := Vhdl.Std_Package.Get_Minimal_Time_Resolution;
+         if Time_Resolution = '?' then
+            Time_Resolution := 'f';
          end if;
-      end loop;
+      end if;
+      Vhdl.Std_Package.Set_Time_Resolution (Time_Resolution);
 
+      --  Set flags.
       Synth.Flags.Flag_Simulation := True;
       Synth.Errors.Debug_Handler := Elab.Debugger.Debug_Error'Access;
+      Synth.Vhdl_Foreign.Initialize;
 
+      --  Generic overriding.
+      Top := Vhdl.Utils.Get_Entity_From_Configuration (Config);
+      Vhdl.Configuration.Apply_Generic_Override (Top);
+      Vhdl.Configuration.Check_Entity_Declaration_Top (Top, False);
+
+      if Errorout.Nbr_Errors > 0 then
+         raise Errorout.Compilation_Error;
+      end if;
+
+      --  *THE* elaboration.
+      --  Compute values, instantiate..
       Lib_Unit := Get_Library_Unit (Config);
       pragma Assert (Get_Kind (Lib_Unit) /= Iir_Kind_Foreign_Module);
       Inst := Elab.Vhdl_Insts.Elab_Top_Unit (Lib_Unit);
@@ -117,8 +160,11 @@ package body Ghdlsimul is
          raise Errorout.Compilation_Error;
       end if;
 
+      --  Finish elaboration: gather processes, signals.
+      --  Compute drivers, sources...
       Simul.Vhdl_Elab.Gather_Processes (Inst);
       Simul.Vhdl_Elab.Elab_Processes;
+      Simul.Vhdl_Elab.Compute_Sources;
 
       if Errorout.Nbr_Errors > 0 then
          raise Errorout.Compilation_Error;
@@ -131,7 +177,7 @@ package body Ghdlsimul is
 
    --  Set options.
    --  This is a little bit over-kill: from C to Ada and then again to C...
-   procedure Set_Run_Options (Args : Argument_List)
+   procedure Set_Run_Options (Args : String_Acc_Array)
    is
       use Interfaces.C;
       use Grt.Options;
@@ -169,14 +215,6 @@ package body Ghdlsimul is
          return;
       end if;
 
-      if Time_Resolution = 'a' then
-         Time_Resolution := Vhdl.Std_Package.Get_Minimal_Time_Resolution;
-         if Time_Resolution = '?' then
-            Time_Resolution := 'f';
-         end if;
-      end if;
-      Vhdl.Std_Package.Set_Time_Resolution (Time_Resolution);
-
       --  Overwrite time resolution in flag string.
       Flags.Flag_String (5) := Time_Resolution;
       Grtlink.Flag_String := Flags.Flag_String;
@@ -190,15 +228,22 @@ package body Ghdlsimul is
 
    function Decode_Option (Option : String) return Boolean
    is
+      Res : Options.Option_State;
+      pragma Unreferenced (Res);
    begin
       if Option = "--debug" or Option = "-g" then
          Elab.Debugger.Flag_Debug_Enable := True;
       elsif Option = "-t" then
          Synth.Flags.Flag_Trace_Statements := True;
       elsif Option = "-i" then
-         Simul.Vhdl_Simul.Flag_Interractive := True;
+         Simul.Main.Flag_Interractive := True;
       elsif Option = "-ge" then
-         Simul.Vhdl_Simul.Flag_Debug_Elab := True;
+         Simul.Main.Flag_Debug_Elab := True;
+      elsif Option'Last > 3
+        and then Option (Option'First + 1) = 'g'
+        and then Is_Generic_Override_Option (Option)
+      then
+         Res := Decode_Generic_Override_Option (Option);
       else
          return False;
       end if;

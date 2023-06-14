@@ -1564,21 +1564,290 @@ package body Vhdl.Parse is
       return Parse_Any_Name (True, True);
    end Parse_Signature_Name;
 
-   --  Emit an error message if MARK doesn't have the form of a type mark.
-   function Check_Type_Mark (Mark : Iir) return Boolean is
+   --  Return the first parenthesis_name from NAME, set suffix field to
+   --  link the others.
+   --  Used for conversion of a parenthesis_name to a subtype.
+   function Rechain_Parenthesis_Name_For_Subtype (Name : Iir) return Iir
+   is
+      Last, Prefix : Iir;
    begin
-      case Get_Kind (Mark) is
+      Last := Name;
+      loop
+         Prefix := Get_Prefix (Last);
+         exit when Get_Kind (Prefix) /= Iir_Kind_Parenthesis_Name;
+
+         Set_Suffix (Prefix, Last);
+         Last := Prefix;
+      end loop;
+      return Last;
+   end Rechain_Parenthesis_Name_For_Subtype;
+
+   --  Transform NAME into record_subtype(s) and array_subtype(s).
+   --  Start from the first name.
+   --
+   --  Here are the related rules from the LRM:
+   --
+   --  LRM08 5.3.2 Array types
+   --  array_constraint ::=
+   --      index_constraint [ array_element_constraint ]
+   --    | ( open ) [ array_element_constraint ]
+   --  array_element_constraint ::= element_constraint
+   --  index_constraint ::= (discrete_range { , discrete_range } )
+   --
+   --  LRM08 5.3.3 Record types
+   --  record_constraint ::=
+   --    ( record_element_constraint { , record_element_constraint } )
+   --  record_element_constraint ::=
+   --     record_element_simple_name element_constraint
+   --
+   --  LRM08 6.3 Subtype declarations
+   --  element_constraint ::=
+   --      array_constraint
+   --    | record_constraint
+   --
+   --  subtype_indication ::=
+   --    [ resolution_indication ] type_mark [ constraint ]
+   --
+   --  resolution_indication ::=
+   --    resolution_function_name | ( element_resolution )
+   --
+   --  constraint ::=
+   --      range_constraint
+   --    | array_constraint
+   --    | record_constraint
+   function Parenthesis_Name_To_Subtype (Name : Iir) return Iir
+   is
+      Suffix : constant Iir := Get_Suffix (Name);
+      First_Assoc : Iir;
+      Assoc, Next_Assoc : Iir;
+      Actual : Iir;
+      Assoc_Index : Iir;
+      Assoc_Element : Iir;
+      Nbr_Assocs : Natural;
+      Res : Iir;
+   begin
+      Assoc_Index := Null_Iir;
+      Assoc_Element := Null_Iir;
+      Nbr_Assocs := 0;
+      First_Assoc := Get_Association_Chain (Name);
+
+      Assoc := First_Assoc;
+      while Assoc /= Null_Iir loop
+         if Get_Formal (Assoc) /= Null_Iir then
+            Error_Msg_Parse (+Assoc, "incorrect constraint for a subtype");
+            Res := Create_Iir (Iir_Kind_Array_Subtype_Definition);
+            Location_Copy (Res, Assoc);
+            return Res;
+         end if;
+
+         Next_Assoc := Get_Chain (Assoc);
+         Nbr_Assocs := Nbr_Assocs + 1;
+
+         case Iir_Kinds_Association_Element (Get_Kind (Assoc)) is
+            when Iir_Kind_Association_Element_Open =>
+               if Next_Assoc /= Null_Iir then
+                  Error_Msg_Parse
+                    (+Next_Assoc,
+                     "'open' must be alone for an array constraint");
+               elsif Assoc /= First_Assoc then
+                  Error_Msg_Parse
+                    (+Assoc, "all indexes must be constrained");
+               end if;
+               --  Free all assocs.
+               Assoc := First_Assoc;
+               while Assoc /= Null_Iir loop
+                  Next_Assoc := Get_Chain (Assoc);
+                  Free_Iir (Assoc);
+                  Assoc := Next_Assoc;
+               end loop;
+
+               Res := Create_Iir (Iir_Kind_Array_Subtype_Definition);
+               Location_Copy (Res, Name);
+               Set_Has_Array_Constraint_Flag (Res, True);
+
+               Free_Iir (Name);
+
+               if Suffix /= Null_Iir then
+                  Set_Array_Element_Constraint
+                    (Res, Parenthesis_Name_To_Subtype (Suffix));
+                  Set_Has_Element_Constraint_Flag (Res, True);
+               end if;
+
+               return Res;
+            when Iir_Kind_Association_Element_By_Expression =>
+               null;
+            when others =>
+               --  Parse_Associations creates only Open or By_Expression
+               --  associations.
+               raise Internal_Error;
+         end case;
+
+         Actual := Get_Actual (Assoc);
+         case Get_Kind (Actual) is
+            when Iir_Kinds_Denoting_Name =>
+               Assoc_Index := Actual;
+            when Iir_Kind_Range_Expression
+               | Iir_Kind_Attribute_Name
+               | Iir_Kind_Subtype_Definition =>
+               Assoc_Index := Actual;
+            when Iir_Kind_Parenthesis_Name =>
+               declare
+                  Prefix : constant Iir := Get_Prefix (Actual);
+               begin
+                  --  Handle attributes like xxx'range(y)
+                  if Get_Kind (Prefix) = Iir_Kind_Attribute_Name then
+                     Assoc_Index := Actual;
+                  else
+                     Assoc_Element := Actual;
+                  end if;
+               end;
+            when Iir_Kind_Error =>
+               Res := Create_Iir (Iir_Kind_Array_Subtype_Definition);
+               Location_Copy (Res, Assoc);
+               return Res;
+            when others =>
+               --  TODO: improve message ?
+               Error_Msg_Parse
+                 (+Actual, "incorrect constraint for a subtype indication");
+               Res := Create_Iir (Iir_Kind_Array_Subtype_Definition);
+               Location_Copy (Res, Assoc);
+               return Res;
+         end case;
+
+         Assoc := Next_Assoc;
+      end loop;
+
+      if Assoc_Index /= Null_Iir and then Assoc_Element = Null_Iir then
+         declare
+            Cons : Iir_Flist;
+            Idx : Natural;
+         begin
+            --  Convert assocs to discrete_ranges.
+            Assoc := First_Assoc;
+            Cons := Create_Iir_Flist (Nbr_Assocs);
+            Idx := 0;
+            while Assoc /= Null_Iir loop
+               Actual := Get_Actual (Assoc);
+               Set_Nth_Element (Cons, Idx, Actual);
+               Idx := Idx + 1;
+               Next_Assoc := Get_Chain (Assoc);
+               Free_Iir (Assoc);
+               Assoc := Next_Assoc;
+            end loop;
+            pragma Assert (Idx = Nbr_Assocs);
+
+            Res := Create_Iir (Iir_Kind_Array_Subtype_Definition);
+            Location_Copy (Res, Name);
+
+            Set_Index_Constraint_List (Res, Cons);
+            Set_Has_Array_Constraint_Flag (Res, True);
+            Free_Iir (Name);
+
+            if Suffix /= Null_Iir then
+               Set_Array_Element_Constraint
+                 (Res, Parenthesis_Name_To_Subtype (Suffix));
+               Set_Has_Element_Constraint_Flag (Res, True);
+            end if;
+            return Res;
+         end;
+      elsif Assoc_Index = Null_Iir and then Assoc_Element /= Null_Iir then
+         --  Convert assocs to record_element_constraints of a record_subtype
+         declare
+            Res : Iir;
+            Last_El : Iir;
+            El : Iir;
+            Prefix : Iir;
+         begin
+            Res := Create_Iir (Iir_Kind_Record_Subtype_Definition);
+            Location_Copy (Res, Name);
+
+            Assoc := First_Assoc;
+            Last_El := Null_Iir;
+            while Assoc /= Null_Iir loop
+               --  Convert.
+               El := Create_Iir (Iir_Kind_Record_Element_Constraint);
+               Location_Copy (El, Assoc);
+               Actual := Get_Actual (Assoc);
+               --  Actual is a parenthesis name.
+               --  Recurse for element_constraint(s).
+               Actual := Rechain_Parenthesis_Name_For_Subtype (Actual);
+
+               Prefix := Get_Prefix (Actual);
+               if Get_Kind (Prefix) /= Iir_Kind_Simple_Name then
+                  Error_Msg_Parse
+                    (+Prefix,
+                     "simple name expected for record element constraint");
+               else
+                  Set_Identifier (El, Get_Identifier (Prefix));
+               end if;
+               Free_Iir (Prefix);
+
+               Actual := Parenthesis_Name_To_Subtype (Actual);
+               Set_Subtype_Indication (El, Actual);
+
+               --  Append.
+               if Last_El = Null_Iir then
+                  Set_Owned_Elements_Chain (Res, El);
+               else
+                  Set_Chain (Last_El, El);
+               end if;
+               Last_El := El;
+
+               Next_Assoc := Get_Chain (Assoc);
+               Free_Iir (Assoc);
+               Assoc := Next_Assoc;
+            end loop;
+
+            if Suffix /= Null_Iir then
+               Error_Msg_Parse
+                 (+Suffix,
+                  "record constraint cannot be followed by a constraint");
+            end if;
+
+            Free_Iir (Name);
+            return Res;
+         end;
+      else
+         if Assoc_Index /= Null_Iir then
+            --  Empty association list has already been reported.
+            Error_Msg_Parse
+              (+Assoc_Index, "cannot mix record and array constraints");
+         end if;
+         Res := Create_Iir (Iir_Kind_Array_Subtype_Definition);
+         Location_Copy (Res, Name);
+         return Res;
+      end if;
+   end Parenthesis_Name_To_Subtype;
+
+   --  Emit an error message if NAME doesn't have the form of a type mark.
+   function Name_To_Type_Mark (Name : Iir) return Iir
+   is
+      Res : Iir;
+   begin
+      case Get_Kind (Name) is
          when Iir_Kind_Simple_Name
            | Iir_Kind_Selected_Name =>
-            return True;
+            return Name;
          when Iir_Kind_Attribute_Name =>
             --  For O'Subtype.
-            return True;
+            return Name;
+         when Iir_Kind_Parenthesis_Name =>
+            --  A constraint.
+            declare
+               Chain : Iir;
+               Prefix : Iir;
+            begin
+               Chain := Rechain_Parenthesis_Name_For_Subtype (Name);
+               Prefix := Get_Prefix (Chain);
+               Res := Parenthesis_Name_To_Subtype (Chain);
+               Set_Subtype_Type_Mark (Res, Prefix);
+               return Res;
+            end;
          when others =>
-            Error_Msg_Parse (+Mark, "type mark must be a name of a type");
-            return False;
+            Error_Msg_Parse (+Name, "type mark must be a name of a type");
+            return Null_Iir;
       end case;
-   end Check_Type_Mark;
+   end Name_To_Type_Mark;
 
    --  precond : next token
    --  postcond: next token
@@ -1592,18 +1861,100 @@ package body Vhdl.Parse is
       Old : Iir;
       pragma Unreferenced (Old);
    begin
-      Res := Parse_Name (Allow_Indexes => False);
+      Res := Parse_Name;
 
-      if Check_Type_Mark (Res) then
+      Res := Name_To_Type_Mark (Res);
+      if Res /= Null_Iir then
          if Check_Paren and then Current_Token = Tok_Left_Paren then
             Error_Msg_Parse ("index constraint not allowed here");
             Old := Parse_Name_Suffix (Res, True);
          end if;
-      else
-         Res := Null_Iir;
       end if;
       return Res;
    end Parse_Type_Mark;
+
+   --  precond:  VIEW
+   --  postcond: next token
+   --
+   --  LRM19 6.5.2 Interface object declarations
+   --  mode_view_indication ::=
+   --      record_mode_view_indication
+   --    | array_mode_view_indication
+   --
+   --  record_mode_view_indication ::=
+   --    VIEW mode_view_name [ OF unresolved_record_subtype_indication ]
+   --
+   --  array_mode_view_indication ::=
+   --    VIEW ( mode_view_name ) [ OF unresolved_array_subtype_indication ]
+   function Parse_Mode_View_Indication return Iir
+   is
+      Res : Iir;
+   begin
+      --  Skip 'view'.
+      Scan;
+
+      if Current_Token = Tok_Left_Paren then
+         Res := Create_Iir (Iir_Kind_Array_Mode_View_Indication);
+         Set_Location (Res);
+
+         --  Skip '('.
+         Scan;
+
+         Set_Name (Res, Parse_Name);
+
+         --  Skip ')'.
+         Expect_Scan (Tok_Right_Paren);
+      else
+         Res := Create_Iir (Iir_Kind_Record_Mode_View_Indication);
+         Set_Location (Res);
+
+         Set_Name (Res, Parse_Name);
+      end if;
+
+      if Current_Token = Tok_Of then
+         --  Skip 'of'.
+         Scan;
+
+         Set_Subtype_Indication (Res, Parse_Subtype_Indication);
+      end if;
+
+      return Res;
+   end Parse_Mode_View_Indication;
+
+   --  Change kind of interfaces, for parse_interface_object_declaration.
+   procedure Rename_Interfaces (First : in out Iir; New_Kind : Iir_Kind)
+   is
+      O_Interface : Iir_Interface_Constant_Declaration;
+      N_Interface : Iir_Interface_Variable_Declaration;
+      Last, Tmp : Iir;
+   begin
+      Last := Null_Iir;
+
+      O_Interface := First;
+      while O_Interface /= Null_Iir loop
+         N_Interface := Create_Iir (New_Kind);
+         Location_Copy (N_Interface, O_Interface);
+         Set_Identifier (N_Interface, Get_Identifier (O_Interface));
+
+         if Flag_Elocations then
+            Create_Elocations (N_Interface);
+            Set_Start_Location (N_Interface, Get_Start_Location (O_Interface));
+            Set_Colon_Location
+              (N_Interface, Get_Colon_Location (O_Interface));
+         end if;
+
+         if Last = Null_Iir then
+            First := N_Interface;
+         else
+            Set_Chain (Last, N_Interface);
+         end if;
+         Last := N_Interface;
+
+         Tmp := Get_Chain (O_Interface);
+         Free_Iir (O_Interface);
+         O_Interface := Tmp;
+      end loop;
+   end Rename_Interfaces;
 
    --  precond : CONSTANT, SIGNAL, VARIABLE. FILE or identifier
    --  postcond: next token (';' or ')')
@@ -1649,6 +2000,7 @@ package body Vhdl.Parse is
       Last : Iir;
       First : Iir;
       Inter: Iir;
+      Next_Inter : Iir;
       Is_Default : Boolean;
       Interface_Mode: Iir_Mode;
       Interface_Type: Iir;
@@ -1680,6 +2032,9 @@ package body Vhdl.Parse is
                   Kind := Iir_Kind_Interface_Signal_Declaration;
             end case;
          when Tok_Constant =>
+            if Ctxt = Port_Interface_List then
+               Error_Msg_Parse ("constant interface not allowed for a port");
+            end if;
             Kind := Iir_Kind_Interface_Constant_Declaration;
          when Tok_Signal =>
             if Ctxt = Generic_Interface_List then
@@ -1775,89 +2130,76 @@ package body Vhdl.Parse is
             Has_Mode := False;
       end case;
 
-      --  LRM93 2.1.1  LRM08 4.2.2.1
-      --  If the mode is INOUT or OUT, and no object class is explicitly
-      --  specified, variable is assumed.
-      if Is_Default
-        and then Ctxt in Parameter_Interface_List
-        and then Interface_Mode in Iir_Out_Modes
-      then
-         --  Convert into variable.
-         declare
-            O_Interface : Iir_Interface_Constant_Declaration;
-            N_Interface : Iir_Interface_Variable_Declaration;
-         begin
-            O_Interface := First;
-            while O_Interface /= Null_Iir loop
-               N_Interface :=
-                 Create_Iir (Iir_Kind_Interface_Variable_Declaration);
-               Location_Copy (N_Interface, O_Interface);
-               Set_Identifier (N_Interface, Get_Identifier (O_Interface));
+      if Current_Token = Tok_View then
+         if Has_Class
+           and then Get_Kind (First) /= Iir_Kind_Interface_Signal_Declaration
+         then
+            Error_Msg_Parse ("view only allowed for interface signal");
+         end if;
+         Rename_Interfaces (First, Iir_Kind_Interface_View_Declaration);
+         Inter := First;
 
-               if Flag_Elocations then
-                  Create_Elocations (N_Interface);
-                  Set_Start_Location
-                    (N_Interface, Get_Start_Location (O_Interface));
-                  Set_Colon_Location
-                    (N_Interface, Get_Colon_Location (O_Interface));
-               end if;
+         if Interface_Mode /= Iir_Unknown_Mode then
+            Error_Msg_Parse ("mode can't be specified for a view");
+         end if;
 
-               if O_Interface = First then
-                  First := N_Interface;
-               else
-                  Set_Chain (Last, N_Interface);
-               end if;
-               Last := N_Interface;
-
-               Inter := Get_Chain (O_Interface);
-               Free_Iir (O_Interface);
-               O_Interface := Inter;
-            end loop;
+         Interface_Type := Parse_Mode_View_Indication;
+      else
+         --  LRM93 2.1.1  LRM08 4.2.2.1
+         --  If the mode is INOUT or OUT, and no object class is explicitly
+         --  specified, variable is assumed.
+         if Is_Default
+           and then Ctxt in Parameter_Interface_List
+           and then Interface_Mode in Iir_Out_Modes
+         then
+            Rename_Interfaces (First, Iir_Kind_Interface_Variable_Declaration);
             Inter := First;
-         end;
-      end if;
+         end if;
 
-      --  Parse mode (and handle default mode).
-      case Iir_Kinds_Interface_Object_Declaration (Get_Kind (Inter)) is
-         when Iir_Kind_Interface_File_Declaration =>
-            if Interface_Mode /= Iir_Unknown_Mode then
-               Error_Msg_Parse
-                 ("mode can't be specified for a file interface");
-            end if;
-            Interface_Mode := Iir_Inout_Mode;
-         when Iir_Kind_Interface_Signal_Declaration
-           | Iir_Kind_Interface_Variable_Declaration =>
-            --  LRM93 4.3.2
-            --  If no mode is explicitly given in an interface declaration
-            --  other than an interface file declaration, mode IN is
-            --  assumed.
-            if Interface_Mode = Iir_Unknown_Mode then
-               Interface_Mode := Iir_In_Mode;
-            end if;
-         when Iir_Kind_Interface_Constant_Declaration =>
-            if Interface_Mode = Iir_Unknown_Mode then
-               Interface_Mode := Iir_In_Mode;
-            elsif Interface_Mode /= Iir_In_Mode then
-               Error_Msg_Parse ("mode must be 'in' for a constant");
-               Interface_Mode := Iir_In_Mode;
-            end if;
-         when Iir_Kind_Interface_Quantity_Declaration =>
-            case Interface_Mode is
-               when Iir_Unknown_Mode =>
-                  Interface_Mode := Iir_In_Mode;
-               when Iir_In_Mode
-                 | Iir_Out_Mode =>
-                  null;
-               when Iir_Inout_Mode
-                 | Iir_Linkage_Mode
-                 | Iir_Buffer_Mode =>
+         --  Parse mode (and handle default mode).
+         case Iir_Kinds_Interface_Object_Declaration (Get_Kind (Inter)) is
+            when Iir_Kind_Interface_File_Declaration =>
+               if Interface_Mode /= Iir_Unknown_Mode then
                   Error_Msg_Parse
-                    ("mode must be 'in' or 'out' for a quantity");
+                    ("mode can't be specified for a file interface");
+               end if;
+               Interface_Mode := Iir_Inout_Mode;
+            when Iir_Kind_Interface_Signal_Declaration
+              | Iir_Kind_Interface_Variable_Declaration =>
+               --  LRM93 4.3.2
+               --  If no mode is explicitly given in an interface declaration
+               --  other than an interface file declaration, mode IN is
+               --  assumed.
+               if Interface_Mode = Iir_Unknown_Mode then
                   Interface_Mode := Iir_In_Mode;
-            end case;
-      end case;
+               end if;
+            when Iir_Kind_Interface_View_Declaration =>
+               raise Internal_Error;
+            when Iir_Kind_Interface_Constant_Declaration =>
+               if Interface_Mode = Iir_Unknown_Mode then
+                  Interface_Mode := Iir_In_Mode;
+               elsif Interface_Mode /= Iir_In_Mode then
+                  Error_Msg_Parse ("mode must be 'in' for a constant");
+                  Interface_Mode := Iir_In_Mode;
+               end if;
+            when Iir_Kind_Interface_Quantity_Declaration =>
+               case Interface_Mode is
+                  when Iir_Unknown_Mode =>
+                     Interface_Mode := Iir_In_Mode;
+                  when Iir_In_Mode
+                    | Iir_Out_Mode =>
+                     null;
+                  when Iir_Inout_Mode
+                    | Iir_Linkage_Mode
+                    | Iir_Buffer_Mode =>
+                     Error_Msg_Parse
+                       ("mode must be 'in' or 'out' for a quantity");
+                     Interface_Mode := Iir_In_Mode;
+               end case;
+         end case;
 
-      Interface_Type := Parse_Subtype_Indication;
+         Interface_Type := Parse_Subtype_Indication;
+      end if;
 
       --  Signal kind (but only for signal).
       if Get_Kind (Inter) = Iir_Kind_Interface_Signal_Declaration then
@@ -1868,15 +2210,20 @@ package body Vhdl.Parse is
       end if;
 
       if Current_Token = Tok_Assign then
-         if Get_Kind (Inter) = Iir_Kind_Interface_File_Declaration then
-            Error_Msg_Parse
-              ("default expression not allowed for an interface file");
-         end if;
+         case Get_Kind (Inter) is
+            when Iir_Kind_Interface_File_Declaration =>
+               Error_Msg_Parse
+                 ("default expression not allowed for an interface file");
+            when Iir_Kind_Interface_View_Declaration =>
+               Error_Msg_Parse
+                 ("default expression not allowed for a mode view");
+            when others =>
+               if Flag_Elocations then
+                  Set_Assign_Location (First, Get_Token_Location);
+               end if;
+         end case;
 
          --  Skip ':='
-         if Flag_Elocations then
-            Set_Assign_Location (First, Get_Token_Location);
-         end if;
          Scan;
 
          Default_Value := Parse_Expression;
@@ -1886,23 +2233,31 @@ package body Vhdl.Parse is
 
       --  Subtype_Indication and Default_Value are set only on the first
       --  interface.
-      Set_Subtype_Indication (First, Interface_Type);
-      if Get_Kind (First) /= Iir_Kind_Interface_File_Declaration then
-         Set_Default_Value (First, Default_Value);
-      end if;
+      case Get_Kind (First) is
+         when Iir_Kind_Interface_View_Declaration =>
+            Set_Mode_View_Indication (First, Interface_Type);
+         when Iir_Kind_Interface_File_Declaration =>
+            Set_Subtype_Indication (First, Interface_Type);
+         when others =>
+            Set_Subtype_Indication (First, Interface_Type);
+            Set_Default_Value (First, Default_Value);
+      end case;
 
       Inter := First;
       while Inter /= Null_Iir loop
-         Set_Mode (Inter, Interface_Mode);
+         Next_Inter := Get_Chain (Inter);
          Set_Is_Ref (Inter, Inter /= First);
-         Set_Has_Mode (Inter, Has_Mode);
          Set_Has_Class (Inter, Has_Class);
-         Set_Has_Identifier_List (Inter, Inter /= Last);
+         Set_Has_Identifier_List (Inter, Next_Inter /= Null_Iir);
+         if Get_Kind (Inter) /= Iir_Kind_Interface_View_Declaration then
+            Set_Mode (Inter, Interface_Mode);
+            Set_Has_Mode (Inter, Has_Mode);
+         end if;
          if Get_Kind (Inter) = Iir_Kind_Interface_Signal_Declaration then
             Set_Guarded_Signal_Flag (Inter, Is_Guarded);
             Set_Signal_Kind (Inter, Signal_Kind);
          end if;
-         Inter := Get_Chain (Inter);
+         Inter := Next_Inter;
       end loop;
 
       return First;
@@ -2303,6 +2658,9 @@ package body Vhdl.Parse is
    --  LRM08 6.5.6 Interface lists
    --  interface_list ::= interface_element { ';' interface_element }
    --
+   --  LRM19 6.5.6 Interface lists
+   --  interface_list ::= interface_element { ';' interface_element } [ ; ]
+   --
    --  interface_element ::= interface_declaration
    function Parse_Interface_List (Ctxt : Interface_Kind_Type; Parent : Iir)
                                  return Iir
@@ -2368,8 +2726,10 @@ package body Vhdl.Parse is
                   Error_Msg_Parse
                     (Prev_Loc, "empty interface list not allowed");
                else
-                  Error_Msg_Parse
-                    (Prev_Loc, "extra ';' at end of interface list");
+                  if Vhdl_Std < Vhdl_19 then
+                     Error_Msg_Parse
+                       (Prev_Loc, "extra ';' at end of interface list");
+                  end if;
                end if;
 
                --  Skip ')'.
@@ -2437,10 +2797,9 @@ package body Vhdl.Parse is
    --
    --  [ LRM93 1.1.1.2 ]
    --  port_list ::= PORT_interface_list
-   procedure Parse_Port_Clause (Parent : Iir)
+   function Parse_Port_Clause (Parent : Iir) return Iir
    is
       Res: Iir;
-      El : Iir;
    begin
       --  Skip 'port'
       pragma Assert (Current_Token = Tok_Port);
@@ -2448,27 +2807,8 @@ package body Vhdl.Parse is
 
       Res := Parse_Interface_List (Port_Interface_List, Parent);
 
-      --  Check the interface are signal interfaces.
-      El := Res;
-      while El /= Null_Iir loop
-         case Get_Kind (El) is
-            when Iir_Kind_Interface_Signal_Declaration
-              | Iir_Kind_Interface_Terminal_Declaration
-              | Iir_Kind_Interface_Quantity_Declaration =>
-               null;
-            when others =>
-               if AMS_Vhdl then
-                  Error_Msg_Parse
-                    (+El, "port must be a signal, a terminal or a quantity");
-               else
-                  Error_Msg_Parse (+El, "port must be a signal");
-               end if;
-         end case;
-         El := Get_Chain (El);
-      end loop;
-
       Scan_Semi_Colon ("port clause");
-      Set_Port_Chain (Parent, Res);
+      return Res;
    end Parse_Port_Clause;
 
    --  precond : GENERIC
@@ -2479,7 +2819,7 @@ package body Vhdl.Parse is
    --
    --  [ LRM93 1.1.1.1, LRM08 6.5.6.2]
    --  generic_list ::= GENERIC_interface_list
-   procedure Parse_Generic_Clause (Parent : Iir)
+   function Parse_Generic_Clause (Parent : Iir) return Iir
    is
       Res: Iir;
    begin
@@ -2488,9 +2828,10 @@ package body Vhdl.Parse is
       Scan;
 
       Res := Parse_Interface_List (Generic_Interface_List, Parent);
-      Set_Generic_Chain (Parent, Res);
 
       Scan_Semi_Colon ("generic clause");
+
+      return Res;
    end Parse_Generic_Clause;
 
    --  precond : a token.
@@ -2524,7 +2865,7 @@ package body Vhdl.Parse is
             end if;
 
             Has_Generic := True;
-            Parse_Generic_Clause (Parent);
+            Set_Generic_Chain (Parent, Parse_Generic_Clause (Parent));
          elsif Current_Token = Tok_Port then
             if Has_Port then
                Error_Msg_Parse ("at most one port clause is allowed");
@@ -2535,7 +2876,7 @@ package body Vhdl.Parse is
             end if;
 
             Has_Port := True;
-            Parse_Port_Clause (Parent);
+            Set_Port_Chain (Parent, Parse_Port_Clause (Parent));
          else
             exit;
          end if;
@@ -3485,12 +3826,7 @@ package body Vhdl.Parse is
 
       if Name /= Null_Iir then
          --  The type_mark was already parsed.
-         if Check_Type_Mark (Name) then
-            Type_Mark := Name;
-         else
-            --  Not a type mark.  Ignore it.
-            Type_Mark := Null_Iir;
-         end if;
+         Type_Mark := Name_To_Type_Mark (Name);
       else
          if Current_Token = Tok_Left_Paren then
             Check_Vhdl_At_Least_2008 ("resolution indication");
@@ -3503,6 +3839,8 @@ package body Vhdl.Parse is
          Type_Mark := Parse_Type_Mark (Check_Paren => False);
       end if;
 
+      --  If a name is followed by a name, the first name is the resolution
+      --  indication.
       if Current_Token = Tok_Identifier then
          if Resolution_Indication /= Null_Iir then
             Error_Msg_Parse ("resolution function already indicated");
@@ -3530,7 +3868,14 @@ package body Vhdl.Parse is
 
          when others =>
             Tolerance := Parse_Tolerance_Aspect_Opt;
-            if Resolution_Indication /= Null_Iir
+            if Type_Mark /= Null_Iir
+              and then
+              Get_Kind (Type_Mark) in Iir_Kinds_Composite_Subtype_Definition
+            then
+               Def := Type_Mark;
+               Set_Resolution_Indication (Def, Resolution_Indication);
+               Set_Tolerance (Def, Tolerance);
+            elsif Resolution_Indication /= Null_Iir
               or else Tolerance /= Null_Iir
             then
                --  A subtype needs to be created.
@@ -3642,7 +3987,7 @@ package body Vhdl.Parse is
          Error_Msg_Parse ("nature mark expected in a subnature indication");
          return Null_Iir;
       end if;
-      Res := Parse_Name (Allow_Indexes => False);
+      Res := Parse_Name;
 
       if Current_Token = Tok_Left_Paren then
          Nature_Mark := Res;
@@ -4608,6 +4953,174 @@ package body Vhdl.Parse is
       return Res;
    end Parse_Alias_Declaration;
 
+   --  precond : VIEW
+   --  postcond: next token
+   --
+   --  LRM19 6.5.2 Interface object declarations
+   --  mode_view_declaration ::=
+   --      VIEW mode_view_name [ OF /unresolved_/record_subtype_indication ]
+   --          { mode_view_element_definition }
+   --      END VIEW [ /mode_view_/simple_name ]
+   function Parse_Mode_View_Declaration return Iir
+   is
+      Res: Iir;
+      Last : Iir;
+      First, Prev : Iir;
+      El: Iir_Element_Declaration;
+   begin
+      --  TODO: can only be declared in:
+      --  entity, block_declarative_item, package declarations,
+
+      Res := Create_Iir (Iir_Kind_Mode_View_Declaration);
+      Set_Location (Res);
+
+      --  Skip 'view'
+      Scan;
+
+      --  Scan and skip identifier.
+      Scan_Identifier (Res);
+
+      --  Skip 'of'.
+      Expect_Scan (Tok_Of);
+      Set_Subtype_Indication (Res, Parse_Subtype_Indication);
+
+      if Flag_Elocations then
+         Create_Elocations (Res);
+         Set_Is_Location (Res, Get_Token_Location);
+      end if;
+
+      Expect_Scan (Tok_Is);
+
+      Last := Null_Iir;
+      Prev := Null_Iir;
+      if Current_Token /= Tok_End then
+         loop
+            First := Null_Iir;
+            --  Parse identifier_list
+            loop
+               El := Create_Iir (Iir_Kind_Simple_Mode_View_Element);
+               Scan_Identifier (El);
+
+               Set_Parent (El, Res);
+
+               --  Keep the first of the identifier list in case of
+               --  changing the kind.
+               if First = Null_Iir then
+                  First := El;
+                  Prev := Last;
+               end if;
+
+               --  Link.
+               if Last = Null_Iir then
+                  Set_Elements_Definition_Chain (Res, El);
+               else
+                  Set_Chain (Last, El);
+               end if;
+               Last := El;
+
+               exit when Current_Token /= Tok_Comma;
+
+               Set_Has_Identifier_List (El, True);
+
+               --  Skip ','
+               Scan;
+            end loop;
+
+            --  Comments attached to the first element.
+            if Flag_Gather_Comments then
+               Gather_Comments_Line (First);
+            end if;
+
+            --  Scan ':'.
+            Expect_Scan (Tok_Colon);
+
+            case Current_Token is
+               when Tok_In
+                 | Tok_Out
+                 | Tok_Inout
+                 | Tok_Linkage
+                 | Tok_Buffer =>
+                  Set_Mode (First, Parse_Mode);
+               when Tok_View =>
+                  declare
+                     Kind : Iir_Kind;
+                     Name : Iir;
+                     N_El : Iir;
+                     El_Chain : Iir;
+                  begin
+                     --  Skip 'view'.
+                     Scan;
+
+                     if Current_Token = Tok_Left_Paren then
+                        Kind := Iir_Kind_Array_Mode_View_Element;
+
+                        --  Skip '('.
+                        Scan;
+
+                        Name := Parse_Name;
+
+                        --  Skip ')'.
+                        Expect_Scan (Tok_Right_Paren);
+                     else
+                        Kind := Iir_Kind_Record_Mode_View_Element;
+                        Name := Parse_Name;
+                     end if;
+
+                     --  Change kind of the elements.
+                     El := First;
+                     while El /= Null_Iir loop
+                        N_El := Create_Iir (Kind);
+                        Location_Copy (N_El, El);
+                        Set_Identifier (N_El, Get_Identifier (El));
+                        Set_Parent (N_El, Res);
+                        Set_Has_Identifier_List
+                          (N_El, Get_Has_Identifier_List (El));
+
+                        --  Set name on the first.
+                        if El = First then
+                           Set_Mode_View_Name (N_El, Name);
+                        end if;
+
+                        --  Chain.
+                        if Prev = Null_Iir then
+                           Set_Elements_Definition_Chain (Res, N_El);
+                        else
+                           Set_Chain (Prev, N_El);
+                        end if;
+                        Prev := N_El;
+
+                        --  Update last.
+                        Last := N_El;
+
+                        El_Chain := Get_Chain (El);
+                        Free_Iir (El);
+                        El := El_Chain;
+                     end loop;
+                  end;
+               when others =>
+                  null;
+            end case;
+
+            Scan_Semi_Colon_Declaration ("element declaration");
+            exit when Current_Token /= Tok_Identifier;
+         end loop;
+      end if;
+
+      if Flag_Elocations then
+         Set_End_Location (Res, Get_Token_Location);
+      end if;
+
+      --  Skip 'end'
+      Expect_Scan (Tok_End);
+      Expect_Scan (Tok_View);
+      Set_End_Has_Reserved_Id (Res, True);
+      Check_End_Name (Res);
+
+      Scan_Semi_Colon ("mode view declaration");
+
+      return Res;
+   end Parse_Mode_View_Declaration;
+
    --  precond : FOR
    --  postcond: next token.
    --
@@ -4689,11 +5202,16 @@ package body Vhdl.Parse is
            | Tok_Group
            | Tok_File =>
             null;
+         when Tok_View =>
+            null;
          when others =>
             Error_Msg_Parse ("%t is not a entity class", +Current_Token);
       end case;
       Res := Current_Token;
+
+      --  Skip entity class.
       Scan;
+
       return Res;
    end Parse_Entity_Class;
 
@@ -5601,6 +6119,8 @@ package body Vhdl.Parse is
             Decl := Parse_Configuration_Specification;
          when Tok_Attribute =>
             Decl := Parse_Attribute;
+         when Tok_View =>
+            Decl := Parse_Mode_View_Declaration;
          when Tok_Disconnect =>
             --  LRM08 4.7 Package declarations
             --  For package declaration that appears in a subprogram body,
@@ -7087,7 +7607,7 @@ package body Vhdl.Parse is
    end Parse_Case_Expression;
 
    --  precond : WITH
-   --  postcond: next token
+   --  postcond: ';'
    --
    --  [ LRM93 9.5.2 ]
    --  selected_signal_assignment ::=
@@ -7098,7 +7618,12 @@ package body Vhdl.Parse is
    --  selected_waveforms ::=
    --      { waveform WHEN choices , }
    --      waveform WHEN choices
-   function Parse_Selected_Signal_Assignment return Iir
+   --
+   --  [ LRM08 10.5.4 ]
+   --  selected_waveform_assignment ::=
+   --     WITH expression SELECT [?]
+   --        target <= [ delay_mechanism ] selected_waveforms ;
+   function Parse_Selected_Signal_Assignment (Kind : Iir_Kind) return Iir
    is
       Res : Iir;
       Assoc : Iir;
@@ -7110,7 +7635,7 @@ package body Vhdl.Parse is
       --  Skip 'with'.
       Scan;
 
-      Res := Create_Iir (Iir_Kind_Concurrent_Selected_Signal_Assignment);
+      Res := Create_Iir (Kind);
       Set_Location (Res);
       Set_Expression (Res, Parse_Case_Expression);
 
@@ -7124,7 +7649,14 @@ package body Vhdl.Parse is
       Set_Target (Res, Target);
       Expect_Scan (Tok_Less_Equal);
 
-      Parse_Options (Res);
+      case Kind is
+         when Iir_Kind_Concurrent_Selected_Signal_Assignment =>
+            Parse_Options (Res);
+         when Iir_Kind_Selected_Waveform_Assignment_Statement =>
+            Parse_Delay_Mechanism (Res);
+         when others =>
+            raise Internal_Error;
+      end case;
 
       Chain_Init (First, Last);
       loop
@@ -7143,8 +7675,6 @@ package body Vhdl.Parse is
          Scan;
       end loop;
       Set_Selected_Waveform_Chain (Res, First);
-
-      Expect_Scan (Tok_Semi_Colon, "';' expected at end of signal assignment");
 
       return Res;
    end Parse_Selected_Signal_Assignment;
@@ -8172,6 +8702,9 @@ package body Vhdl.Parse is
                      return First_Stmt;
                   end if;
                end;
+            when Tok_With =>
+               Stmt := Parse_Selected_Signal_Assignment
+                 (Iir_Kind_Selected_Waveform_Assignment_Statement);
 
             when Tok_Return =>
                Stmt := Create_Iir (Iir_Kind_Return_Statement);
@@ -8797,9 +9330,6 @@ package body Vhdl.Parse is
                   else
                      Actual := Parse_Range_Expression (Actual);
                   end if;
-                  if Nbr_Assocs /= 1 then
-                     Error_Msg_Parse ("multi-dimensional slice is forbidden");
-                  end if;
 
                when Tok_Range =>
                   Actual := Parse_Subtype_Indication (Actual);
@@ -9006,20 +9536,21 @@ package body Vhdl.Parse is
    --  [ LRM93 9.1 ]
    --  block_header ::= [ generic_clause [ generic_map_aspect ; ] ]
    --                   [ port_clause [ port_map_aspect ; ] ]
-   function Parse_Block_Header return Iir_Block_Header is
+   function Parse_Block_Header (Parent : Iir) return Iir_Block_Header
+   is
       Res : Iir_Block_Header;
    begin
       Res := Create_Iir (Iir_Kind_Block_Header);
       Set_Location (Res);
       if Current_Token = Tok_Generic then
-         Parse_Generic_Clause (Res);
+         Set_Generic_Chain (Res, Parse_Generic_Clause (Parent));
          if Current_Token = Tok_Generic then
             Set_Generic_Map_Aspect_Chain (Res, Parse_Generic_Map_Aspect);
             Scan_Semi_Colon ("generic map aspect");
          end if;
       end if;
       if Current_Token = Tok_Port then
-         Parse_Port_Clause (Res);
+         Set_Port_Chain (Res, Parse_Port_Clause (Parent));
          if Current_Token = Tok_Port then
             Set_Port_Map_Aspect_Chain (Res, Parse_Port_Map_Aspect);
             Scan_Semi_Colon ("port map aspect");
@@ -9090,7 +9621,7 @@ package body Vhdl.Parse is
          Scan;
       end if;
       if Current_Token = Tok_Generic or Current_Token = Tok_Port then
-         Set_Block_Header (Res, Parse_Block_Header);
+         Set_Block_Header (Res, Parse_Block_Header (Res));
       end if;
       if Current_Token /= Tok_Begin then
          Parse_Declarative_Part (Res, Res);
@@ -10385,7 +10916,11 @@ package body Vhdl.Parse is
                   Expect_Scan (Tok_Semi_Colon);
                end if;
             when Tok_With =>
-               Stmt := Parse_Selected_Signal_Assignment;
+               Stmt := Parse_Selected_Signal_Assignment
+                 (Iir_Kind_Concurrent_Selected_Signal_Assignment);
+               Expect_Scan (Tok_Semi_Colon,
+                            "';' expected at end of signal assignment");
+
             when Tok_Block =>
                Postponed_Not_Allowed;
                Stmt := Parse_Block_Statement (Label, Loc);
@@ -11204,13 +11739,13 @@ package body Vhdl.Parse is
    --  package_header ::=
    --      [ generic_clause               -- LRM08 6.5.6.2
    --      [ generic_map aspect ; ] ]
-   function Parse_Package_Header return Iir
+   function Parse_Package_Header (Pkg : Iir) return Iir
    is
       Res : Iir;
    begin
       Res := Create_Iir (Iir_Kind_Package_Header);
       Set_Location (Res);
-      Parse_Generic_Clause (Res);
+      Set_Generic_Chain (Res, Parse_Generic_Clause (Pkg));
 
       if Current_Token = Tok_Generic then
          Set_Generic_Map_Aspect_Chain (Res, Parse_Generic_Map_Aspect);
@@ -11249,7 +11784,7 @@ package body Vhdl.Parse is
 
       if Current_Token = Tok_Generic then
          Check_Vhdl_At_Least_2008 ("generic packages");
-         Set_Package_Header (Res, Parse_Package_Header);
+         Set_Package_Header (Res, Parse_Package_Header (Res));
       end if;
 
       Parse_Declarative_Part (Res, Get_Package_Parent (Res));

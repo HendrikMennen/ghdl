@@ -28,6 +28,13 @@ package body Elab.Memtype is
       return To_Memory_Ptr (To_Address (Base) + Storage_Offset (Off));
    end "+";
 
+   function "-" (Base : Memory_Ptr; Off : Size_Type) return Memory_Ptr
+   is
+      use System.Storage_Elements;
+   begin
+      return To_Memory_Ptr (To_Address (Base) - Storage_Offset (Off));
+   end "-";
+
    type Ghdl_U8_Ptr is access all Ghdl_U8;
    function To_U8_Ptr is
       new Ada.Unchecked_Conversion (Address, Ghdl_U8_Ptr);
@@ -41,6 +48,14 @@ package body Elab.Memtype is
    begin
       return To_U8_Ptr (To_Address (Mem)).all;
    end Read_U8;
+
+   type Char_Ptr is access all Character;
+   function To_Char_Ptr is new Ada.Unchecked_Conversion (Address, Char_Ptr);
+
+   function Read_Char (Mem : Memory_Ptr) return Character is
+   begin
+      return To_Char_Ptr (To_Address (Mem)).all;
+   end Read_Char;
 
    procedure Write_I32 (Mem : Memory_Ptr; Val : Ghdl_I32)
    is
@@ -114,4 +129,21 @@ package body Elab.Memtype is
       return V;
    end Read_Fp64;
 
+   procedure Write_Ptr (Mem : Memory_Ptr; Val : Memory_Ptr)
+   is
+      V : Memory_Ptr;
+      for V'Address use To_Address (Mem);
+      pragma Import (Ada, V);
+   begin
+      V := Val;
+   end Write_Ptr;
+
+   function Read_Ptr (Mem : Memory_Ptr) return Memory_Ptr
+   is
+      V : Memory_Ptr;
+      for V'Address use To_Address (Mem);
+      pragma Import (Ada, V);
+   begin
+      return V;
+   end Read_Ptr;
 end Elab.Memtype;

@@ -37,12 +37,17 @@ package Elab.Memtype is
    function To_Memory_Ptr is new Ada.Unchecked_Conversion
      (System.Address, Memory_Ptr);
 
+   Ptr_Size : constant Size_Type := Standard'Address_Size / 8;
+
    --  Low-level functions.
 
    function "+" (Base : Memory_Ptr; Off : Size_Type) return Memory_Ptr;
+   function "-" (Base : Memory_Ptr; Off : Size_Type) return Memory_Ptr;
 
    procedure Write_U8 (Mem : Memory_Ptr; Val : Ghdl_U8);
    function Read_U8 (Mem : Memory_Ptr) return Ghdl_U8;
+
+   function Read_Char (Mem : Memory_Ptr) return Character;
 
    procedure Write_U32 (Mem : Memory_Ptr; Val : Ghdl_U32);
    function Read_U32 (Mem : Memory_Ptr) return Ghdl_U32;
@@ -55,4 +60,7 @@ package Elab.Memtype is
 
    procedure Write_Fp64 (Mem : Memory_Ptr; Val : Fp64);
    function Read_Fp64 (Mem : Memory_Ptr) return Fp64;
+
+   procedure Write_Ptr (Mem : Memory_Ptr; Val : Memory_Ptr);
+   function Read_Ptr (Mem : Memory_Ptr) return Memory_Ptr;
 end Elab.Memtype;

@@ -305,6 +305,10 @@ package body Vhdl.Sem is
       Formal_Base := Get_Object_Prefix (Formal);
       Actual_Base := Get_Object_Prefix (Actual);
 
+      if Get_Kind (Formal_Base) = Iir_Kind_Interface_View_Declaration then
+         return True;
+      end if;
+
       --  If the formal is of mode IN, then it has no driving value, and its
       --  effective value is the effective value of the actual.
       --  Always collapse in this case.
@@ -445,6 +449,12 @@ package body Vhdl.Sem is
 
       Sem_Association_Chain
         (Inter_Chain, Assoc_Chain, True, Miss, Assoc_Parent, Match);
+
+      --  Clear associated type of interface type.
+      --  Should be part of Sem_Association_Chain, but needed only for
+      --  generics.
+      Clear_Interface_Associated (Inter_Chain);
+
       Set_Generic_Map_Aspect_Chain (Assoc_Parent, Assoc_Chain);
       if Match = Not_Compatible then
          return False;
@@ -665,7 +675,8 @@ package body Vhdl.Sem is
          Formal_Base := Get_Interface_Of_Formal (Formal);
 
          case Get_Kind (Formal_Base) is
-            when Iir_Kind_Interface_Signal_Declaration =>
+            when Iir_Kind_Interface_Signal_Declaration
+               | Iir_Kind_Interface_View_Declaration =>
                if Get_Kind (Assoc) = Iir_Kind_Association_Element_By_Expression
                then
                   N_Assoc := Sem_Signal_Port_Association
@@ -1953,6 +1964,8 @@ package body Vhdl.Sem is
                         "result subtype of a pure function cannot denote an"
                           & " access type");
                   end if;
+               when Iir_Kind_Error =>
+                  null;
                when others =>
                   if  Vhdl_Std >= Vhdl_08
                     and then not Get_Signal_Type_Flag (Return_Type)
@@ -2104,13 +2117,80 @@ package body Vhdl.Sem is
       Add_Element (List, El);
    end Add_Analysis_Checks_List;
 
+   procedure Clear_Suspend_Flag (N : Iir);
+
+   procedure Clear_Suspend_Flag_Chain (N : Iir)
+   is
+      El : Iir;
+   begin
+      El := N;
+      while El /= Null_Iir loop
+         Clear_Suspend_Flag (El);
+         El := Get_Chain (El);
+      end loop;
+   end Clear_Suspend_Flag_Chain;
+
+   procedure Clear_Suspend_Flag (N : Iir) is
+   begin
+      case Iir_Kinds_Sequential_Statement (Get_Kind (N)) is
+         when Iir_Kind_Procedure_Call_Statement =>
+            Set_Suspend_Flag (N, False);
+         when Iir_Kind_For_Loop_Statement
+           | Iir_Kind_While_Loop_Statement =>
+            Set_Suspend_Flag (N, False);
+            Clear_Suspend_Flag_Chain (Get_Sequential_Statement_Chain (N));
+         when Iir_Kind_Case_Statement =>
+            declare
+               Ch : Iir;
+               Stmts : Iir;
+            begin
+               Set_Suspend_Flag (N, False);
+               Ch := Get_Case_Statement_Alternative_Chain (N);
+               while Ch /= Null_Iir loop
+                  Stmts := Get_Associated_Chain (Ch);
+                  if Stmts /= Null_Iir then
+                     Clear_Suspend_Flag_Chain (Stmts);
+                  end if;
+                  Ch := Get_Chain (Ch);
+               end loop;
+            end;
+         when Iir_Kind_If_Statement =>
+            Set_Suspend_Flag (N, False);
+            Clear_Suspend_Flag_Chain (Get_Sequential_Statement_Chain (N));
+            declare
+               Els : Iir;
+            begin
+               Els := Get_Else_Clause (N);
+               while Els /= Null_Iir loop
+                  Clear_Suspend_Flag_Chain
+                    (Get_Sequential_Statement_Chain (Els));
+                  Els := Get_Else_Clause (Els);
+               end loop;
+            end;
+         when Iir_Kinds_Signal_Assignment_Statement
+           | Iir_Kinds_Variable_Assignment_Statement
+           | Iir_Kind_Null_Statement
+           | Iir_Kind_Assertion_Statement
+           | Iir_Kind_Report_Statement
+           | Iir_Kinds_Next_Exit_Statement
+           | Iir_Kind_Return_Statement
+           | Iir_Kind_Break_Statement =>
+            null;
+         when Iir_Kind_Wait_Statement =>
+            raise Internal_Error;
+      end case;
+   end Clear_Suspend_Flag;
+
    procedure Sem_Subprogram_Body (Subprg : Iir)
    is
       Spec : constant Iir := Get_Subprogram_Specification (Subprg);
       Warn_Hide_Enabled : constant Boolean := Is_Warning_Enabled (Warnid_Hide);
+      Prev_Unelaborated_Use_Allowed : constant Boolean :=
+        Unelaborated_Use_Allowed;
       El : Iir;
    begin
       Set_Impure_Depth (Subprg, Iir_Depth_Pure);
+      Set_Elaborated_Flag (Spec, True);
 
       --  LRM 10.1  Declarative regions
       --  3.  A subprogram declaration, together with the corresponding
@@ -2149,10 +2229,14 @@ package body Vhdl.Sem is
          end;
       end if;
 
+      Unelaborated_Use_Allowed := True;
+
       Sem_Sequential_Statements (Spec, Subprg);
 
       Set_Is_Within_Flag (Spec, False);
       Close_Declarative_Region;
+
+      Unelaborated_Use_Allowed := Prev_Unelaborated_Use_Allowed;
 
       case Get_Kind (Spec) is
          when Iir_Kind_Procedure_Declaration =>
@@ -2220,6 +2304,21 @@ package body Vhdl.Sem is
                      Next (Callees_It);
                   end loop;
                end;
+            end if;
+
+            --  There is no wait in this procedure (either directly or
+            --  indirectly).  So can clear the suspend flag.
+            if Get_Suspend_Flag (Subprg)
+              and then Get_Wait_State (Spec) = False
+            then
+               --  Clear spec only if it has never been used.
+               if Get_Chain (Spec) = Subprg then
+                  Set_Suspend_Flag (Spec, False);
+               end if;
+               --  Clear recursively.
+               Set_Suspend_Flag (Subprg, False);
+               Clear_Suspend_Flag_Chain
+                 (Get_Sequential_Statement_Chain (Subprg));
             end if;
 
             --  Do not add to Analysis_Checks_List as procedures can't
@@ -2804,6 +2903,8 @@ package body Vhdl.Sem is
                null;
             when Iir_Kind_Terminal_Declaration =>
                null;
+            when Iir_Kind_Mode_View_Declaration =>
+               null;
             when others =>
                pragma Assert (Flags.Flag_Force_Analysis);
                null;
@@ -2876,6 +2977,43 @@ package body Vhdl.Sem is
       end loop;
       return False;
    end Is_Package_Macro_Expanded;
+
+   --  Mark declarations of HDR elaboration status to FLAG.
+   --  Set to true at then end of a package declaration, but reset at the
+   --  beginning of body analysis.
+   procedure Mark_Declarations_Elaborated (Hdr : Iir; Flag : Boolean)
+   is
+      Decl : Iir;
+   begin
+      Decl := Get_Declaration_Chain (Hdr);
+      while Decl /= Null_Iir loop
+         case Get_Kind (Decl) is
+            when Iir_Kinds_Subprogram_Declaration =>
+               --  The flag can always be set, but not cleared on implicit
+               --  subprograms.
+               if Flag
+                 or else
+                 Get_Implicit_Definition (Decl) not in Iir_Predefined_Implicit
+               then
+                  Set_Elaborated_Flag (Decl, Flag);
+               end if;
+            when Iir_Kind_Type_Declaration =>
+               declare
+                  Def : constant Iir := Get_Type_Definition (Decl);
+               begin
+                  if Get_Kind (Def) = Iir_Kind_Protected_Type_Declaration then
+                     --  Mark the protected type as elaborated.
+                     --  Mark the methods as elaborated.
+                     Set_Elaborated_Flag (Def, Flag);
+                     Mark_Declarations_Elaborated (Def, Flag);
+                  end if;
+               end;
+            when others =>
+               null;
+         end case;
+         Decl := Get_Chain (Decl);
+      end loop;
+   end Mark_Declarations_Elaborated;
 
    --  LRM 2.5  Package Declarations.
    procedure Sem_Package_Declaration (Pkg : Iir_Package_Declaration)
@@ -2951,6 +3089,7 @@ package body Vhdl.Sem is
       end if;
 
       Sem_Declaration_Chain (Pkg);
+      Mark_Declarations_Elaborated (Pkg, True);
       --  GHDL: subprogram bodies appear in package body.
 
       Pop_Signals_Declarative_Part (Implicit);
@@ -3035,6 +3174,10 @@ package body Vhdl.Sem is
       Xref_Body (Decl, Package_Decl);
       Set_Package_Body (Package_Decl, Decl);
       Set_Is_Within_Flag (Package_Decl, True);
+
+      --  Unmark subprograms from the specifications: they are not elaborated
+      --  before body elaboration.
+      Mark_Declarations_Elaborated (Package_Decl, False);
 
       --  LRM93 10.1 Declarative Region
       --  4. A package declaration, together with the corresponding

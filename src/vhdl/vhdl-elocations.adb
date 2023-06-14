@@ -243,6 +243,9 @@ package body Vhdl.Elocations is
            | Iir_Kind_Array_Element_Resolution
            | Iir_Kind_Record_Resolution
            | Iir_Kind_Record_Element_Resolution
+           | Iir_Kind_Simple_Mode_View_Element
+           | Iir_Kind_Array_Mode_View_Element
+           | Iir_Kind_Record_Mode_View_Element
            | Iir_Kind_Break_Element
            | Iir_Kind_Disconnection_Specification
            | Iir_Kind_Step_Limit_Specification
@@ -268,6 +271,8 @@ package body Vhdl.Elocations is
            | Iir_Kind_Wildcard_Type_Definition
            | Iir_Kind_Foreign_Vector_Type_Definition
            | Iir_Kind_Subtype_Definition
+           | Iir_Kind_Record_Mode_View_Indication
+           | Iir_Kind_Array_Mode_View_Indication
            | Iir_Kind_Scalar_Nature_Definition
            | Iir_Kind_Array_Nature_Definition
            | Iir_Kind_Array_Subnature_Definition
@@ -276,6 +281,7 @@ package body Vhdl.Elocations is
            | Iir_Kind_Vmode_Declaration
            | Iir_Kind_Vprop_Declaration
            | Iir_Kind_Vunit_Declaration
+           | Iir_Kind_Package_Instantiation_Body
            | Iir_Kind_Nature_Declaration
            | Iir_Kind_Subnature_Declaration
            | Iir_Kind_Unit_Declaration
@@ -378,16 +384,16 @@ package body Vhdl.Elocations is
            | Iir_Kind_Selected_Waveform_Assignment_Statement
            | Iir_Kind_Signal_Force_Assignment_Statement
            | Iir_Kind_Signal_Release_Assignment_Statement
+           | Iir_Kind_Variable_Assignment_Statement
+           | Iir_Kind_Conditional_Variable_Assignment_Statement
            | Iir_Kind_Null_Statement
            | Iir_Kind_Assertion_Statement
            | Iir_Kind_Report_Statement
-           | Iir_Kind_Wait_Statement
-           | Iir_Kind_Variable_Assignment_Statement
-           | Iir_Kind_Conditional_Variable_Assignment_Statement
-           | Iir_Kind_Return_Statement
            | Iir_Kind_Next_Statement
            | Iir_Kind_Exit_Statement
+           | Iir_Kind_Return_Statement
            | Iir_Kind_Procedure_Call_Statement
+           | Iir_Kind_Wait_Statement
            | Iir_Kind_Break_Statement
            | Iir_Kind_Suspend_State_Statement
            | Iir_Kind_Character_Literal
@@ -449,6 +455,7 @@ package body Vhdl.Elocations is
            | Iir_Kind_Simple_Name_Attribute
            | Iir_Kind_Instance_Name_Attribute
            | Iir_Kind_Path_Name_Attribute
+           | Iir_Kind_Converse_Attribute
            | Iir_Kind_Left_Array_Attribute
            | Iir_Kind_Right_Array_Attribute
            | Iir_Kind_High_Array_Attribute
@@ -504,6 +511,7 @@ package body Vhdl.Elocations is
            | Iir_Kind_Interface_Constant_Declaration
            | Iir_Kind_Interface_Variable_Declaration
            | Iir_Kind_Interface_Signal_Declaration
+           | Iir_Kind_Interface_View_Declaration
            | Iir_Kind_Interface_File_Declaration
            | Iir_Kind_Interface_Quantity_Declaration
            | Iir_Kind_If_Generate_Statement
@@ -521,6 +529,7 @@ package body Vhdl.Elocations is
          when Iir_Kind_Architecture_Body
            | Iir_Kind_Type_Declaration
            | Iir_Kind_Subtype_Declaration
+           | Iir_Kind_Mode_View_Declaration
            | Iir_Kind_Function_Body
            | Iir_Kind_Procedure_Body
            | Iir_Kind_Sensitized_Process_Statement

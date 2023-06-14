@@ -86,6 +86,8 @@ package body Synth.Vhdl_Eval is
          return Prev;
       end if;
 
+      --  TODO: should be directly allocated on the expr_pool to avoid
+      --  a copy.
       return Create_Vec_Type_By_Length (Prev.W, Prev.Arr_El);
    end Create_Res_Bound;
 
@@ -607,6 +609,7 @@ package body Synth.Vhdl_Eval is
       end case;
    end Eval_Vector_Minimum;
 
+   --  ARG to log-vector, sign extended.
    function Eval_To_Log_Vector (Arg : Uns64; Sz : Int64; Res_Type : Type_Acc)
                                return Memtyp
    is
@@ -749,7 +752,7 @@ package body Synth.Vhdl_Eval is
    begin
       Bnd := (Dir => Dir_To, Left => 1, Right => Int32 (Len),
               Len => Uns32 (Len));
-      Typ := Create_Array_Type (Bnd, True, Styp.Uarr_El);
+      Typ := Create_Array_Type (Bnd, True, True, Styp.Uarr_El);
 
       Res := Create_Memory (Typ);
       for I in Str'Range loop
@@ -788,7 +791,30 @@ package body Synth.Vhdl_Eval is
          C (1) := Get_Character (Lit_Id);
          return String_To_Memtyp (C, Res_Typ);
       else
-         return String_To_Memtyp (Image (Lit_Id), Res_Typ);
+         declare
+            Img : String := Image (Lit_Id);
+            P, Idx : Natural;
+         begin
+            if Img (Img'First) = '\' then
+               --  Extended identifier.
+               --  Remove initial and final backslash.
+               --  Un-duplicate doubled backslashes.
+               P := Img'First - 1;
+               Idx := 2;
+               while Idx < Img'Last loop
+                  P := P + 1;
+                  Img (P) := Img (Idx);
+                  if Img (Idx) = '\' then
+                     Idx := Idx + 2;
+                  else
+                     Idx := Idx + 1;
+                  end if;
+               end loop;
+            else
+               P := Img'Last;
+            end if;
+            return String_To_Memtyp (Img (Img'First .. P), Res_Typ);
+         end;
       end if;
    end Eval_Enum_To_String;
 
@@ -1093,6 +1119,13 @@ package body Synth.Vhdl_Eval is
                Check_Integer_Overflow (Inst, Res, Res_Typ, Expr);
                return Create_Memory_Discrete (Res, Res_Typ);
             end;
+         when Iir_Predefined_Universal_I_R_Mul =>
+            return Create_Memory_Fp64
+              (Fp64 (Read_Discrete (Param1)) * Read_Fp64 (Param2), Res_Typ);
+         when Iir_Predefined_Universal_R_I_Mul =>
+            return Create_Memory_Fp64
+              (Read_Fp64 (Param1) * Fp64 (Read_Discrete (Param2)), Res_Typ);
+
          when Iir_Predefined_Integer_Div
             | Iir_Predefined_Physical_Physical_Div
             | Iir_Predefined_Physical_Integer_Div =>
@@ -1109,19 +1142,32 @@ package body Synth.Vhdl_Eval is
                Check_Integer_Overflow (Inst, Res, Res_Typ, Expr);
                return Create_Memory_Discrete (Res, Res_Typ);
             end;
-         when Iir_Predefined_Integer_Mod =>
+         when Iir_Predefined_Integer_Mod
+            | Iir_Predefined_Physical_Mod =>
             declare
                Res : Int64;
+               Div : Int64;
             begin
-               Res := Read_Discrete (Param1) mod Read_Discrete (Param2);
+               Div := Read_Discrete (Param2);
+               if Div = 0 then
+                  Error_Msg_Synth (Inst, Expr, "division by zero");
+                  return Null_Memtyp;
+               end if;
+               Res := Read_Discrete (Param1) mod Div;
                Check_Integer_Overflow (Inst, Res, Res_Typ, Expr);
                return Create_Memory_Discrete (Res, Res_Typ);
             end;
          when Iir_Predefined_Integer_Rem =>
             declare
                Res : Int64;
+               Div : Int64;
             begin
-               Res := Read_Discrete (Param1) rem Read_Discrete (Param2);
+               Div := Read_Discrete (Param2);
+               if Div = 0 then
+                  Error_Msg_Synth (Inst, Expr, "division by zero");
+                  return Null_Memtyp;
+               end if;
+               Res := Read_Discrete (Param1) rem Div;
                Check_Integer_Overflow (Inst, Res, Res_Typ, Expr);
                return Create_Memory_Discrete (Res, Res_Typ);
             end;
@@ -1131,6 +1177,7 @@ package body Synth.Vhdl_Eval is
                Lv : Ghdl_I64;
                Rv : Std_Integer;
                Res : Ghdl_I64;
+               R : Int64;
                Ovf : Boolean;
             begin
                Lv := Ghdl_I64 (Read_Discrete (Param1));
@@ -1138,9 +1185,12 @@ package body Synth.Vhdl_Eval is
                Grt.Arith.Exp_I64 (Lv, Rv, Res, Ovf);
                if Ovf then
                   Error_Msg_Synth (Inst, Expr, "exponentiation overflow");
-                  Res := 0;
+                  R := 0;
+               else
+                  R := Int64 (Res);
+                  Check_Integer_Overflow (Inst, R, Res_Typ, Expr);
                end if;
-               return Create_Memory_Discrete (Int64 (Res), Res_Typ);
+               return Create_Memory_Discrete (R, Res_Typ);
             end;
 
          when Iir_Predefined_Integer_Less_Equal
@@ -1254,7 +1304,7 @@ package body Synth.Vhdl_Eval is
                  Iir_Index32 (Get_Bound_Length (Param2.Typ));
                Le_Typ : constant Type_Acc := Get_Array_Element (Param1.Typ);
                Re_Typ : constant Type_Acc := Get_Array_Element (Param2.Typ);
-               El_Typ : Type_Acc;
+               El_Typ : constant Type_Acc := Le_Typ;
                Bnd : Bound_Type;
                Res_St : Type_Acc;
                Res : Memtyp;
@@ -1268,7 +1318,7 @@ package body Synth.Vhdl_Eval is
                end if;
                if Vhdl_Std > Vhdl_87 then
                   Bnd := Elab.Vhdl_Types.Create_Bounds_From_Length
-                    (Get_Uarray_Index (Res_Typ).Drange, L_Len + R_Len);
+                    (Res_Typ.Uarr_Idx.Drange, L_Len + R_Len);
                else
                   --  LRM87 7.2.3
                   --  [...], unless the left operand is a null array, in which
@@ -1294,9 +1344,12 @@ package body Synth.Vhdl_Eval is
                      when Dir_Downto =>
                         Bnd.Right := Bnd.Left - Int32 (L_Len + R_Len - 1);
                   end case;
+                  if not In_Range (Res_Typ.Uarr_Idx.Drange, Int64 (Bnd.Right))
+                  then
+                     Error_Msg_Synth (Inst, Expr, "bound not in range");
+                     return Null_Memtyp;
+                  end if;
                end if;
-               El_Typ := Unshare_Type_Expr (Le_Typ,
-                                            Get_Array_Element (Res_Typ));
                Res_St := Create_Onedimensional_Array_Subtype
                  (Res_Typ, Bnd, El_Typ);
                Res := Create_Memory (Res_St);
@@ -1314,7 +1367,7 @@ package body Synth.Vhdl_Eval is
                Rlen : constant Iir_Index32 :=
                  Iir_Index32 (Get_Bound_Length (Param2.Typ));
                Re_Typ : constant Type_Acc := Get_Array_Element (Param2.Typ);
-               El_Typ : Type_Acc;
+               El_Typ : constant Type_Acc := Re_Typ;
                Bnd : Bound_Type;
                Res_St : Type_Acc;
                Res : Memtyp;
@@ -1322,8 +1375,6 @@ package body Synth.Vhdl_Eval is
                Check_Matching_Bounds (Param1.Typ, Re_Typ, Expr);
                Bnd := Elab.Vhdl_Types.Create_Bounds_From_Length
                  (Get_Uarray_Index (Res_Typ).Drange, 1 + Rlen);
-               El_Typ := Unshare_Type_Expr (Re_Typ,
-                                            Get_Array_Element (Res_Typ));
                Res_St := Create_Onedimensional_Array_Subtype
                  (Res_Typ, Bnd, El_Typ);
                Res := Create_Memory (Res_St);
@@ -1337,7 +1388,7 @@ package body Synth.Vhdl_Eval is
                Llen : constant Iir_Index32 :=
                  Iir_Index32 (Get_Bound_Length (Param1.Typ));
                Le_Typ : constant Type_Acc := Get_Array_Element (Param1.Typ);
-               El_Typ : Type_Acc;
+               El_Typ : constant Type_Acc := Le_Typ;
                Bnd : Bound_Type;
                Res_St : Type_Acc;
                Res : Memtyp;
@@ -1345,8 +1396,6 @@ package body Synth.Vhdl_Eval is
                Check_Matching_Bounds (Le_Typ, Param2.Typ, Expr);
                Bnd := Elab.Vhdl_Types.Create_Bounds_From_Length
                  (Get_Uarray_Index (Res_Typ).Drange, Llen + 1);
-               El_Typ := Unshare_Type_Expr (Le_Typ,
-                                            Get_Array_Element (Res_Typ));
                Res_St := Create_Onedimensional_Array_Subtype
                  (Res_Typ, Bnd, El_Typ);
                Res := Create_Memory (Res_St);
@@ -1358,7 +1407,7 @@ package body Synth.Vhdl_Eval is
          when Iir_Predefined_Element_Element_Concat =>
             declare
                Le_Typ : constant Type_Acc := Param1.Typ;
-               El_Typ : Type_Acc;
+               El_Typ : constant Type_Acc := Le_Typ;
                Bnd : Bound_Type;
                Res_St : Type_Acc;
                Res : Memtyp;
@@ -1366,8 +1415,6 @@ package body Synth.Vhdl_Eval is
                Check_Matching_Bounds (Param1.Typ, Param2.Typ, Expr);
                Bnd := Elab.Vhdl_Types.Create_Bounds_From_Length
                  (Get_Uarray_Index (Res_Typ).Drange, 2);
-               El_Typ := Unshare_Type_Expr (Le_Typ,
-                                            Get_Array_Element (Res_Typ));
                Res_St := Create_Onedimensional_Array_Subtype
                  (Res_Typ, Bnd, El_Typ);
                Res := Create_Memory (Res_St);
@@ -2436,24 +2483,6 @@ package body Synth.Vhdl_Eval is
                return Create_Memory_U8 (Std_Ulogic'Pos (Res), Res_Typ);
             end;
 
-         when Iir_Predefined_Ieee_Math_Real_Pow_Real_Real =>
-            declare
-               function Pow (L, R : Fp64) return Fp64;
-               pragma Import (C, Pow);
-            begin
-               return Create_Memory_Fp64
-                 (Pow (Read_Fp64 (Param1), Read_Fp64 (Param2)), Res_Typ);
-            end;
-
-         when Iir_Predefined_Ieee_Math_Real_Mod =>
-            declare
-               function Fmod (L, R : Fp64) return Fp64;
-               pragma Import (C, Fmod);
-            begin
-               return Create_Memory_Fp64
-                 (Fmod (Read_Fp64 (Param1), Read_Fp64 (Param2)), Res_Typ);
-            end;
-
          when Iir_Predefined_Physical_Minimum
            | Iir_Predefined_Integer_Minimum
            | Iir_Predefined_Enum_Minimum =>
@@ -2502,15 +2531,18 @@ package body Synth.Vhdl_Eval is
             end;
          when Iir_Predefined_Real_To_String_Digits =>
             declare
-               Str : Grt.To_Strings.String_Real_Format;
                Last : Natural;
                Val : Ghdl_F64;
                Dig : Ghdl_I32;
             begin
                Val := Ghdl_F64 (Read_Fp64 (Param1));
                Dig := Ghdl_I32 (Read_Discrete (Param2));
-               Grt.To_Strings.To_String (Str, Last, Val, Dig);
-               return String_To_Memtyp (Str (Str'First .. Last), Res_Typ);
+               declare
+                  Str : String (1 .. 320 + Natural (Dig));
+               begin
+                  Grt.To_Strings.To_String (Str, Last, Val, Dig);
+                  return String_To_Memtyp (Str (Str'First .. Last), Res_Typ);
+               end;
             end;
          when Iir_Predefined_Real_To_String_Format =>
             declare
@@ -2603,7 +2635,8 @@ package body Synth.Vhdl_Eval is
               (Uns64 (Read_Discrete (Param1)), Int64 (Param2.Typ.Abound.Len),
                Res_Typ);
          when Iir_Predefined_Ieee_Numeric_Std_Tosgn_Int_Nat_Sgn
-            | Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Vector_Int =>
+            | Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Vector_Int
+            | Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Signed_Int =>
             return Eval_To_Log_Vector
               (To_Uns64 (Read_Discrete (Param1)), Read_Discrete (Param2),
                Res_Typ);
@@ -2679,6 +2712,13 @@ package body Synth.Vhdl_Eval is
                return Resize_Vec (Param1, Uns32 (Len), True);
             end;
 
+         when Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Vector_Sgn =>
+            return Conv_Slv
+              (Param1, Uns32 (Read_Discrete (Param2)), True, +Expr);
+         when Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Vector_Uns =>
+            return Conv_Slv
+              (Param1, Uns32 (Read_Discrete (Param2)), False, +Expr);
+
          when Iir_Predefined_Ieee_1164_To_Stdulogic =>
             declare
                B : Std_Ulogic;
@@ -2702,6 +2742,15 @@ package body Synth.Vhdl_Eval is
                B := Read_Std_Logic (Param1.Mem, 0);
                B := Map_X01Z (B);
                return Create_Memory_U8 (Std_Ulogic'Pos (B), Res_Typ);
+            end;
+         when Iir_Predefined_Ieee_1164_To_X01_Bit_Log =>
+            declare
+               B : Bit;
+               S : Std_Ulogic;
+            begin
+               B := Read_Bit (Param1.Mem, 0);
+               S := Bit2log_Table (B);
+               return Create_Memory_U8 (Std_Ulogic'Pos (S), Res_Typ);
             end;
          when Iir_Predefined_Ieee_1164_To_X01_Slv
             | Iir_Predefined_Ieee_Numeric_Std_To_X01_Uns
@@ -2832,13 +2881,29 @@ package body Synth.Vhdl_Eval is
 
          when Iir_Predefined_Ieee_1164_To_Hstring
             | Iir_Predefined_Ieee_Numeric_Std_To_Hstring_Uns =>
+            if Param1.Typ.Abound.Len = 0 then
+               Error_Msg_Synth
+                 (Inst, Expr, "to_hstring fails with a null-vector");
+            end if;
             return Eval_Logic_Vector_To_String (Param1, Res_Typ, False, 4);
          when Iir_Predefined_Ieee_Numeric_Std_To_Hstring_Sgn =>
+            if Param1.Typ.Abound.Len = 0 then
+               Error_Msg_Synth
+                 (Inst, Expr, "to_hstring fails with a null-vector");
+            end if;
             return Eval_Logic_Vector_To_String (Param1, Res_Typ, True, 4);
          when Iir_Predefined_Ieee_1164_To_Ostring
             | Iir_Predefined_Ieee_Numeric_Std_To_Ostring_Uns =>
+            if Param1.Typ.Abound.Len = 0 then
+               Error_Msg_Synth
+                 (Inst, Expr, "to_ostring fails with a null-vector");
+            end if;
             return Eval_Logic_Vector_To_String (Param1, Res_Typ, False, 3);
          when Iir_Predefined_Ieee_Numeric_Std_To_Ostring_Sgn =>
+            if Param1.Typ.Abound.Len = 0 then
+               Error_Msg_Synth
+                 (Inst, Expr, "to_ostring fails with a null-vector");
+            end if;
             return Eval_Logic_Vector_To_String (Param1, Res_Typ, True, 3);
 
          when Iir_Predefined_Ieee_Numeric_Std_Max_Uns_Uns =>
@@ -2910,6 +2975,24 @@ package body Synth.Vhdl_Eval is
          when Iir_Predefined_Ieee_Std_Logic_Misc_Xnor_Reduce_Slv
             | Iir_Predefined_Ieee_Std_Logic_Misc_Xnor_Reduce_Suv =>
             return Eval_Vector_Reduce ('0', Param1, Xor_Table, True);
+
+         when Iir_Predefined_Ieee_Math_Real_Pow_Real_Real =>
+            declare
+               function Pow (L, R : Fp64) return Fp64;
+               pragma Import (C, Pow);
+            begin
+               return Create_Memory_Fp64
+                 (Pow (Read_Fp64 (Param1), Read_Fp64 (Param2)), Res_Typ);
+            end;
+
+         when Iir_Predefined_Ieee_Math_Real_Mod =>
+            declare
+               function Fmod (L, R : Fp64) return Fp64;
+               pragma Import (C, Fmod);
+            begin
+               return Create_Memory_Fp64
+                 (Fmod (Read_Fp64 (Param1), Read_Fp64 (Param2)), Res_Typ);
+            end;
 
          when Iir_Predefined_Ieee_Math_Real_Sign =>
             declare

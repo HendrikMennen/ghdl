@@ -9,6 +9,8 @@ import pyGHDL.libghdl.vhdl.nodes as nodes
 import pyGHDL.libghdl.vhdl.sem_lib as sem_lib
 import pyGHDL.libghdl.vhdl.sem as sem
 import pyGHDL.libghdl.vhdl.formatters as formatters
+import pyGHDL.libghdl.vhdl.prints as prints
+import pyGHDL.libghdl.file_comments as file_comments
 
 from . import symbols, references
 
@@ -27,10 +29,11 @@ class Document(object):
 
     initial_gap_size = 4096
 
-    def __init__(self, uri, sfe=None, version=None):
+    def __init__(self, uri, sfe=None, lib=None, version=None):
         self.uri = uri
         self.version = version
         self._fe = sfe
+        self.library = lib
         self.gap_size = Document.initial_gap_size
         self._tree = nodes.Null_Iir
 
@@ -126,7 +129,12 @@ class Document(object):
         files_map_editor.Check_Buffer_Content(self._fe, ctypes.c_char_p(text_bytes), len(text_bytes))
 
     @staticmethod
-    def add_to_library(tree):
+    def add_to_library(tree, library):
+        # Set the target library
+        if library is None:
+            library = "work"
+        libraries.Work_Library_Name.value = name_table.Get_Identifier(library)
+        libraries.Load_Work_Library(False)
         # Detach the chain of units.
         unit = nodes.Get_First_Design_Unit(tree)
         nodes.Set_First_Design_Unit(tree, nodes.Null_Iir)
@@ -151,8 +159,8 @@ class Document(object):
         tree = sem_lib.Load_File(self._fe)
         if tree == nodes.Null_Iir:
             return
-        self._tree = Document.add_to_library(tree)
-        log.debug("add_to_library(%u) -> %u", tree, self._tree)
+        self._tree = Document.add_to_library(tree, self.library)
+        log.debug("add_to_library(%u, '%s') -> %u", tree, self.library, self._tree)
         if self._tree == nodes.Null_Iir:
             return
         nodes.Set_Design_File_Source(self._tree, self._fe)
@@ -195,9 +203,41 @@ class Document(object):
         pos = files_map.File_Line_To_Position(self._fe, position["line"] + 1)
         return files_map.File_Pos_To_Location(self._fe, pos) + position["character"]
 
-    def goto_definition(self, position):
+    def find_definition(self, position):
         loc = self.position_to_location(position)
-        return references.goto_definition(self._tree, loc)
+        return references.find_definition_by_loc(self._tree, loc)
+
+    def hover(self, position):
+        loc = self.position_to_location(position)
+        t = references.find_definition_by_loc(self._tree, loc)
+        if t is None:
+            return None
+
+        # Regenerate the declaration
+        hand = prints.Allocate_Handle()
+        prints.Print_String(t, hand)
+        buffer = prints.Get_C_String(hand)
+        buf_len = prints.Get_Length(hand)
+        if buf_len == 0:
+            res = None
+        else:
+            txt = ""
+            # Extract comments
+            t_loc = nodes.Get_Location(t)
+            t_fe = files_map.Location_To_File(t_loc)
+            comm = file_comments.Find_First_Comment(t_fe, t)
+            while comm != file_comments.No_Comment_Index:
+                # Add a comment in 'preformatted' mode
+                txt += "    " + file_comments.Get_Comment(t_fe, comm) + "\n"
+                comm = file_comments.Get_Next_Comment(t_fe, comm)
+            if txt:
+                # Add a separation line between comments and declaration.
+                txt += "---\n"
+            newtext = buffer[:buf_len].decode(Document.encoding)
+            txt += "```vhdl\n" + newtext + "\n```"
+            res = {"contents": {"kind": "markdown", "value": txt}}
+        prints.Free_Handle(hand)
+        return res
 
     def format_range(self, rng):
         first_line = rng["start"]["line"] + 1
@@ -206,10 +246,10 @@ class Document(object):
             return None
         if self._tree == nodes.Null_Iir:
             return None
-        hand = formatters.Allocate_Handle()
+        hand = prints.Allocate_Handle()
         formatters.Indent_String(self._tree, hand, first_line, last_line)
-        buffer = formatters.Get_C_String(hand)
-        buf_len = formatters.Get_Length(hand)
+        buffer = prints.Get_C_String(hand)
+        buf_len = prints.Get_Length(hand)
         newtext = buffer[:buf_len].decode(Document.encoding)
         res = [
             {
@@ -220,5 +260,5 @@ class Document(object):
                 "newText": newtext,
             }
         ]
-        formatters.Free_Handle(hand)
+        prints.Free_Handle(hand)
         return res

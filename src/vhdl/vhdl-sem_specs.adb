@@ -53,7 +53,28 @@ package body Vhdl.Sem_Specs is
          when Iir_Kind_Function_Declaration =>
             return Tok_Function;
          when Iir_Kind_Type_Declaration =>
-            return Tok_Type;
+            --  For vhdl08 and later, if an array or record is not fully
+            --  unconstrained, the type is anonymous and a subtype is
+            --  implicitely created.
+            if Vhdl_Std < Vhdl_08 then
+               return Tok_Type;
+            end if;
+            declare
+               Atype : constant Iir := Get_Type (Decl);
+            begin
+               case Get_Kind (Atype) is
+                  when Iir_Kind_Record_Type_Definition
+                    | Iir_Kind_Array_Type_Definition =>
+                     null;
+                  when others =>
+                     return Tok_Type;
+               end case;
+               if Get_Constraint_State (Atype) = Unconstrained then
+                  return Tok_Type;
+               else
+                  return Tok_Subtype;
+               end if;
+            end;
          when Iir_Kind_Subtype_Declaration =>
             return Tok_Subtype;
          when Iir_Kind_Constant_Declaration
@@ -94,10 +115,11 @@ package body Vhdl.Sem_Specs is
             --  Because an attribute declaration can appear in a declaration
             --  region.
             return Tok_Attribute;
+         when Iir_Kind_Mode_View_Declaration =>
+            return Tok_View;
          when others =>
             Error_Kind ("get_entity_class_kind", Decl);
       end case;
-      return Tok_Invalid;
    end Get_Entity_Class_Kind;
 
    --  Return the node containing the attribute_value_chain field for DECL.
@@ -242,6 +264,8 @@ package body Vhdl.Sem_Specs is
       Attr_Decl : Iir;
 
       Attr_Chain_Parent : Iir;
+
+      Is_Anon_Type : Boolean;
    begin
       --  LRM93 5.1
       --  It is an error if the class of those names is not the same as that
@@ -249,26 +273,43 @@ package body Vhdl.Sem_Specs is
       if Attr_Class /= Tok_Invalid
         and then Get_Entity_Class_Kind (Decl) /= Attr_Class
       then
-         if Check_Class then
+         if not Check_Class then
+            return;
+         end if;
+
+         --  If -frelaxed, specifying an attribute of class 'type' to
+         --  an anonynous type declaration is allowed.
+         Is_Anon_Type := Get_Kind (Decl) = Iir_Kind_Subtype_Declaration
+           and then Get_Entity_Class (Attr) = Tok_Type
+           and then Get_Type (Decl) /= Null_Iir
+           and then Get_Base_Type (Get_Type (Decl)) /= Null_Iir
+           and then (Get_Kind (Get_Type_Declarator
+                                 (Get_Base_Type (Get_Type (Decl))))
+                       = Iir_Kind_Anonymous_Type_Declaration);
+
+         if Is_Anon_Type then
+            --  The type declaration declares an anonymous type
+            --  and a named subtype.
+            Report_Start_Group;
+            Error_Msg_Sem_Relaxed
+              (Attr, Warnid_Specs,
+               "%n is not of class %t", (+Decl, +Attr_Class));
+            Error_Msg_Sem_Relaxed
+              (Decl, Warnid_Specs,
+               "%i declares both an anonymous type and a named subtype",
+               (1 => +Decl));
+            Report_End_Group;
+
+            --  If -frelaxed, this is not an error and the named entity is
+            --  specified with the attribute.
+            if not Flag_Relaxed_Rules then
+               return;
+            end if;
+         else
             Error_Msg_Sem
               (+Attr, "%n is not of class %t", (+Decl, +Attr_Class));
-            if Get_Kind (Decl) = Iir_Kind_Subtype_Declaration
-              and then Get_Entity_Class (Attr) = Tok_Type
-              and then Get_Type (Decl) /= Null_Iir
-              and then Get_Base_Type (Get_Type (Decl)) /= Null_Iir
-              and then Get_Kind
-              (Get_Type_Declarator (Get_Base_Type (Get_Type (Decl))))
-              = Iir_Kind_Anonymous_Type_Declaration
-            then
-               --  The type declaration declares an anonymous type
-               --  and a named subtype.
-               Error_Msg_Sem
-                 (+Decl,
-                  "%i declares both an anonymous type and a named subtype",
-                  +Decl);
-            end if;
+            return;
          end if;
-         return;
       end if;
 
       --  LRM93 5.1
@@ -477,7 +518,8 @@ package body Vhdl.Sem_Specs is
               | Iir_Kind_Enumeration_Literal
               | Iir_Kind_Unit_Declaration
               | Iir_Kind_Group_Template_Declaration
-              | Iir_Kind_Group_Declaration =>
+              | Iir_Kind_Group_Declaration
+              | Iir_Kind_Mode_View_Declaration =>
                Res := Res or Sem_Named_Entity1 (Ent, Ent);
             when Iir_Kind_Function_Declaration
               | Iir_Kind_Procedure_Declaration =>

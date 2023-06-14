@@ -268,7 +268,7 @@ package body Elab.Vhdl_Stmts is
    begin
       case Get_Kind (Stmt) is
          when Iir_Kinds_Process_Statement =>
-            null;
+            Create_Sub_Instance (Syn_Inst, Stmt, null);
          when Iir_Kind_Concurrent_Simple_Signal_Assignment
            | Iir_Kind_Concurrent_Selected_Signal_Assignment
            | Iir_Kind_Concurrent_Conditional_Signal_Assignment
@@ -283,6 +283,16 @@ package body Elab.Vhdl_Stmts is
            | Iir_Kind_Psl_Cover_Directive
            | Iir_Kind_Psl_Declaration =>
             null;
+         when Iir_Kind_Psl_Endpoint_Declaration =>
+            declare
+               Val : Valtyp;
+            begin
+               Val := Create_Value_Memory
+                 (Boolean_Type, Global_Pool'Access);
+               Write_Discrete (Val, 0);
+               Create_Object (Syn_Inst, Stmt, Val);
+            end;
+
          when Iir_Kind_Component_Instantiation_Statement =>
             if Is_Component_Instantiation (Stmt) then
                Elab_Component_Instantiation_Statement (Syn_Inst, Stmt);

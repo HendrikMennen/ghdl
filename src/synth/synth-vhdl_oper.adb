@@ -883,11 +883,21 @@ package body Synth.Vhdl_Oper is
          return Synth_Resize (Ctxt, L, Size, Is_Signed, Expr);
       end Synth_Conv_Vector;
 
+      function Synth_Posedge return Valtyp
+      is
+         Edge : Net;
+      begin
+         Edge := Build_Posedge (Ctxt, Get_Net (Ctxt, L));
+         Set_Location (Edge, Expr);
+         return Create_Value_Net (Edge, Res_Typ);
+      end Synth_Posedge;
+
       function Error_Unhandled return Valtyp is
       begin
          Error_Msg_Synth
            (Get_Caller_Instance (Syn_Inst), Expr,
-            "unhandled function: " & Iir_Predefined_Functions'Image (Def));
+            "unhandled dyn operation: "
+              & Iir_Predefined_Functions'Image (Def));
          return No_Valtyp;
       end Error_Unhandled;
    begin
@@ -905,7 +915,7 @@ package body Synth.Vhdl_Oper is
                return Create_Value_Memtyp
                  (Hook_Bit_Rising_Edge.all (L, Res_Typ));
             end if;
-            raise Internal_Error;
+            return Synth_Posedge;
          when Iir_Predefined_Bit_Falling_Edge =>
             if Hook_Bit_Falling_Edge /= null then
                return Create_Value_Memtyp
@@ -917,13 +927,7 @@ package body Synth.Vhdl_Oper is
                return Create_Value_Memtyp
                  (Hook_Std_Rising_Edge.all (L, Res_Typ));
             end if;
-            declare
-               Edge : Net;
-            begin
-               Edge := Build_Posedge (Ctxt, Get_Net (Ctxt, L));
-               Set_Location (Edge, Expr);
-               return Create_Value_Net (Edge, Res_Typ);
-            end;
+            return Synth_Posedge;
          when Iir_Predefined_Ieee_1164_Falling_Edge =>
             if Hook_Std_Falling_Edge /= null then
                return Create_Value_Memtyp
@@ -958,27 +962,33 @@ package body Synth.Vhdl_Oper is
             | Iir_Predefined_Ieee_Std_Logic_Signed_Abs_Slv =>
             return Synth_Vec_Monadic (Id_Abs);
 
-         when Iir_Predefined_Ieee_1164_And_Suv
+         when Iir_Predefined_TF_Reduction_And
+            | Iir_Predefined_Ieee_1164_And_Suv
             | Iir_Predefined_Ieee_Numeric_Std_And_Sgn
             | Iir_Predefined_Ieee_Numeric_Std_And_Uns =>
             return Synth_Vec_Reduce_Monadic (Id_Red_And);
-         when Iir_Predefined_Ieee_1164_Nand_Suv
+         when Iir_Predefined_TF_Reduction_Nand
+            | Iir_Predefined_Ieee_1164_Nand_Suv
             | Iir_Predefined_Ieee_Numeric_Std_Nand_Sgn
             | Iir_Predefined_Ieee_Numeric_Std_Nand_Uns =>
             return Synth_Vec_Reduce_Monadic (Id_Red_And, True);
-         when Iir_Predefined_Ieee_1164_Or_Suv
+         when Iir_Predefined_TF_Reduction_Or
+            | Iir_Predefined_Ieee_1164_Or_Suv
             | Iir_Predefined_Ieee_Numeric_Std_Or_Sgn
             | Iir_Predefined_Ieee_Numeric_Std_Or_Uns =>
             return Synth_Vec_Reduce_Monadic (Id_Red_Or);
-         when Iir_Predefined_Ieee_1164_Nor_Suv
+         when Iir_Predefined_TF_Reduction_Nor
+            | Iir_Predefined_Ieee_1164_Nor_Suv
             | Iir_Predefined_Ieee_Numeric_Std_Nor_Sgn
             | Iir_Predefined_Ieee_Numeric_Std_Nor_Uns =>
             return Synth_Vec_Reduce_Monadic (Id_Red_Or, True);
-         when Iir_Predefined_Ieee_1164_Xor_Suv
+         when Iir_Predefined_TF_Reduction_Xor
+            | Iir_Predefined_Ieee_1164_Xor_Suv
             | Iir_Predefined_Ieee_Numeric_Std_Xor_Sgn
             | Iir_Predefined_Ieee_Numeric_Std_Xor_Uns =>
             return Synth_Vec_Reduce_Monadic (Id_Red_Xor);
-         when Iir_Predefined_Ieee_1164_Xnor_Suv
+         when Iir_Predefined_TF_Reduction_Xnor
+            | Iir_Predefined_Ieee_1164_Xnor_Suv
             | Iir_Predefined_Ieee_Numeric_Std_Xnor_Sgn
             | Iir_Predefined_Ieee_Numeric_Std_Xnor_Uns =>
             return Synth_Vec_Reduce_Monadic (Id_Red_Xor, True);
@@ -1005,8 +1015,10 @@ package body Synth.Vhdl_Oper is
             end;
 
          when Iir_Predefined_Bit_And
-           | Iir_Predefined_Boolean_And
-           | Iir_Predefined_Ieee_1164_Scalar_And =>
+           | Iir_Predefined_Boolean_And =>
+            --  Short circuit.
+            raise Internal_Error;
+         when Iir_Predefined_Ieee_1164_Scalar_And =>
             return Synth_Bit_Dyadic (Id_And);
          when Iir_Predefined_Bit_Xor
            | Iir_Predefined_Boolean_Xor
@@ -1060,51 +1072,63 @@ package body Synth.Vhdl_Oper is
             | Iir_Predefined_Ieee_Numeric_Std_Xnor_Sgn_Sgn =>
             return Synth_Vec_Dyadic (Id_Xnor);
 
-         when Iir_Predefined_Ieee_1164_And_Suv_Log
+         when Iir_Predefined_TF_Array_Element_And
+            | Iir_Predefined_Ieee_1164_And_Suv_Log
             | Iir_Predefined_Ieee_Numeric_Std_And_Uns_Log
             | Iir_Predefined_Ieee_Numeric_Std_And_Sgn_Log =>
             return Synth_Dyadic_Vec_Log (Ctxt, Id_And, L, R, Expr);
-         when Iir_Predefined_Ieee_1164_And_Log_Suv
+         when Iir_Predefined_TF_Element_Array_And
+            | Iir_Predefined_Ieee_1164_And_Log_Suv
             | Iir_Predefined_Ieee_Numeric_Std_And_Log_Uns
             | Iir_Predefined_Ieee_Numeric_Std_And_Log_Sgn =>
             return Synth_Dyadic_Vec_Log (Ctxt, Id_And, R, L, Expr);
-         when Iir_Predefined_Ieee_1164_Nand_Suv_Log
+         when Iir_Predefined_TF_Array_Element_Nand
+            | Iir_Predefined_Ieee_1164_Nand_Suv_Log
             | Iir_Predefined_Ieee_Numeric_Std_Nand_Uns_Log
             | Iir_Predefined_Ieee_Numeric_Std_Nand_Sgn_Log =>
             return Synth_Dyadic_Vec_Log (Ctxt, Id_Nand, L, R, Expr);
-         when Iir_Predefined_Ieee_1164_Nand_Log_Suv
+         when Iir_Predefined_TF_Element_Array_Nand
+            | Iir_Predefined_Ieee_1164_Nand_Log_Suv
             | Iir_Predefined_Ieee_Numeric_Std_Nand_Log_Uns
             | Iir_Predefined_Ieee_Numeric_Std_Nand_Log_Sgn =>
             return Synth_Dyadic_Vec_Log (Ctxt, Id_Nand, R, L, Expr);
-         when Iir_Predefined_Ieee_1164_Or_Suv_Log
+         when Iir_Predefined_TF_Array_Element_Or
+            | Iir_Predefined_Ieee_1164_Or_Suv_Log
             | Iir_Predefined_Ieee_Numeric_Std_Or_Uns_Log
             | Iir_Predefined_Ieee_Numeric_Std_Or_Sgn_Log =>
             return Synth_Dyadic_Vec_Log (Ctxt, Id_Or, L, R, Expr);
-         when Iir_Predefined_Ieee_1164_Or_Log_Suv
+         when Iir_Predefined_TF_Element_Array_Or
+            | Iir_Predefined_Ieee_1164_Or_Log_Suv
             | Iir_Predefined_Ieee_Numeric_Std_Or_Log_Uns
             | Iir_Predefined_Ieee_Numeric_Std_Or_Log_Sgn =>
             return Synth_Dyadic_Vec_Log (Ctxt, Id_Or, R, L, Expr);
-         when Iir_Predefined_Ieee_1164_Nor_Suv_Log
+         when Iir_Predefined_TF_Array_Element_Nor
+            | Iir_Predefined_Ieee_1164_Nor_Suv_Log
             | Iir_Predefined_Ieee_Numeric_Std_Nor_Uns_Log
             | Iir_Predefined_Ieee_Numeric_Std_Nor_Sgn_Log =>
             return Synth_Dyadic_Vec_Log (Ctxt, Id_Nor, L, R, Expr);
-         when Iir_Predefined_Ieee_1164_Nor_Log_Suv
+         when Iir_Predefined_TF_Element_Array_Nor
+            | Iir_Predefined_Ieee_1164_Nor_Log_Suv
             | Iir_Predefined_Ieee_Numeric_Std_Nor_Log_Uns
             | Iir_Predefined_Ieee_Numeric_Std_Nor_Log_Sgn =>
             return Synth_Dyadic_Vec_Log (Ctxt, Id_Nor, R, L, Expr);
-         when Iir_Predefined_Ieee_1164_Xor_Suv_Log
+         when Iir_Predefined_TF_Array_Element_Xor
+            | Iir_Predefined_Ieee_1164_Xor_Suv_Log
             | Iir_Predefined_Ieee_Numeric_Std_Xor_Uns_Log
             | Iir_Predefined_Ieee_Numeric_Std_Xor_Sgn_Log =>
             return Synth_Dyadic_Vec_Log (Ctxt, Id_Xor, L, R, Expr);
-         when Iir_Predefined_Ieee_1164_Xor_Log_Suv
+         when Iir_Predefined_TF_Element_Array_Xor
+            | Iir_Predefined_Ieee_1164_Xor_Log_Suv
             | Iir_Predefined_Ieee_Numeric_Std_Xor_Log_Uns
             | Iir_Predefined_Ieee_Numeric_Std_Xor_Log_Sgn =>
             return Synth_Dyadic_Vec_Log (Ctxt, Id_Xor, R, L, Expr);
-         when Iir_Predefined_Ieee_1164_Xnor_Suv_Log
+         when Iir_Predefined_TF_Array_Element_Xnor
+            | Iir_Predefined_Ieee_1164_Xnor_Suv_Log
             | Iir_Predefined_Ieee_Numeric_Std_Xnor_Uns_Log
             | Iir_Predefined_Ieee_Numeric_Std_Xnor_Sgn_Log =>
             return Synth_Dyadic_Vec_Log (Ctxt, Id_Xnor, L, R, Expr);
-         when Iir_Predefined_Ieee_1164_Xnor_Log_Suv
+         when Iir_Predefined_TF_Element_Array_Xnor
+            | Iir_Predefined_Ieee_1164_Xnor_Log_Suv
             | Iir_Predefined_Ieee_Numeric_Std_Xnor_Log_Uns
             | Iir_Predefined_Ieee_Numeric_Std_Xnor_Log_Sgn =>
             return Synth_Dyadic_Vec_Log (Ctxt, Id_Xnor, R, L, Expr);
@@ -1965,7 +1989,7 @@ package body Synth.Vhdl_Oper is
             declare
                Res : Boolean;
             begin
-               Res := Elab.Vhdl_Files.Endfile (L.Val.File, Expr);
+               Res := Elab.Vhdl_Files.Endfile (Syn_Inst, L.Val.File, Expr);
                return Create_Value_Memtyp
                  (Create_Memory_U8 (Boolean'Pos (Res), Boolean_Type));
             exception
@@ -1999,6 +2023,7 @@ package body Synth.Vhdl_Oper is
             --  A no-op (with change of bounds).
             return Create_Value_Net (Get_Net (Ctxt, L), Create_Res_Bound (L));
          when Iir_Predefined_Ieee_1164_To_Bit
+            | Iir_Predefined_Ieee_1164_To_01_Log_Log
             | Iir_Predefined_Ieee_1164_To_X01_Log
             | Iir_Predefined_Ieee_1164_To_UX01_Log
             | Iir_Predefined_Ieee_1164_To_X01Z_Log
@@ -2016,7 +2041,8 @@ package body Synth.Vhdl_Oper is
                return Synth_Resize (Ctxt, L, B.Len, False, Expr);
             end;
          when Iir_Predefined_Ieee_Numeric_Std_Tosgn_Int_Nat_Sgn
-            | Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Vector_Int =>
+            | Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Vector_Int
+            | Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Signed_Int =>
             return Synth_Conv_Vector (True);
          when Iir_Predefined_Ieee_Numeric_Std_Toint_Uns_Nat
             | Iir_Predefined_Ieee_Numeric_Std_Unsigned_To_Integer_Slv_Nat
@@ -2037,7 +2063,10 @@ package body Synth.Vhdl_Oper is
             | Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Vector_Uns
             | Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Unsigned_Uns
             | Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Unsigned_Log
+            | Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Signed_Log
+            | Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Signed_Uns
             | Iir_Predefined_Ieee_Std_Logic_Arith_Ext =>
+            --  Unsigned to unsigned (resize)
             declare
                W : Width;
             begin
@@ -2067,6 +2096,7 @@ package body Synth.Vhdl_Oper is
          when Iir_Predefined_Ieee_Numeric_Std_Resize_Sgn_Nat
             | Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Vector_Sgn
             | Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Unsigned_Sgn
+            | Iir_Predefined_Ieee_Std_Logic_Arith_Conv_Signed_Sgn
             | Iir_Predefined_Ieee_Std_Logic_Arith_Sxt =>
             if not Is_Static (R.Val) then
                Error_Msg_Synth
@@ -2209,7 +2239,7 @@ package body Synth.Vhdl_Oper is
       Subprg_Inst := Make_Instance (Syn_Inst, Imp);
 
       Synth_Subprogram_Associations
-        (Subprg_Inst, Syn_Inst, Inter_Chain, Assoc_Chain);
+        (Subprg_Inst, Syn_Inst, Inter_Chain, Assoc_Chain, Expr);
 
       if Is_Error (Subprg_Inst) then
          Res := No_Valtyp;
@@ -2255,8 +2285,11 @@ package body Synth.Vhdl_Oper is
 
                Mt := Eval_Static_Predefined_Function_Call
                  (Syn_Inst, Param1, Param2, Res_Typ, Expr);
+
                if Mt /= Null_Memtyp then
                   Res := Create_Value_Memtyp (Mt);
+                  --  Protect deallocation.
+                  Res.Typ := Unshare_Type_Expr (Res.Typ, Res_Typ);
                else
                   Res := No_Valtyp;
                end if;

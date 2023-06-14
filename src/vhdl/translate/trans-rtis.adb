@@ -1994,6 +1994,9 @@ package body Trans.Rtis is
                Comm := Ghdl_Rtik_Port;
                Var := Info.Signal_Sig;
                Mode := Iir_Mode'Pos (Get_Mode (Decl));
+            when Iir_Kind_Interface_View_Declaration =>
+               Comm := Ghdl_Rtik_Port;
+               Var := Info.Signal_Sig;
             when Iir_Kind_Constant_Declaration =>
                Comm := Ghdl_Rtik_Constant;
                Var := Info.Object_Var;
@@ -2179,6 +2182,8 @@ package body Trans.Rtis is
          case Get_Kind (Decl) is
             when Iir_Kind_Use_Clause =>
                null;
+            when Iir_Kind_Suspend_State_Declaration =>
+               null;
             when Iir_Kind_Type_Declaration =>
                --  FIXME: physicals ?
                if Get_Kind (Get_Type_Definition (Decl))
@@ -2303,6 +2308,8 @@ package body Trans.Rtis is
             when Iir_Kind_Type_Declaration
                | Iir_Kind_Subtype_Declaration =>
                Add_Rti_Node (Generate_Type_Decl (Decl));
+            when Iir_Kind_Suspend_State_Declaration =>
+               null;
             when Iir_Kind_Constant_Declaration =>
                --  Do not generate RTIs for full declarations.
                --  (RTI will be generated for the deferred declaration).
@@ -2326,7 +2333,8 @@ package body Trans.Rtis is
                   Add_Rti_Node (Info.Object_Rti);
                end;
             when Iir_Kind_Signal_Declaration
-              | Iir_Kind_Interface_Signal_Declaration =>
+              | Iir_Kind_Interface_Signal_Declaration
+              | Iir_Kind_Interface_View_Declaration =>
                declare
                   Info : constant Signal_Info_Acc := Get_Info (Decl);
                begin
@@ -2410,8 +2418,12 @@ package body Trans.Rtis is
                end if;
 
             when Iir_Kind_Package_Instantiation_Declaration
-              |  Iir_Kind_Interface_Package_Declaration =>
+              |  Iir_Kind_Interface_Package_Declaration
+              | Iir_Kind_Package_Instantiation_Body =>
                --  FIXME: todo
+               null;
+
+            when Iir_Kind_Mode_View_Declaration =>
                null;
 
             when Iir_Kind_Psl_Default_Clock =>
@@ -2904,6 +2916,9 @@ package body Trans.Rtis is
       case Get_Kind (Lib_Unit) is
          when Iir_Kind_Configuration_Declaration =>
             --  No RTI for configurations.
+            return;
+         when Iir_Kind_Package_Instantiation_Body =>
+            --  No RTI for instantiation bodies.
             return;
          when Iir_Kind_Architecture_Body =>
             if Info.Block_Rti_Const /= O_Dnode_Null then

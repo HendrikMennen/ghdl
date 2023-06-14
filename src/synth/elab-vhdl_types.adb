@@ -18,6 +18,7 @@
 
 with Types; use Types;
 with Mutils; use Mutils;
+with Errorout;
 
 with Vhdl.Utils; use Vhdl.Utils;
 with Vhdl.Std_Package;
@@ -31,6 +32,7 @@ with Elab.Vhdl_Decls;
 with Elab.Vhdl_Errors; use Elab.Vhdl_Errors;
 
 with Synth.Vhdl_Expr; use Synth.Vhdl_Expr;
+with Synth.Errors;
 
 package body Elab.Vhdl_Types is
    function Synth_Subtype_Indication_With_Parent
@@ -83,38 +85,38 @@ package body Elab.Vhdl_Types is
       return (Get_Direction (Rng), Read_Fp64 (L), Read_Fp64 (R));
    end Synth_Float_Range_Expression;
 
-   function Synth_Array_Attribute (Syn_Inst : Synth_Instance_Acc; Attr : Node)
-                                  return Bound_Type
+   --  Return the type of the prefix for an array attribute.
+   function Synth_Array_Attribute_Prefix
+     (Syn_Inst : Synth_Instance_Acc; Attr : Node) return Type_Acc
    is
       Prefix_Name : constant Iir := Get_Prefix (Attr);
       Prefix : constant Iir := Strip_Denoting_Name (Prefix_Name);
-      Dim    : constant Natural :=
-        Vhdl.Evaluation.Eval_Attribute_Parameter_Or_1 (Attr);
-      Typ    : Type_Acc;
    begin
       --  Prefix is an array object or an array subtype.
       if Get_Kind (Prefix) = Iir_Kind_Subtype_Declaration then
          --  TODO: does this cover all the cases ?
-         Typ := Get_Subtype_Object (Syn_Inst, Get_Subtype_Indication (Prefix));
+         return Get_Subtype_Object (Syn_Inst, Get_Subtype_Indication (Prefix));
       else
          --  The expression cannot be fully executed as it can be a signal
          --  (whose evaluation is not allowed during elaboration).
-         Typ := Exec_Name_Subtype (Syn_Inst, Prefix_Name);
+         return Exec_Name_Subtype (Syn_Inst, Prefix);
       end if;
+   end Synth_Array_Attribute_Prefix;
+
+   function Synth_Array_Attribute (Syn_Inst : Synth_Instance_Acc; Attr : Node)
+                                  return Bound_Type
+   is
+      Dim    : constant Natural :=
+        Vhdl.Evaluation.Eval_Attribute_Parameter_Or_1 (Attr);
+      Typ    : Type_Acc;
+   begin
+      Typ := Synth_Array_Attribute_Prefix (Syn_Inst, Attr);
 
       for I in 2 .. Dim loop
          Typ := Typ.Arr_El;
       end loop;
       return Get_Array_Bound (Typ);
    end Synth_Array_Attribute;
-
-   function Synth_Type_Attribute (Syn_Inst : Synth_Instance_Acc; Attr : Node)
-                                 return Type_Acc is
-   begin
-      return Get_Subtype_Object
-        (Syn_Inst,
-         Get_Subtype_Indication (Get_Named_Entity (Get_Prefix (Attr))));
-   end Synth_Type_Attribute;
 
    procedure Synth_Discrete_Range (Syn_Inst : Synth_Instance_Acc;
                                    Bound : Node;
@@ -258,7 +260,7 @@ package body Elab.Vhdl_Types is
       else
          Typ := El_Typ;
          for I in reverse 1 .. Ndims loop
-            Idx := Get_Index_Type (Def, 0);
+            Idx := Get_Index_Type (Def, Flist_First + (I - 1));
             Idx_Typ := Get_Subtype_Object (Syn_Inst, Idx);
             Typ := Create_Unbounded_Array (Idx_Typ, I = Ndims, Typ);
          end loop;
@@ -266,32 +268,31 @@ package body Elab.Vhdl_Types is
       return Typ;
    end Synth_Array_Type_Definition;
 
-   function Synth_Record_Type_Definition
-     (Syn_Inst : Synth_Instance_Acc; Def : Node) return Type_Acc
+   function Synth_Record_Type_Definition (Syn_Inst : Synth_Instance_Acc;
+                                          Parent_Typ : Type_Acc;
+                                          Def : Node) return Type_Acc
    is
-      Is_Subtype : constant Boolean :=
-        Get_Kind (Def) = Iir_Kind_Record_Subtype_Definition;
       El_List : constant Node_Flist := Get_Elements_Declaration_List (Def);
       Rec_Els : Rec_El_Array_Acc;
       El      : Node;
       El_Type : Node;
       El_Typ  : Type_Acc;
+      Bounded : Boolean;
 
-      Parent_Typ : Type_Acc;
       Parent_Els : Rec_El_Array_Acc;
    begin
       Rec_Els := Create_Rec_El_Array
         (Iir_Index32 (Get_Nbr_Elements (El_List)));
 
-      if Is_Subtype then
-         Parent_Typ := Get_Subtype_Object (Syn_Inst, Get_Parent_Type (Def));
+      if Parent_Typ /= null then
          Parent_Els := Parent_Typ.Rec;
       end if;
 
+      Bounded := True;
       for I in Flist_First .. Flist_Last (El_List) loop
          El := Get_Nth_Element (El_List, I);
          El_Type := Get_Type (El);
-         if Is_Subtype then
+         if Parent_Typ /= null then
             if Get_Kind (El) = Iir_Kind_Record_Element_Constraint then
                El_Typ := Synth_Subtype_Indication_If_Anonymous
                  (Syn_Inst, El_Type);
@@ -302,13 +303,16 @@ package body Elab.Vhdl_Types is
             El_Typ := Synth_Subtype_Indication_If_Anonymous
               (Syn_Inst, El_Type);
          end if;
+         if Bounded and then not Is_Bounded_Type (El_Typ) then
+            Bounded := False;
+         end if;
          Rec_Els.E (Iir_Index32 (I + 1)).Typ := El_Typ;
       end loop;
 
-      if not Is_Fully_Constrained_Type (Def) then
-         return Create_Unbounded_Record (Rec_Els);
+      if Bounded then
+         return Create_Record_Type (Parent_Typ, Rec_Els);
       else
-         return Create_Record_Type (Rec_Els);
+         return Create_Unbounded_Record (Parent_Typ, Rec_Els);
       end if;
    end Synth_Record_Type_Definition;
 
@@ -321,6 +325,7 @@ package body Elab.Vhdl_Types is
       Des_Typ : Type_Acc;
       Typ : Type_Acc;
    begin
+      --  Need to handle incomplete access type.
       if Get_Kind (Des_Ind) in Iir_Kinds_Denoting_Name then
          T := Get_Named_Entity (Des_Ind);
          if Get_Kind (T) = Iir_Kind_Type_Declaration
@@ -449,7 +454,7 @@ package body Elab.Vhdl_Types is
          when Iir_Kind_File_Type_Definition =>
             Typ := Synth_File_Type_Definition (Syn_Inst, Def);
          when Iir_Kind_Record_Type_Definition =>
-            Typ := Synth_Record_Type_Definition (Syn_Inst, Def);
+            Typ := Synth_Record_Type_Definition (Syn_Inst, null, Def);
          when Iir_Kind_Protected_Type_Declaration =>
             --  TODO...
             Elab.Vhdl_Decls.Elab_Declarations
@@ -548,6 +553,30 @@ package body Elab.Vhdl_Types is
               = Iir_Kind_Array_Element_Resolution));
    end Has_Element_Subtype_Indication;
 
+   procedure Check_Bound_Compatibility (Syn_Inst : Synth_Instance_Acc;
+                                        Loc : Node;
+                                        Bnd : Bound_Type;
+                                        Typ : Type_Acc)
+   is
+      use Synth.Errors;
+      use Errorout;
+   begin
+      --  A null range is always compatible (see LRM08 5.2.1).
+      if Bnd.Len = 0 then
+         return;
+      end if;
+
+      if not In_Range (Typ.Drange, Int64 (Bnd.Left)) then
+         Error_Msg_Synth (Syn_Inst, Loc,
+                          "left bound (%v) not in range (%v to %v)",
+                          (+Bnd.Left, +Typ.Drange.Left, +Typ.Drange.Right));
+      elsif not In_Range (Typ.Drange, Int64 (Bnd.Right)) then
+         Error_Msg_Synth (Syn_Inst, Loc,
+                          "right bound (%v) not in range (%v to %v)",
+                          (+Bnd.Right, +Typ.Drange.Left, +Typ.Drange.Right));
+      end if;
+   end Check_Bound_Compatibility;
+
    function Synth_Array_Subtype_Indication (Syn_Inst : Synth_Instance_Acc;
                                             Parent_Typ : Type_Acc;
                                             Atype : Node) return Type_Acc
@@ -555,21 +584,21 @@ package body Elab.Vhdl_Types is
       Parent_Type : constant Node := Get_Parent_Type (Atype);
       El_Type : constant Node := Get_Element_Subtype (Atype);
       St_Indexes : constant Node_Flist := Get_Index_Subtype_List (Atype);
-      St_El : Node;
       El_Typ : Type_Acc;
    begin
+      --  Get parent real array element.
+      El_Typ := Parent_Typ;
+      while not Is_Last_Dimension (El_Typ) loop
+         El_Typ := Get_Array_Element (El_Typ);
+      end loop;
+      El_Typ := Get_Array_Element (El_Typ);
+
       --  VHDL08
       if Has_Element_Subtype_Indication (Atype) then
          --  This subtype has created a new anonymous subtype for the
          --  element.
          El_Typ := Synth_Subtype_Indication_With_Parent
-           (Syn_Inst, Get_Array_Element (Parent_Typ), El_Type);
-      else
-         El_Typ := Parent_Typ;
-         while not Is_Last_Dimension (El_Typ) loop
-            El_Typ := Get_Array_Element (El_Typ);
-         end loop;
-         El_Typ := Get_Array_Element (El_Typ);
+           (Syn_Inst, El_Typ, El_Type);
       end if;
 
       if not Get_Index_Constraint_Flag (Atype) then
@@ -585,9 +614,18 @@ package body Elab.Vhdl_Types is
       case Parent_Typ.Kind is
          when Type_Unbounded_Vector =>
             if Get_Index_Constraint_Flag (Atype) then
-               St_El := Get_Index_Type (St_Indexes, 0);
-               return Create_Vector_Type
-                 (Synth_Bounds_From_Range (Syn_Inst, St_El), El_Typ);
+               declare
+                  St_El : Node;
+                  Bnd : Bound_Type;
+                  Bnd_Static : Boolean;
+               begin
+                  St_El := Get_Index_Type (St_Indexes, 0);
+                  Bnd := Synth_Bounds_From_Range (Syn_Inst, St_El);
+                  Bnd_Static := Get_Type_Staticness (St_El) = Locally;
+                  Check_Bound_Compatibility
+                    (Syn_Inst, St_El, Bnd, Parent_Typ.Uarr_Idx);
+                  return Create_Vector_Type (Bnd, Bnd_Static, El_Typ);
+               end;
             else
                --  An alias.
                --  Handle vhdl08 definition of std_logic_vector from
@@ -599,19 +637,30 @@ package body Elab.Vhdl_Types is
             if Get_Index_Constraint_Flag (Atype) then
                declare
                   El_Bounded : constant Boolean := Is_Bounded_Type (El_Typ);
+                  St_El : Node;
                   Res_Typ : Type_Acc;
                   Bnd : Bound_Type;
+                  P : Type_Acc;
+                  Bnd_Static : Boolean;
                begin
                   Res_Typ := El_Typ;
                   for I in reverse Flist_First .. Flist_Last (St_Indexes) loop
                      St_El := Get_Index_Type (St_Indexes, I);
                      Bnd := Synth_Bounds_From_Range (Syn_Inst, St_El);
+                     Bnd_Static := Get_Type_Staticness (St_El) = Locally;
+                     --  Get parent index.
+                     P := Parent_Typ;
+                     for J in Flist_First + 1 .. I loop
+                        P := P.Uarr_El;
+                     end loop;
+                     Check_Bound_Compatibility
+                       (Syn_Inst, St_El, Bnd, P.Uarr_Idx);
                      if El_Bounded then
                         Res_Typ := Create_Array_Type
-                          (Bnd, Res_Typ = El_Typ, Res_Typ);
+                          (Bnd, Bnd_Static, Res_Typ = El_Typ, Res_Typ);
                      else
                         Res_Typ := Create_Array_Unbounded_Type
-                          (Bnd, Res_Typ = El_Typ, Res_Typ);
+                          (Bnd, Bnd_Static, Res_Typ = El_Typ, Res_Typ);
                      end if;
                   end loop;
                   return Res_Typ;
@@ -646,6 +695,9 @@ package body Elab.Vhdl_Types is
             when Iir_Kind_Array_Subtype_Definition =>
                return Synth_Array_Subtype_Indication
                  (Syn_Inst, Parent_Typ, Atype);
+            when Iir_Kind_Record_Subtype_Definition =>
+               return Synth_Record_Type_Definition
+                 (Syn_Inst, Parent_Typ, Atype);
             when others =>
                return Synth_Subtype_Indication (Syn_Inst, Atype);
          end case;
@@ -671,7 +723,14 @@ package body Elab.Vhdl_Types is
                  (Syn_Inst, Parent_Typ, Atype);
             end;
          when Iir_Kind_Record_Subtype_Definition =>
-            return Synth_Record_Type_Definition (Syn_Inst, Atype);
+            declare
+               Parent_Type : constant Node := Get_Parent_Type (Atype);
+               Parent_Typ : constant Type_Acc :=
+                 Get_Subtype_Object (Syn_Inst, Parent_Type);
+            begin
+               return Synth_Record_Type_Definition
+                 (Syn_Inst, Parent_Typ, Atype);
+            end;
          when Iir_Kind_Integer_Subtype_Definition
            | Iir_Kind_Physical_Subtype_Definition
            | Iir_Kind_Enumeration_Subtype_Definition =>
@@ -707,6 +766,13 @@ package body Elab.Vhdl_Types is
                Acc_Typ := Synth_Subtype_Indication
                  (Syn_Inst, Get_Designated_Type (Atype));
                return Create_Access_Type (Acc_Typ);
+            end;
+         when Iir_Kind_File_Subtype_Definition =>
+            --  Same as parent.
+            declare
+               Parent_Type : constant Node := Get_Parent_Type (Atype);
+            begin
+               return Get_Subtype_Object (Syn_Inst, Parent_Type);
             end;
          when Iir_Kind_Record_Type_Definition
            | Iir_Kind_Array_Type_Definition =>
@@ -783,17 +849,28 @@ package body Elab.Vhdl_Types is
                end if;
             when Iir_Kinds_Denoting_Name =>
                --  Already elaborated.
+               --  We cannot use the object type as it can be a subtype
+               --  deduced from the default value (for constants).
                Atype := Get_Type (Get_Named_Entity (Atype));
             when Iir_Kind_Subtype_Attribute =>
                declare
                   Pfx : constant Node := Get_Prefix (Atype);
-                  Vt : Valtyp;
+                  T : Type_Acc;
                begin
                   Mark_Expr_Pool (Marker);
-                  Vt := Synth_Name (Syn_Inst, Pfx);
+                  T := Exec_Name_Subtype (Syn_Inst, Pfx);
                   Release_Expr_Pool (Marker);
-                  pragma Assert (Vt.Typ.Is_Global);
-                  return Vt.Typ;
+                  pragma Assert (T.Is_Global);
+                  return T;
+               end;
+            when Iir_Kind_Element_Attribute =>
+               declare
+                  T : Type_Acc;
+               begin
+                  T := Synth_Array_Attribute_Prefix (Syn_Inst, Atype);
+                  pragma Assert (T.Is_Global);
+                  --  Always a bounded array/vector.
+                  return T.Arr_El;
                end;
             when others =>
                Error_Kind ("elab_declaration_type", Atype);

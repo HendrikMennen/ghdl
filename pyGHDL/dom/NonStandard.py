@@ -40,15 +40,13 @@ import time
 from pathlib import Path
 from typing import Any
 
-from pyTooling.Decorators import export
-
 from pyGHDL.dom.Names import SimpleName
+from pyTooling.Decorators import export, InheritDocString
+
 from pyVHDLModel import VHDLVersion
-from pyVHDLModel.SyntaxModel import (
-    Design as VHDLModel_Design,
-    Library as VHDLModel_Library,
-    Document as VHDLModel_Document,
-)
+from pyVHDLModel import Design as VHDLModel_Design
+from pyVHDLModel import Library as VHDLModel_Library
+from pyVHDLModel import Document as VHDLModel_Document
 
 from pyGHDL.libghdl import (
     ENCODING,
@@ -70,7 +68,7 @@ from pyGHDL.libghdl.vhdl import nodes, sem_lib
 from pyGHDL.libghdl.vhdl.parse import Flag_Parse_Parenthesis
 from pyGHDL.dom import DOMException, Position
 from pyGHDL.dom._Utils import GetIirKindOfNode, CheckForErrors, GetNameOfNode, GetDocumentationOfNode
-from pyGHDL.dom.Names import SimpleName
+from pyGHDL.dom.Symbol import LibraryReferenceSymbol
 from pyGHDL.dom.DesignUnit import (
     Entity,
     Architecture,
@@ -83,14 +81,14 @@ from pyGHDL.dom.DesignUnit import (
     UseClause,
     ContextReference,
 )
-from pyGHDL.dom.Symbol import LibraryReferenceSymbol
 from pyGHDL.dom.PSL import VerificationUnit, VerificationProperty, VerificationMode
 
 
 @export
 class Design(VHDLModel_Design):
-    def __init__(self):
-        super().__init__()
+    @InheritDocString(VHDLModel_Design)
+    def __init__(self, name: str = None):
+        super().__init__(name)
 
         self.__ghdl_init()
 
@@ -211,7 +209,7 @@ class Document(VHDLModel_Document):
                     itemKind = GetIirKindOfNode(item)
                     if itemKind is nodes.Iir_Kind.Library_Clause:
                         libraryIdentifier = GetNameOfNode(item)
-                        contextNames.append(LibraryReferenceSymbol(item, libraryIdentifier))
+                        contextNames.append(LibraryReferenceSymbol(item, SimpleName(item, libraryIdentifier)))
                         if nodes.Get_Has_Identifier_List(item):
                             continue
 

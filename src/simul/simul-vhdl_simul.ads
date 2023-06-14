@@ -22,23 +22,15 @@ with Areapools;
 
 with Vhdl.Nodes; use Vhdl.Nodes;
 
-with Grt.Vhdl_Types; use Grt.Vhdl_Types;
-
 with Elab.Memtype; use Elab.Memtype;
 with Elab.Vhdl_Context; use Elab.Vhdl_Context;
+with Elab.Vhdl_Values; use Elab.Vhdl_Values;
 
 with Simul.Vhdl_Elab; use Simul.Vhdl_Elab;
 
-with Grt.Signals;
+with Grt.Signals; use Grt.Signals;
 
 package Simul.Vhdl_Simul is
-   Break_Time : Std_Time;
-
-   Trace_Simulation : Boolean := False;
-
-   Flag_Interractive : Boolean := False;
-   Flag_Debug_Elab : Boolean := False;
-
    Trace_Residues : Boolean := False;
 
    type Process_Kind is (Kind_Process, Kind_PSL);
@@ -84,14 +76,22 @@ package Simul.Vhdl_Simul is
    -- If true, disp current time in assert message.
    Disp_Time_Before_Values: Boolean := False;
 
-   Simulation_Finished : exception;
-
    procedure Simulation;
 
    --  Low level functions, for debugger.
    function Sig_Index (Base : Memory_Ptr; Idx : Uns32) return Memory_Ptr;
    function Read_Sig (Mem : Memory_Ptr) return Grt.Signals.Ghdl_Signal_Ptr;
+   function Hook_Signal_Expr (Val : Valtyp) return Valtyp;
 
+   --  Used by simul-vhdl_compile.
+   Sig_Size : constant Size_Type := Ghdl_Signal_Ptr'Size / 8;
+
+   procedure Write_Sig (Mem : Memory_Ptr; Val : Ghdl_Signal_Ptr);
+   procedure Create_User_Signal (E : Signal_Entry);
+   procedure Collapse_Signal (E : in out Signal_Entry);
+   procedure Create_Process_Drivers (Proc : Process_Index_Type);
+   procedure Register_Sensitivity (Proc_Idx : Process_Index_Type);
+   procedure Create_Connects;
 
    --  Tables visible to the debugger.
 

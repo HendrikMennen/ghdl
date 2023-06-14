@@ -34,6 +34,18 @@ from typing import List, Generator, Type
 
 from pyTooling.Decorators import export
 
+from pyVHDLModel import Name
+from pyVHDLModel.Base import ModelEntity, Direction, ExpressionUnion
+from pyVHDLModel.Symbol import Symbol
+from pyVHDLModel.Association import AssociationItem
+from pyVHDLModel.Interface import GenericInterfaceItem, PortInterfaceItem, ParameterInterfaceItem
+from pyVHDLModel.Type import BaseType
+from pyVHDLModel.Sequential import SequentialStatement
+from pyVHDLModel.Concurrent import ConcurrentStatement
+
+from pyGHDL.libghdl import utils, name_table
+from pyGHDL.libghdl._types import Iir
+from pyGHDL.libghdl.vhdl import nodes
 from pyGHDL.dom.Sequential import (
     IfStatement,
     ForLoopStatement,
@@ -43,32 +55,12 @@ from pyGHDL.dom.Sequential import (
     WaitStatement,
     SequentialSimpleSignalAssignment,
     NullStatement,
+    ExitStatement,
     SequentialProcedureCall,
 )
-from pyVHDLModel.SyntaxModel import (
-    ConstraintUnion,
-    Direction,
-    ExpressionUnion,
-    SubtypeOrSymbol,
-    BaseType,
-    GenericInterfaceItem,
-    PortInterfaceItem,
-    ParameterInterfaceItem,
-    ModelEntity,
-    Name,
-    ConcurrentStatement,
-    SequentialStatement,
-    AssociationItem,
-)
 
-from pyGHDL.libghdl import utils, name_table
-from pyGHDL.libghdl._types import Iir
-from pyGHDL.libghdl.vhdl import nodes
 from pyGHDL.dom import Position, DOMException
-from pyGHDL.dom._Utils import (
-    GetNameOfNode,
-    GetIirKindOfNode,
-)
+from pyGHDL.dom._Utils import GetNameOfNode, GetIirKindOfNode
 from pyGHDL.dom.Names import (
     SimpleName,
     SelectedName,
@@ -174,26 +166,25 @@ from pyGHDL.dom.PSL import DefaultClock
 
 
 @export
-def GetNameFromNode(node: Iir) -> Name:
+def GetName(node: Iir) -> Name:
     kind = GetIirKindOfNode(node)
     if kind == nodes.Iir_Kind.Simple_Name:
         name = GetNameOfNode(node)
         return SimpleName(node, name)
     elif kind == nodes.Iir_Kind.Selected_Name:
         name = GetNameOfNode(node)
-        prefixName = GetNameFromNode(nodes.Get_Prefix(node))
+        prefixName = GetName(nodes.Get_Prefix(node))
         return SelectedName(node, name, prefixName)
+    elif kind == nodes.Iir_Kind.Parenthesis_Name:
+        prefixName = GetName(nodes.Get_Prefix(node))
+        associations = GetAssociations(node)
+        return ParenthesisName(node, prefixName, associations)
     elif kind == nodes.Iir_Kind.Attribute_Name:
         name = GetNameOfNode(node)
-        prefixName = GetNameFromNode(nodes.Get_Prefix(node))
+        prefixName = GetName(nodes.Get_Prefix(node))
         return AttributeName(node, name, prefixName)
-    elif kind == nodes.Iir_Kind.Parenthesis_Name:
-        prefixName = GetNameFromNode(nodes.Get_Prefix(node))
-        associations = GetAssociations(node)
-
-        return ParenthesisName(node, prefixName, associations)
     elif kind == nodes.Iir_Kind.Selected_By_All_Name:
-        prefixName = GetNameFromNode(nodes.Get_Prefix(node))
+        prefixName = GetName(nodes.Get_Prefix(node))
         return AllName(node, prefixName)
     else:
         raise DOMException(f"Unknown name kind '{kind.name}'")
@@ -223,7 +214,7 @@ def GetAssociations(node: Iir) -> List:
 @export
 def GetArrayConstraintsFromSubtypeIndication(
     subtypeIndication: Iir,
-) -> List[ConstraintUnion]:
+) -> List:
     constraints = []
     for constraint in utils.flist_iter(nodes.Get_Index_Constraint_List(subtypeIndication)):
         constraintKind = GetIirKindOfNode(constraint)
@@ -235,7 +226,7 @@ def GetArrayConstraintsFromSubtypeIndication(
             nodes.Iir_Kind.Selected_Name,
             nodes.Iir_Kind.Attribute_Name,
         ):
-            constraints.append(GetNameFromNode(constraint))
+            constraints.append(GetName(constraint))
         else:
             position = Position.parse(constraint)
             raise DOMException(
@@ -285,7 +276,7 @@ def GetAnonymousTypeFromNode(node: Iir) -> BaseType:
         return IntegerType(node, typeName, r)
 
     elif kind in (nodes.Iir_Kind.Attribute_Name, nodes.Iir_Kind.Parenthesis_Name):
-        n = GetNameFromNode(typeDefinition)
+        n = GetName(typeDefinition)
 
         return IntegerType(node, typeName, n)
     elif kind == nodes.Iir_Kind.Physical_Type_Definition:
@@ -303,13 +294,13 @@ def GetAnonymousTypeFromNode(node: Iir) -> BaseType:
 
 
 @export
-def GetSubtypeIndicationFromNode(node: Iir, entity: str, name: str) -> SubtypeOrSymbol:
+def GetSubtypeIndicationFromNode(node: Iir, entity: str, name: str) -> Symbol:
     subtypeIndicationNode = nodes.Get_Subtype_Indication(node)
     return GetSubtypeIndicationFromIndicationNode(subtypeIndicationNode, entity, name)
 
 
 @export
-def GetSubtypeIndicationFromIndicationNode(subtypeIndicationNode: Iir, entity: str, name: str) -> SubtypeOrSymbol:
+def GetSubtypeIndicationFromIndicationNode(subtypeIndicationNode: Iir, entity: str, name: str) -> Symbol:
     if subtypeIndicationNode is nodes.Null_Iir:
         raise ValueError("Parameter 'subtypeIndicationNode' is 'Null_Iir'.")
 
@@ -330,7 +321,7 @@ def GetSubtypeIndicationFromIndicationNode(subtypeIndicationNode: Iir, entity: s
 
 @export
 def GetSimpleTypeFromNode(subtypeIndicationNode: Iir) -> SimpleSubtypeSymbol:
-    subtypeName = GetNameFromNode(subtypeIndicationNode)
+    subtypeName = GetName(subtypeIndicationNode)
     return SimpleSubtypeSymbol(subtypeIndicationNode, subtypeName)
 
 
@@ -342,7 +333,13 @@ def GetScalarConstrainedSubtypeFromNode(
     typeMarkName = GetNameOfNode(typeMark)
     simpleTypeMark = SimpleName(typeMark, typeMarkName)
     rangeConstraint = nodes.Get_Range_Constraint(subtypeIndicationNode)
-    r = GetRangeFromNode(rangeConstraint)
+
+    r = None
+    # Check if RangeExpression. Might also be an AttributeName (see §3.1)
+    if GetIirKindOfNode(rangeConstraint) == nodes.Iir_Kind.Range_Expression:
+        r = GetRangeFromNode(rangeConstraint)
+    # todo: Get actual range from AttributeName node?
+
     return ConstrainedScalarSubtypeSymbol(subtypeIndicationNode, simpleTypeMark, r)
 
 
@@ -359,7 +356,7 @@ def GetCompositeConstrainedSubtypeFromNode(
 
 
 @export
-def GetSubtypeFromNode(subtypeNode: Iir) -> SubtypeOrSymbol:
+def GetSubtypeFromNode(subtypeNode: Iir) -> Symbol:
     subtypeName = GetNameOfNode(subtypeNode)
 
     return Subtype(subtypeNode, subtypeName)
@@ -511,7 +508,6 @@ def GetGenericsFromChainedNodes(
 def GetPortsFromChainedNodes(
     nodeChain: Iir,
 ) -> Generator[PortInterfaceItem, None, None]:
-
     furtherIdentifiers = []
     port = nodeChain
     while port != nodes.Null_Iir:
@@ -553,7 +549,6 @@ def GetPortsFromChainedNodes(
 def GetParameterFromChainedNodes(
     nodeChain: Iir,
 ) -> Generator[ParameterInterfaceItem, None, None]:
-
     identifiers = []
     parameter = nodeChain
     while parameter != nodes.Null_Iir:
@@ -613,7 +608,7 @@ def GetMapAspect(mapAspect: Iir, cls: Type, entity: str) -> Generator[Associatio
             if formalNode is nodes.Null_Iir:
                 formal = None
             else:
-                formal = GetNameFromNode(formalNode)
+                formal = GetName(formalNode)
 
             actual = GetExpressionFromNode(nodes.Get_Actual(generic))
 
@@ -623,7 +618,7 @@ def GetMapAspect(mapAspect: Iir, cls: Type, entity: str) -> Generator[Associatio
             if formalNode is nodes.Null_Iir:
                 formal = None
             else:
-                formal = GetNameFromNode(formalNode)
+                formal = GetName(formalNode)
 
             yield cls(generic, OpenName(generic), formal)
         else:
@@ -891,6 +886,8 @@ def GetSequentialStatementsFromChainedNodes(
             yield SequentialAssertStatement.parse(statement, label)
         elif kind == nodes.Iir_Kind.Null_Statement:
             yield NullStatement(statement, label)
+        elif kind == nodes.Iir_Kind.Exit_Statement:
+            yield ExitStatement(statement, label)
         else:
             raise DOMException(f"Unknown statement of kind '{kind.name}' in {entity} '{name}' at {position}.")
 

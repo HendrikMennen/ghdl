@@ -605,17 +605,31 @@ package body Vhdl.Sem_Inst is
                      --  case set the forward link.
                      --  Or it can be the body of an instantiated package; in
                      --  that case there is no forward link.
-                     if Get_Kind (Pkg) = Iir_Kind_Package_Declaration then
-                        Set_Package_Body (Get_Package (Res), Res);
-                     end if;
+                     case Get_Kind (Pkg) is
+                        when Iir_Kind_Package_Declaration =>
+                           Set_Package_Body (Pkg, Res);
+                        when Iir_Kind_Package_Instantiation_Declaration =>
+                           Set_Instance_Package_Body (Pkg, Res);
+                        when others =>
+                           raise Internal_Error;
+                     end case;
                   end;
 
-               when Field_Instance_Package_Body =>
+               when Field_Owned_Instance_Package_Body =>
                   --  Do not instantiate the body of a package while
                   --  instantiating a shared package.
                   if not Is_Within_Shared_Instance then
-                     Instantiate_Iir_Field (Res, N, F);
+                     declare
+                        Bod : Iir;
+                     begin
+                        Bod := Instantiate_Iir (Get_Instance_Package_Body (N),
+                                                False);
+                        Set_Owned_Instance_Package_Body (Res, Bod);
+                     end;
                   end if;
+
+               when Field_Instance_Package_Body =>
+                  null;
 
                when Field_Subtype_Definition =>
                   --  TODO
@@ -664,17 +678,20 @@ package body Vhdl.Sem_Inst is
 
                when Field_Suspend_State_Chain =>
                   if Kind = Iir_Kind_Suspend_State_Declaration then
+                     --  Clear the fields for suspend state variable.
                      Set_Suspend_State_Chain (Res, Null_Node);
                      Set_Suspend_State_Last (Res, Null_Node);
                   else
+                     --  Link for suspend state statement.
                      declare
                         Decl : constant Node := Get_Suspend_State_Decl (Res);
                         Last : constant Node := Get_Suspend_State_Last (Decl);
                      begin
-                        Set_Suspend_State_Chain (Res, Last);
                         Set_Suspend_State_Last (Decl, Res);
-                        if Decl = Null_Node then
+                        if Last = Null_Node then
                            Set_Suspend_State_Chain (Decl, Res);
+                        else
+                           Set_Suspend_State_Chain (Last, Res);
                         end if;
                      end;
                   end if;
@@ -757,11 +774,12 @@ package body Vhdl.Sem_Inst is
                end if;
             when Iir_Kind_Interface_Type_Declaration =>
                declare
-                  Itype : Iir;
+                  Def : Iir;
                begin
-                  Itype := Instantiate_Iir (Get_Type (Inter), False);
-                  Set_Type (Res, Itype);
-                  Set_Interface_Type_Definition (Res, Itype);
+                  --  Also instantiate the interface type definition.
+                  Def := Instantiate_Iir (Get_Type (Inter), False);
+                  Set_Type (Res, Def);
+                  Set_Interface_Type_Definition (Res, Def);
                   Set_Is_Ref (Res, True);
                end;
             when Iir_Kinds_Interface_Subprogram_Declaration =>
@@ -1215,6 +1233,7 @@ package body Vhdl.Sem_Inst is
       Pkg : constant Iir := Get_Uninstantiated_Package_Decl (Inst);
       Prev_Instance_File : constant Source_File_Entry := Instance_File;
       Mark : constant Instance_Index_Type := Prev_Instance_Table.Last;
+      Bod : constant Iir := Get_Package_Body (Pkg);
       Res : Iir;
    begin
       Create_Relocation (Inst, Pkg);
@@ -1252,8 +1271,11 @@ package body Vhdl.Sem_Inst is
             case Get_Kind (Inter_El) is
                when Iir_Kind_Interface_Type_Declaration =>
                   Inter := Get_Association_Interface (Inst_El, Inter_El);
+                  --  Redirect the interface type definition.
                   Set_Instance (Get_Type (Get_Origin (Inter)),
                                 Get_Actual_Type (Inst_El));
+                  --  And also the interface type declaration.
+                  Set_Instance (Get_Origin (Inter), Inter);
                   --  Implicit operators.
                   declare
                      Imp_Inter : Iir;
@@ -1295,7 +1317,14 @@ package body Vhdl.Sem_Inst is
         (Get_Declaration_Chain (Pkg), Get_Declaration_Chain (Inst));
 
       --  Instantiate the body.
-      Res := Instantiate_Iir (Get_Package_Body (Pkg), False);
+
+      Res := Create_Iir (Iir_Kind_Package_Instantiation_Body);
+      Location_Copy (Res, Inst);
+      Set_Declaration_Chain
+        (Res, Instantiate_Iir_Chain (Get_Declaration_Chain (Bod)));
+      Set_Attribute_Value_Chain
+        (Res, Instantiate_Iir_Chain (Get_Attribute_Value_Chain (Bod)));
+      Set_Package (Res, Inst);
       Set_Identifier (Res, Get_Identifier (Inst));
 
       --  Restore.
@@ -1478,4 +1507,18 @@ package body Vhdl.Sem_Inst is
          return Get_Subprogram_Body_Origin (Orig);
       end if;
    end Get_Subprogram_Body_Origin;
+
+   function Get_Protected_Type_Body_Origin (Atype : Iir) return Iir
+   is
+      Res : constant Iir := Get_Protected_Type_Body (Atype);
+      Orig : Iir;
+   begin
+      if Res /= Null_Iir then
+         return Res;
+      else
+         Orig := Get_Origin (Atype);
+         pragma Assert (Orig /= Null_Iir);
+         return Get_Protected_Type_Body_Origin (Orig);
+      end if;
+   end Get_Protected_Type_Body_Origin;
 end Vhdl.Sem_Inst;

@@ -14,21 +14,23 @@
 --  You should have received a copy of the GNU General Public License
 --  along with this program.  If not, see <gnu.org/licenses>.
 with Interfaces; use Interfaces;
-with Ortho_Nodes; use Ortho_Nodes;
-with Ortho_Ident; use Ortho_Ident;
+
 with Flags; use Flags;
 with Types; use Types;
 with Errorout; use Errorout;
-with Vhdl.Errors; use Vhdl.Errors;
 with Name_Table; -- use Name_Table;
-with Str_Table;
 with Files_Map;
+with Libraries;
+with Simple_IO;
+
 with Vhdl.Utils; use Vhdl.Utils;
 with Vhdl.Std_Package; use Vhdl.Std_Package;
-with Vhdl.Sem_Specs;
-with Libraries;
-with Std_Names;
+with Vhdl.Errors; use Vhdl.Errors;
 with Vhdl.Canon;
+
+with Ortho_Nodes; use Ortho_Nodes;
+with Ortho_Ident; use Ortho_Ident;
+
 with Trans;
 with Trans_Decls; use Trans_Decls;
 with Trans.Chap1;
@@ -53,140 +55,14 @@ package body Translation is
 
    function Get_Resolv_Ortho_Decl (Func : Iir) return O_Dnode
    is
-      Info : Subprg_Resolv_Info_Acc;
+      Info : constant Subprg_Info_Acc := Get_Info (Func);
    begin
-      Info := Get_Info (Func).Subprg_Resolv;
-      if Info = null then
+      if Info = null or else Info.Subprg_Resolv = null then
          --  Maybe the resolver is not used.
          return O_Dnode_Null;
-      else
-         return Info.Resolv_Func;
       end if;
+      return Info.Subprg_Resolv.Resolv_Func;
    end Get_Resolv_Ortho_Decl;
-
-   function Get_String_As_String (Expr : Iir) return String is
-   begin
-      case Get_Kind (Expr) is
-         when Iir_Kind_String_Literal8 =>
-            declare
-               Len : constant Natural := Natural (Get_String_Length (Expr));
-               Id : constant String8_Id := Get_String8_Id (Expr);
-               Res : String (1 .. Len);
-            begin
-               for I in 1 .. Len loop
-                  Res (I) := Str_Table.Char_String8 (Id, Pos32 (I));
-               end loop;
-               return Res;
-            end;
-         when Iir_Kind_Simple_Aggregate =>
-            declare
-               List : constant Iir_Flist := Get_Simple_Aggregate_List (Expr);
-               Len : constant Natural := Get_Nbr_Elements (List);
-               Res : String (1 .. Len);
-               El : Iir;
-            begin
-               for I in Flist_First .. Flist_Last (List) loop
-                  El := Get_Nth_Element (List, I);
-                  pragma Assert (Get_Kind (El) = Iir_Kind_Enumeration_Literal);
-                  Res (I - Flist_First + 1) :=
-                    Character'Val (Get_Enum_Pos (El));
-               end loop;
-               return Res;
-            end;
-         when others =>
-            if Get_Expr_Staticness (Expr) /= Locally then
-               Error_Msg_Sem
-                 (+Expr, "value of FOREIGN attribute must be locally static");
-               return "";
-            else
-               raise Internal_Error;
-            end if;
-      end case;
-   end Get_String_As_String;
-
-   function Translate_Foreign_Id (Decl : Iir) return Foreign_Info_Type
-   is
-      --  Look for 'FOREIGN.
-      Attr : constant Iir_Attribute_Value :=
-        Vhdl.Sem_Specs.Find_Attribute_Value (Decl, Std_Names.Name_Foreign);
-      pragma Assert (Attr /= Null_Iir);
-      Spec : constant Iir_Attribute_Specification :=
-        Get_Attribute_Specification (Attr);
-      Name : constant String := Get_String_As_String (Get_Expression (Spec));
-      Length : constant Natural := Name'Length;
-   begin
-      if Length = 0 then
-         return Foreign_Bad;
-      end if;
-
-      pragma Assert (Name'First = 1);
-
-      --  Only 'VHPIDIRECT' is recognized.
-      if Length >= 10 and then Name (1 .. 10) = "VHPIDIRECT" then
-         declare
-            Info : Foreign_Info_Type (Foreign_Vhpidirect);
-            P : Natural;
-            Sf, Sl : Natural;
-            Lf, Ll : Natural;
-         begin
-            P := 11;
-
-            --  Skip spaces.
-            while P <= Length and then Name (P) = ' ' loop
-               P := P + 1;
-            end loop;
-            if P > Length then
-               Error_Msg_Sem
-                 (+Spec, "missing subprogram/library name after VHPIDIRECT");
-               Info.Lib_Len := 0;
-               Info.Subprg_Len := 0;
-               return Info;
-            end if;
-            --  Extract library.
-            Lf := P;
-            while P <= Length and then Name (P) /= ' ' loop
-               P := P + 1;
-            end loop;
-            Ll := P - 1;
-            --  Extract subprogram.
-            while P <= Length and then Name (P) = ' ' loop
-               P := P + 1;
-            end loop;
-            Sf := P;
-            while P <= Length and then Name (P) /= ' ' loop
-               P := P + 1;
-            end loop;
-            Sl := P - 1;
-            if P <= Length then
-               Error_Msg_Sem (+Spec, "garbage at end of VHPIDIRECT");
-            end if;
-
-            --  Accept empty library.
-            if Sf > Length then
-               Sf := Lf;
-               Sl := Ll;
-               Lf := 1;
-               Ll := 0;
-            end if;
-
-            Info.Lib_Len := Ll - Lf + 1;
-            Info.Lib_Name (1 .. Info.Lib_Len) := Name (Lf .. Ll);
-
-            Info.Subprg_Len := Sl - Sf + 1;
-            Info.Subprg_Name (1 .. Info.Subprg_Len) := Name (Sf .. Sl);
-            return Info;
-         end;
-      elsif Length = 14
-        and then Name (1 .. 14) = "GHDL intrinsic"
-      then
-         return Foreign_Info_Type'(Kind => Foreign_Intrinsic);
-      else
-         Error_Msg_Sem
-           (+Spec,
-            "value of 'FOREIGN attribute does not begin with VHPIDIRECT");
-         return Foreign_Bad;
-      end if;
-   end Translate_Foreign_Id;
 
    procedure Gen_Filename (Design_File : Iir)
    is
@@ -291,21 +167,15 @@ package body Translation is
          when Iir_Kind_Package_Declaration =>
             New_Debug_Comment_Decl
               ("package declaration " & Image_Identifier (Lib_Unit));
-            Chap2.Translate_Package_Declaration (Lib_Unit);
-            if Get_Package_Origin (Lib_Unit) /= Null_Iir
-              and then Get_Package_Body (Lib_Unit) /= Null_Iir
-            then
-               --  Corresponding body for package instantiation.
-               Chap2.Translate_Package_Body (Get_Package_Body (Lib_Unit));
-            end if;
+            Chap2.Translate_Package_Declaration_Unit (Lib_Unit);
          when Iir_Kind_Package_Body =>
             New_Debug_Comment_Decl
               ("package body " & Image_Identifier (Lib_Unit));
-            Chap2.Translate_Package_Body (Lib_Unit);
+            Chap2.Translate_Package_Body_Unit (Lib_Unit);
          when Iir_Kind_Package_Instantiation_Declaration =>
             New_Debug_Comment_Decl
               ("package instantiation " & Image_Identifier (Lib_Unit));
-            Chap2.Translate_Package_Instantiation_Declaration (Lib_Unit);
+            Chap2.Translate_Package_Instantiation_Declaration_Unit (Lib_Unit);
          when Iir_Kind_Entity_Declaration =>
             New_Debug_Comment_Decl ("entity " & Image_Identifier (Lib_Unit));
             Chap1.Translate_Entity_Declaration (Lib_Unit);
@@ -757,6 +627,14 @@ package body Translation is
       if Flag_Rti then
          Rtis.Rti_Initialize;
       end if;
+
+      --  procedure __ghdl_signal_set_mode (mode : ghdl_i32);
+      Start_Procedure_Decl
+        (Interfaces, Get_Identifier ("__ghdl_signal_set_mode"),
+         O_Storage_External);
+      New_Interface_Decl (Interfaces, Param, Get_Identifier ("ctxt"),
+                          Ghdl_I32_Type);
+      Finish_Subprogram_Decl (Interfaces, Ghdl_Signal_Set_Mode);
 
       --  procedure __ghdl_signal_name_rti
       --       (obj : ghdl_rti_access;
@@ -2221,6 +2099,40 @@ package body Translation is
       Current_Filename_Node := O_Dnode_Null;
       --Pop_Global_Factory;
    end Translate_Standard;
+
+   function Parse_Option (Opt : String) return Boolean is
+   begin
+      if Opt = "--dump-drivers" then
+         Translation.Flag_Dump_Drivers := True;
+      elsif Opt = "--no-direct-drivers" then
+         Translation.Flag_Direct_Drivers := False;
+      elsif Opt = "--no-range-checks" then
+         Translation.Flag_Range_Checks := False;
+      elsif Opt = "--no-index-checks" then
+         Translation.Flag_Index_Checks := False;
+      elsif Opt = "--no-identifiers" then
+         Translation.Flag_Discard_Identifiers := True;
+      elsif Opt = "--no-elaboration" then
+         Translation.Flag_Elaboration := False;
+      else
+         return False;
+      end if;
+      return True;
+   end Parse_Option;
+
+   procedure Disp_Option
+   is
+      procedure P (Str : String) renames Simple_IO.Put_Line;
+   begin
+      P ("  --dump-drivers     dump processes drivers");
+   end Disp_Option;
+
+   procedure Register_Translation_Back_End is
+   begin
+      Vhdl.Back_End.Sem_Foreign := Vhdl.Back_End.Sem_Foreign_Wrapper'Access;
+      Vhdl.Back_End.Parse_Option := Parse_Option'Access;
+      Vhdl.Back_End.Disp_Option := Disp_Option'Access;
+   end Register_Translation_Back_End;
 
    procedure Finalize is
    begin

@@ -74,8 +74,8 @@ package body Trans.Chap8 is
    function Get_State_Var (Info : Ortho_Info_Acc) return O_Lnode is
    begin
       case Info.Kind is
-         when Kind_Process =>
-            return Get_Var (Info.Process_State);
+         when Kind_Object =>
+            return Get_Var (Info.Object_Var);
          when Kind_Subprg =>
             return New_Selected_Acc_Value
               (New_Obj (Info.Res_Interface), Info.Subprg_State_Field);
@@ -109,7 +109,6 @@ package body Trans.Chap8 is
    procedure State_Leave (Parent : Iir) is
    begin
       pragma Assert (State_Enabled);
-      pragma Assert (Get_Info (Parent) = State_Info);
 
       if State_Debug then
          Start_Choice (State_Case);
@@ -1179,7 +1178,7 @@ package body Trans.Chap8 is
             --  TODO: Because the aggregate is composed only of locally static
             --  variable names, it is possible to compute the bounds and check
             --  matching constraints.
-            Chap3.Translate_Anonymous_Subtype_Definition (Targ_Type, False);
+            Chap3.Translate_Anonymous_Subtype_Definition (Targ_Type, True);
             E := Chap7.Translate_Expression (Expr, Targ_Type);
 
             if Assignment_Overlap (Target, Expr) then
@@ -2473,31 +2472,56 @@ package body Trans.Chap8 is
                Kind : Iir_Kind;
             begin
                if Is_Fully_Constrained_Type (Ftype) then
+                  --  No bounds as the parameter is not a fat pointer.
                   return False;
                end if;
-               if Act_Type /= Null_Iir
-                 and then Get_Type_Staticness (Act_Type) = Locally
+               if Act_Type /= Null_Iir then
+                  if not Chap7.Is_A_Derived_Type (Act_Type, Ftype) then
+                     --  But if an implicit subtype conversion is needed,
+                     --  the bounds need to be saved.
+                     return True;
+                  end if;
+                  if Get_Type_Staticness (Act_Type) = Locally then
+                     --  Actual bounds are statically built.
+                     return False;
+                  end if;
+               end if;
+
+               if Actual = Null_Iir then
+                  --  No actual, and default value is not locally static.
+                  return True;
+               end if;
+
+               if Get_Expr_Staticness (Actual) = Locally
+                 and then Kind_In (Actual,
+                                   Iir_Kind_Simple_Aggregate,
+                                   Iir_Kind_Aggregate)
                then
+                  --  Actual is static (so are its bounds).
                   return False;
                end if;
-               if Actual /= Null_Iir then
-                  if Get_Expr_Staticness (Actual) = Locally then
-                     return False;
-                  end if;
-                  Kind := Get_Kind (Actual);
-                  if (Kind = Iir_Kind_Function_Call
-                        or else Kind in Iir_Kinds_Dyadic_Operator
-                        or else Kind in Iir_Kinds_Monadic_Operator)
-                    and then Is_Fully_Constrained_Type (Get_Type (Actual))
-                  then
-                     return False;
-                  end if;
-                  if Is_Object_Name (Actual)
-                    and then Kind /= Iir_Kind_Slice_Name
-                  then
-                     return False;
-                  end if;
+
+               Kind := Get_Kind (Actual);
+               if (Kind = Iir_Kind_Function_Call
+                     or else Kind in Iir_Kinds_Dyadic_Operator
+                     or else Kind in Iir_Kinds_Monadic_Operator)
+                 and then Is_Fully_Constrained_Type (Get_Type (Actual))
+               then
+                  --  Actual is the result of an unconstrained function call.
+                  --  The result bounds are already allocated on stack2.
+                  return False;
                end if;
+
+               if Is_Object_Name (Actual) then
+                  --  The life of an object name is longer than the life
+                  --  of a call.
+                  if Kind = Iir_Kind_Slice_Name then
+                     --  Unless the name is a slice!
+                     return True;
+                  end if;
+                  return False;
+               end if;
+
                return True;
             end Need_Bounds_Field;
 
@@ -2850,7 +2874,9 @@ package body Trans.Chap8 is
 
       --  References to the formals (for copy-out), and variables for whole
       --  actual of individual associations.
+      --  ALT_PARAMS is for values of signal parameters.
       Params : Mnode_Array (0 .. Nbr_Assoc - 1);
+      Alt_Params : Mnode_Array (0 .. Nbr_Assoc - 1);
 
       --  The values of actuals.
       E_Params : O_Enode_Array (0 .. Nbr_Assoc - 1);
@@ -2885,30 +2911,44 @@ package body Trans.Chap8 is
          Act : constant Iir := Get_Actual (Assoc);
          Assoc_Info : Call_Assoc_Info_Acc;
          Param : Mnode;
+         E : O_Enode;
       begin
          Param := Translate_Individual_Association_Formal
            (Formal, Formal_Info, Params (Last_Individual),
             Formal_Object_Kind);
-         if Formal_Object_Kind = Mode_Value then
-            Chap7.Translate_Assign (Param, M2E (Val), Act, Formal_Type, Assoc);
-         else
-            Chap3.Translate_Object_Copy (Param, Sig, Formal_Type);
-            if Is_Suspendable then
-               --  Keep reference to the value to update the whole object
-               --  at each call.
-               Assoc_Info := Get_Info (Assoc);
-               New_Assign_Stmt
-                 (Get_Var (Assoc_Info.Call_Assoc_Value (Mode_Value)),
-                  M2E (Val));
-            else
-               --  Assign the value to the whole object, as there is
-               --  only one call.
-               Param := Translate_Individual_Association_Formal
-                 (Formal, Formal_Info, Params (Last_Individual),
-                  Mode_Value);
-               Chap3.Translate_Object_Copy (Param, Val, Formal_Type);
-            end if;
-         end if;
+         case Formal_Object_Kind is
+            when Mode_Value =>
+               Chap7.Translate_Assign
+                 (Param, M2E (Val), Act, Formal_Type, Assoc);
+            when Mode_Signal =>
+               Chap3.Translate_Object_Copy (Param, Sig, Formal_Type);
+               if Is_Suspendable then
+                  --  Keep reference to the value to update the whole object
+                  --  at each call.
+                  Assoc_Info := Get_Info (Assoc);
+                  New_Assign_Stmt
+                    (Get_Var (Assoc_Info.Call_Assoc_Value (Mode_Value)),
+                     M2E (Val));
+               else
+                  --  Assign the value to the whole object, as there is
+                  --  only one call.
+                  Param := Translate_Individual_Association_Formal
+                    (Formal, Formal_Info, Alt_Params (Last_Individual),
+                     Mode_Value);
+                  E := M2E (Val);
+                  --  Signal values are always passed by pointers (ie even
+                  --  scalars). But for assignment, the ortho node must be
+                  --  a value for scalar types.
+                  --  TODO: Do not get the address of a scalar in case of
+                  --   individual assoc.
+                  if Get_Type_Info (Val).Type_Mode in Type_Mode_Pass_By_Copy
+                  then
+                     E := New_Value (New_Access_Element (E));
+                  end if;
+                  Chap7.Translate_Assign
+                    (Param, E, Act, Formal_Type, Assoc);
+               end if;
+         end case;
       end Trans_Individual_Assign;
 
       --  Evaluate the actual of ASSOC/INTER (whose index is POS), do the
@@ -3038,8 +3078,11 @@ package body Trans.Chap8 is
                      Chap4.Allocate_Complex_Object (Formal_Type, Alloc, Param);
                   end if;
 
-                  --  In case of signals, don't keep value, only keep
-                  --  signal (so override the value).
+                  if Mode = Mode_Signal then
+                     Alt_Params (Pos) := Params (Pos);
+                  else
+                     Alt_Params (Pos) := Mnode_Null;
+                  end if;
                   Params (Pos) := Param;
 
                   if Formal_Info.Interface_Field (Mode) /= O_Fnode_Null then
@@ -3558,6 +3601,9 @@ package body Trans.Chap8 is
                if Get_Kind (El) = Iir_Kind_Association_Element_By_Individual
                then
                   --  Pass the whole data for an individual association.
+                  if Alt_Params (Pos) /= Mnode_Null then
+                     New_Association (Constr, M2E (Alt_Params (Pos)));
+                  end if;
                   New_Association (Constr, M2E (Params (Pos)));
                elsif Base_Formal = Formal then
                   --  Whole association.
@@ -3748,13 +3794,15 @@ package body Trans.Chap8 is
       Sensitivity : Iir_List;
       Constr      : O_Assoc_List;
       Resume_State : State_Type;
+      Free_List_P : Boolean;
    begin
       Sensitivity := Get_Sensitivity_List (Stmt);
+      Free_List_P := False;
       if Sensitivity = Null_Iir_List and Cond /= Null_Iir then
          --  Extract sensitivity from condition.
          Sensitivity := Create_Iir_List;
          Vhdl.Canon.Canon_Extract_Sensitivity_Expression (Cond, Sensitivity);
-         Set_Sensitivity_List (Stmt, Sensitivity);
+         Free_List_P := True;
       end if;
 
       --  The wait statement must be within a suspendable process/subprogram.
@@ -3810,6 +3858,9 @@ package body Trans.Chap8 is
          Register_Signal_List
            (Sensitivity, Ghdl_Process_Wait_Add_Sensitivity);
          Chap9.Destroy_Types_In_List (Sensitivity);
+         if Free_List_P then
+            Destroy_Iir_List (Sensitivity);
+         end if;
       end if;
 
       --  suspend ();
@@ -4082,7 +4133,7 @@ package body Trans.Chap8 is
       end if;
       Res := Signal_Assign_Data'
         (Expr => Chap3.Index_Base (Chap3.Get_Composite_Base (Val.Expr),
-         Targ_Type, New_Obj_Value (Index)),
+                                   Targ_Type, New_Obj_Value (Index)),
          Reject => Val.Reject,
          After => Val.After);
       return Res;
@@ -4567,19 +4618,29 @@ package body Trans.Chap8 is
 
       Target_Tinfo : Type_Info_Acc;
       Bounds : Mnode;
+      Layout : Mnode;
+      Constrained : Boolean;
    begin
       if Get_Kind (Target) = Iir_Kind_Aggregate then
          --  The target is an aggregate.
-         Chap3.Translate_Anonymous_Subtype_Definition (Target_Type, False);
+         Constrained := Get_Constraint_State (Target_Type) = Fully_Constrained;
+         Chap3.Translate_Anonymous_Subtype_Definition
+           (Target_Type, Constrained);
          Target_Tinfo := Get_Info (Target_Type);
          Targ := Create_Temp (Target_Tinfo, Mode_Signal);
          if Target_Tinfo.Type_Mode in Type_Mode_Unbounded then
+            pragma Assert (not Constrained);
             --  Unbounded array, allocate bounds.
-            Bounds := Dv2M (Create_Temp (Target_Tinfo.B.Bounds_Type),
+            pragma Assert (Target_Tinfo.S.Composite_Layout = Null_Var);
+            Target_Tinfo.S.Composite_Layout :=
+              Create_Var (Create_Uniq_Identifier, Target_Tinfo.B.Layout_Type,
+                          O_Storage_Local);
+            Layout := Lv2M (Get_Var (Target_Tinfo.S.Composite_Layout),
                             Target_Tinfo,
                             Mode_Value,
-                            Target_Tinfo.B.Bounds_Type,
-                            Target_Tinfo.B.Bounds_Ptr_Type);
+                            Target_Tinfo.B.Layout_Type,
+                            Target_Tinfo.B.Layout_Ptr_Type);
+            Bounds := Stabilize (Chap3.Layout_To_Bounds (Layout));
             New_Assign_Stmt (M2Lp (Chap3.Get_Composite_Bounds (Targ)),
                              M2Addr (Bounds));
             --  Build bounds from aggregate.
@@ -4589,6 +4650,7 @@ package body Trans.Chap8 is
             Translate_Signal_Target_Aggr
               (Chap3.Get_Composite_Base (Targ), Target, Target_Type);
          else
+            pragma Assert (Constrained);
             Chap4.Allocate_Complex_Object (Target_Type, Alloc_Stack, Targ);
             Translate_Signal_Target_Aggr (Targ, Target, Target_Type);
          end if;
@@ -4983,11 +5045,31 @@ package body Trans.Chap8 is
       Gen_Signal_Force (Targ, Target_Type, M2E (Value));
    end Translate_Signal_Force_Assignment_Statement;
 
+   --  Free the statement createed by Canon for a conditional assignment.
+   procedure Free_Canon_Conditional_Statement (Stmt : Iir)
+   is
+      S : Iir;
+      Els : Iir;
+      Asgn : Iir;
+   begin
+      S := Stmt;
+      while S /= Null_Iir loop
+         Asgn := Get_Sequential_Statement_Chain (S);
+         Free_Iir (Asgn);
+         Els := Get_Else_Clause (S);
+         Free_Iir (S);
+         S := Els;
+      end loop;
+   end Free_Canon_Conditional_Statement;
+
    procedure Translate_Statement (Stmt : Iir) is
    begin
       New_Debug_Line_Stmt (Get_Line_Number (Stmt));
       Open_Temp;
       case Get_Kind (Stmt) is
+         when Iir_Kind_Suspend_State_Statement =>
+            null;
+
          when Iir_Kind_Return_Statement =>
             Translate_Return_Statement (Stmt);
 
@@ -5016,23 +5098,24 @@ package body Trans.Chap8 is
             Translate_Variable_Assignment_Statement (Stmt);
          when Iir_Kind_Conditional_Variable_Assignment_Statement =>
             declare
+               use Vhdl.Canon;
                C_Stmt : Iir;
             begin
                C_Stmt :=
-                 Vhdl.Canon.Canon_Conditional_Variable_Assignment_Statement
-                 (Stmt);
+                 Canon_Conditional_Variable_Assignment_Statement (Stmt);
                Trans.Update_Node_Infos;
                Translate_If_Statement (C_Stmt);
+               Free_Canon_Conditional_Statement (C_Stmt);
             end;
          when Iir_Kind_Conditional_Signal_Assignment_Statement =>
             declare
+               use Vhdl.Canon;
                C_Stmt : Iir;
             begin
-               C_Stmt :=
-                 Vhdl.Canon.Canon_Conditional_Signal_Assignment_Statement
-                 (Stmt);
+               C_Stmt := Canon_Conditional_Signal_Assignment_Statement (Stmt);
                Trans.Update_Node_Infos;
                Translate_If_Statement (C_Stmt);
+               Free_Canon_Conditional_Statement (C_Stmt);
             end;
          when Iir_Kind_Signal_Release_Assignment_Statement =>
             Translate_Signal_Release_Assignment_Statement (Stmt);

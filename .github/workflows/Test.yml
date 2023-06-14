@@ -9,16 +9,18 @@ env:
 
 jobs:
 
-#
-# Doc
-#
+# Convention for the names:
+# lin, osx, win, msys2: build package for the platform
+# *-test: test on the platform
 
+#
+# Generate and upload doc
+#
   gnatdoc:
     name: '📚 gnatdoc'
     runs-on: ubuntu-latest
 
     steps:
-
       - name: '🧰 Checkout'
         uses: actions/checkout@v3
 
@@ -36,6 +38,9 @@ jobs:
           name: gnatdoc
           path: gnatdoc
 
+#
+# Upload Build The Doc
+#
   doc:
     needs: gnatdoc
     name: '📓 Docs'
@@ -64,7 +69,9 @@ jobs:
         uses: buildthedocs/btd@v0
         with:
           token: ${{ github.token }}
-          skip-deploy: ${{ github.event_name == 'pull_request' }}
+#          skip-deploy: ${{ github.event_name == 'pull_request' }}
+# git push currently fails
+          skip-deploy: true
 
       #- run: nroff -man doc/_build/man/ghdl.1
 
@@ -78,15 +85,13 @@ jobs:
             doc/_build/man
 
 #
-# pyGHDL Bindings, Formatting and Wheel
+# pyGHDL Bindings, Formatting and pure wheel
 #
-
   pyGHDL:
     name: '🐍 pyGHDL'
     runs-on: ubuntu-latest
 
     steps:
-
       - name: '🧰 Checkout'
         uses: actions/checkout@v3
 
@@ -131,6 +136,7 @@ jobs:
 #
 
   gpl:
+    if: false
     name: '🚧🚦🐧 GPL mcode'
     runs-on: ubuntu-latest
 
@@ -142,9 +148,8 @@ jobs:
       - run: TASK=bullseye+mcode ./scripts/ci-run.sh -c --gplcompat
 
 #
-# GNU/Linux
+# Build for GNU/Linux
 #
-
   lin:
     name: '🚧🚦🐧 Ubuntu ${{ matrix.os }} ${{ matrix.backend }}'
     runs-on: ubuntu-${{ matrix.os }}.04
@@ -159,10 +164,9 @@ jobs:
           - { os: 20, backend: llvm-10 }
           - { os: 22, backend: llvm-14 }
           - { os: 20, backend: gcc-9.3.0 }
-          - { os: 22, backend: gcc-11.2.0 }
+          - { os: 22, backend: gcc-12.1.0 }
 
     steps:
-
       - name: '🧰 Checkout'
         uses: actions/checkout@v3
 
@@ -179,9 +183,8 @@ jobs:
           if-no-files-found: error
 
 #
-# MacOS
+# Build for MacOS
 #
-
   osx:
     name: '🚧🚦🍎 macOS ${{ matrix.os }} ${{ matrix.backend }}'
     runs-on: 'macOS-${{ matrix.os }}'
@@ -197,7 +200,6 @@ jobs:
           - llvm
 
     steps:
-
       - name: '🧰 Checkout'
         uses: actions/checkout@v3
 
@@ -214,7 +216,9 @@ jobs:
 
       - name: '🚧 Build and 🚦 Test GHDL'
         run: |
-          PATH=$PWD/gnat/bin:$PATH:/usr/local/Cellar/llvm@14/14.0.6/bin/
+          ls -l /usr/local/Cellar/llvm*
+          echo $(brew --prefix llvm@15)
+          PATH=$PWD/gnat/bin:$PATH:$(brew --prefix llvm@15)/bin/
           ./scripts/ci-run.sh -c
           mv ghdl-*.tgz ghdl-macos-${{ matrix.os }}-${{ matrix.backend }}.tgz
         env:
@@ -229,375 +233,21 @@ jobs:
           path: ghdl-macos-${{ matrix.os }}-${{ matrix.backend }}.tgz
           if-no-files-found: error
 
-#
-# Windows MSYS2 Build
-#
 
-  win-msys2-build-package:
-    name: '🚧${{ matrix.icon }} ${{ matrix.sys }} ${{ matrix.pkg }}'
-    runs-on: windows-latest
+  Windows-MSYS2:
+    uses: ./.github/workflows/Windows-MSYS2.yml
 
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-#          - {icon: '🟪', pkg: 'llvm',  sys: 'MINGW32' } ! not yet functional
-          - {icon: '🟦', pkg: 'llvm',  sys: 'MINGW64' }
-          - {icon: '🟨', pkg: 'llvm',  sys: 'UCRT64'  } #! experimental
-          - {icon: '🟪', pkg: 'mcode', sys: 'MINGW32' }
-          - {icon: '🟦', pkg: 'mcode', sys: 'MINGW64' } #! simulation with mcode is not yet supported on win64
-          - {icon: '🟨', pkg: 'mcode', sys: 'UCRT64'  } #! experimental; simulation with mcode is not yet supported on win64
+  Windows-Standalone:
+    uses: ./.github/workflows/Windows-Standalone.yml
 
-    env:
-      MINGW_ARCH: ${{ matrix.sys }}
-    defaults:
-      run:
-        shell: msys2 {0}
+  Windows-pyGHDL:
+    needs: Windows-Standalone
+    uses: ./.github/workflows/Windows-pyGHDL.yml
 
-    steps:
-
-      - name: '${{ matrix.icon }} Setup MSYS2'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: ${{ matrix.sys }}
-          update: true
-          install: base-devel git
-          pacboy: toolchain:p
-
-      - name: '⚙ git config'
-        run: git config --global core.autocrlf input
-        shell: bash
-
-      - name: '🧰 Checkout'
-        uses: actions/checkout@v3
-        with:
-          # The command 'git describe' (used for version) needs the history.
-          fetch-depth: 0
-
-      - name: '🚧 Build package'
-        run: |
-          cd scripts/msys2-${{ matrix.pkg }}
-          makepkg-mingw --noconfirm --noprogressbar -sCLf
-          for item in src pkg; do
-            tar czf msys2-${{ matrix.pkg }}."$item".tar.gz "$item"
-          done
-
-      - name: '📤 Upload artifact: builddir'
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ matrix.sys }}-${{ matrix.pkg }}-builddir
-          path: |
-            scripts/msys2-${{ matrix.pkg }}/msys2-${{ matrix.pkg }}.src.tar.gz
-            scripts/msys2-${{ matrix.pkg }}/msys2-${{ matrix.pkg }}.pkg.tar.gz
-
-      - name: '📤 Upload artifact: package'
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ matrix.sys }}-${{ matrix.pkg }}
-          path: scripts/msys2-${{ matrix.pkg }}/mingw-*ghdl*.pkg.tar.zst
-          if-no-files-found: error
-
-#
-# Windows MSYS2 Test
-#
-
-  win-msys2-test:
-    name: '🚦${{ matrix.sys.icon }} ${{ matrix.sys.sys }} ${{ matrix.sys.pkg }} ${{ matrix.suite }}'
-    runs-on: windows-latest
-
-    needs:
-      - win-msys2-build-package
-
-    strategy:
-      fail-fast: false
-      matrix:
-        sys:
-#          - {icon: '🟪', pkg: 'llvm',  sys: 'MINGW32' } ! not yet functional
-          - {icon: '🟦', pkg: 'llvm',  sys: 'MINGW64' }
-          - {icon: '🟨', pkg: 'llvm',  sys: 'UCRT64'  } #! experimental
-          - {icon: '🟪', pkg: 'mcode', sys: 'MINGW32' }
-#          - {icon: '🟦', pkg: 'mcode', sys: 'MINGW64' } ! simulation with mcode is not yet supported on win64
-#          - {icon: '🟨', pkg: 'mcode', sys: 'UCRT64'  } ! experimental; simulation with mcode is not yet supported on win64
-
-        suite:
-          - 'sanity pyunit vpi vhpi'
-          - 'gna'
-          - 'vests'
-          - 'synth'
-
-    defaults:
-      run:
-        shell: msys2 {0}
-
-    steps:
-
-      - name: '${{ matrix.sys.icon }} Setup MSYS2'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: ${{ matrix.sys.sys }}
-          update: true
-          pacboy: >
-            diffutils:p
-            gcc:p
-            python-pip:p
-            python-setuptools:p
-
-      - name: '⚙ git config'
-        run: git config --global core.autocrlf input
-        shell: bash
-
-      - name: '🧰 Checkout'
-        uses: actions/checkout@v3
-
-      - name: '📥 Download artifact: package'
-        uses: actions/download-artifact@v3
-        with:
-          path: artifact
-          name: ${{ matrix.sys.sys }}-${{ matrix.sys.pkg }}
-
-      - name: '🛠 Install package and 🐍 Python dependencies'
-        run: |
-          pacman --noconfirm -U artifact/mingw-w64-*-ghdl-${{ matrix.sys.pkg }}-*.zst
-          pip3 install -r testsuite/requirements.txt
-
-      - name: '🚦 Test package'
-        run: GHDL=ghdl ./testsuite/testsuite.sh ${{ matrix.suite }}
-
-#
-# Windows Generate Standalone ZipFile
-#
-
-  win-generate-standalone-zip:
-    name: '🚧🥡${{ matrix.icon }} ${{ matrix.sys }} mcode'
-    runs-on: windows-latest
-
-    needs:
-      - win-msys2-build-package
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - {icon: '🟪', sys: 'MINGW32' }
-          - {icon: '🟦', sys: 'MINGW64' } #! simulation with mcode is not yet supported on win64
-          - {icon: '🟨', sys: 'UCRT64'  } #! experimental; simulation with mcode is not yet supported on win64
-
-    defaults:
-      run:
-        shell: msys2 {0}
-
-    steps:
-
-      - name: '${{ matrix.icon }} Setup MSYS2'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: ${{ matrix.sys }}
-          update: true
-          install: >-
-            tree
-            zstd
-            zip
-            tar
-
-      - name: '⚙ git config'
-        run: git config --global core.autocrlf input
-        shell: bash
-
-      - name: '🧰 Checkout'
-        uses: actions/checkout@v3
-
-      - name: '📥 Download artifact: package'
-        uses: actions/download-artifact@v3
-        with:
-          path: artifact
-          name: ${{ matrix.sys }}-mcode
-
-      - name: '🛠 Install package'
-        run: pacman --noconfirm -U artifact/mingw-w64-*-ghdl-mcode-*.zst
-
-      - name: '🥡 Generate standalone zipfile'
-        run: |
-          _zipdir='${{ matrix.sys }}-mcode-standalone'
-          mkdir -p "${_zipdir}"-extract
-          tar xf artifact/mingw-w64-*-ghdl-mcode-*.zst -C "${_zipdir}"-extract
-          cd "${_zipdir}-extract/${{ matrix.sys }}"/bin
-          ../../../scripts/msys2-mcode/GetStandaloneDeps.sh
-          cd ../../..
-          mv "${_zipdir}"-extract/${{ matrix.sys }} "${_zipdir}"
-          tree "${_zipdir}"
-          zip "${_zipdir}".zip -r "${_zipdir}"
-
-      - name: '📤 Upload artifact: zipfile'
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ matrix.sys }}-mcode-standalone
-          path: ${{ matrix.sys }}-mcode-standalone.zip
-
-#
-# Windows CPython pyGHDL Test with MSYS2 installation
-#
-
-  win-cpython-msys2:
-    name: '🚦🐍${{ matrix.icon }} ${{ matrix.sys }} ${{ matrix.pkg }}'
-    runs-on: windows-latest
-
-    needs:
-      - win-msys2-build-package
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-#          - {icon: '🟪', pkg: 'llvm',  sys: 'MINGW32', pyarch: x86 }, ! not yet functional
-          - {icon: '🟦', pkg: 'llvm',  sys: 'MINGW64', pyarch: x64 }
-          - {icon: '🟨', pkg: 'llvm',  sys: 'UCRT64',  pyarch: x64 } #! experimental
-          - {icon: '🟪', pkg: 'mcode', sys: 'MINGW32', pyarch: x86 }
-          - {icon: '🟦', pkg: 'mcode', sys: 'MINGW64', pyarch: x64 } #! simulation with mcode is not yet supported on win64
-          - {icon: '🟨', pkg: 'mcode', sys: 'UCRT64',  pyarch: x64 } #! experimental; simulation with mcode is not yet supported on win64
-
-    defaults:
-      run:
-        shell: pwsh
-
-    steps:
-
-      - name: '${{ matrix.icon }} Setup MSYS2'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: ${{ matrix.sys }}
-          update: true
-
-      - name: '⚙ git config'
-        run: git config --global core.autocrlf input
-
-      - name: '🧰 Checkout'
-        uses: actions/checkout@v3
-
-      - name: '📥 Download artifact: package'
-        uses: actions/download-artifact@v3
-        with:
-          path: artifact
-          name: ${{ matrix.sys }}-${{ matrix.pkg }}
-
-      - name: '🛠 Install package'
-        shell: msys2 {0}
-        run: |
-          pacman --noconfirm -U artifact/mingw-w64-*-ghdl-${{ matrix.pkg }}-*.zst
-
-      - name: '🛠 Set envvars'
-        run: |
-          $GHDL = (& msys2 -c 'cygpath -w /') + '${{ matrix.sys }}\bin\ghdl.exe'
-          $GHDL_HASH = (& $GHDL version hash)
-          echo "GHDL_HASH=$GHDL_HASH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          $GHDL_PREFIX = (& msys2 -c 'cygpath -w /') + '${{ matrix.sys }}\lib\ghdl\'
-          echo "GHDL_PREFIX=$GHDL_PREFIX" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: '🐍 Setup Python'
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-          architecture: ${{ matrix.pyarch }}
-
-      - name: '🐍 Install Python dependencies'
-        run: pip3 install -r testsuite/requirements.txt
-
-      - name: '🚦 Test installation of pyGHDL through pip'
-        run: pip install ("git+https://github.com/ghdl/ghdl.git@" + $env:GHDL_HASH)
-
-      - name: '🚦 Test pyGHDL entrypoints'
-        run: |
-          ghdl-dom help
-          ghdl-ls --help
-
-      - name: '🚦 Test pyunit testsuite'
-        run: |
-          cd testsuite
-          python3 -m pytest -vsrA pyunit
-
-#
-# Windows CPython pyGHDL Test with standalone zipfile and pyGHDL wheel
-#
-
-  win-cpython-standalone:
-    name: '🚦🐍🥡${{ matrix.icon }} ${{ matrix.sys }} ${{ matrix.pkg }}'
-    runs-on: windows-latest
-
-    needs:
-      - win-generate-standalone-zip
-      - pyGHDL
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-#          - {icon: '🟪', pkg: 'llvm',  sys: 'MINGW32', pyarch: x86 }, ! not yet functional
-#          - {icon: '🟦', pkg: 'llvm',  sys: 'MINGW64', pyarch: x64 }
-#          - {icon: '🟨', pkg: 'llvm',  sys: 'UCRT64',  pyarch: x64 } #! experimental
-#          - {icon: '🟪', pkg: 'mcode', sys: 'MINGW32', pyarch: x86 }
-          - {icon: '🟦', pkg: 'mcode', sys: 'MINGW64', pyarch: x64 } #! simulation with mcode is not yet supported on win64
-          - {icon: '🟨', pkg: 'mcode', sys: 'UCRT64',  pyarch: x64 } #! experimental; simulation with mcode is not yet supported on win64
-
-    defaults:
-      run:
-        shell: pwsh
-
-    steps:
-
-      - name: '⚙ git config'
-        run: git config --global core.autocrlf input
-
-      - name: '🧰 Checkout'
-        uses: actions/checkout@v3
-
-      - name: '📥 Download artifact: package'
-        uses: actions/download-artifact@v3
-        with:
-          path: artifact
-          name: ${{ matrix.sys }}-${{ matrix.pkg }}-standalone
-
-      - name: '⚙ Extract package'
-        run: |
-          unzip artifact\${{ matrix.sys }}-${{ matrix.pkg }}-standalone.zip
-          mv '${{ matrix.sys }}-${{ matrix.pkg }}-standalone\' GHDL-standalone
-
-      - name: '🛠 Set envvars'
-        run: |
-          $GHDL = (pwd).Path + '\GHDL-standalone\bin\ghdl.exe'
-          $GHDL_HASH = (& $GHDL version hash)
-          echo "GHDL_HASH=$GHDL_HASH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          $GHDL_PREFIX = (pwd).Path + '\GHDL-standalone\lib\ghdl'
-          echo "GHDL_PREFIX=$GHDL_PREFIX" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: '🐍 Setup Python'
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-          architecture: ${{ matrix.pyarch }}
-
-      - name: '📥 Download artifact: pyGHDL'
-        uses: actions/download-artifact@v3
-        with:
-          name: pyGHDL
-
-      - name: '🐍 Install pyGHDL'
-        run: |
-          python -m pip install --disable-pip-version-check wheel (& ls *.whl)
-          python -m pip install --disable-pip-version-check -r testsuite/requirements.txt
-
-      - name: '🚦 Test pyGHDL entrypoints'
-        run: |
-          ghdl-dom help
-          ghdl-ls --help
-
-      - name: '🚦 Test pyunit testsuite'
-        run: |
-          cd testsuite
-          python3 -m pytest -vsrA pyunit
 
 #
 # Release
 #
-
   Release:
     name: '📦 Release'
     runs-on: ubuntu-latest
@@ -606,142 +256,35 @@ jobs:
       - doc
       - lin
       - osx
-      - win-msys2-test
-      - win-generate-standalone-zip
-      - win-cpython-msys2
-      - win-cpython-standalone
+      - Windows-MSYS2
+      - Windows-Standalone
+      - Windows-pyGHDL
 
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || contains(github.ref, 'refs/tags/'))
 
     steps:
 
       - name: '📥 Download artifacts'
-        if: "!contains(github.ref, 'refs/tags/')"
         uses: actions/download-artifact@v3
         with:
           path: artifacts
-
-      # Do not upload assets to tagged releases
-      - name: Set list of files for uploading
-        id: files
-        shell: python
-        run: |
-          print('None'
-              if '${{ github.ref }}'.startswith('refs/tags/')
-              else'::set-output name=list::**/*.zst **/*.tgz **/*-standalone.zip **/man/ghdl.1'
-          )
 
       # Tagged: create a pre-release or a release (semver)
       # Untagged: update the assets of pre-release 'nightly'
       - uses: pyTooling/Actions/releaser@r0
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ github.token }}
           tag: 'nightly'
-          files: ${{ steps.files.outputs.list }}
+          snapshots: false
+          files: |
+            **/*.zst
+            **/*.tgz
+            **/ghdl-*.zip
+            **/*.whl
+            **/man/ghdl.1
 
-      - name: '🔔 Trigger ghdl/docker'
-        run: |
-          curl -X POST https://api.github.com/repos/ghdl/docker/dispatches \
-          -H 'Content-Type: application/json' \
-          -H 'Accept: application/vnd.github.everest-preview+json' \
-          -H "Authorization: token ${{ secrets.GHDL_BOT }}" \
-          --data '{"event_type": "ghdl"}'
 
-#
-# Coverage (MINGW64)
-#
-
-  coverage:
-    name: '📈 Coverage'
-    runs-on: windows-latest
-
-    needs:
-      - win-msys2-build-package
-
-    defaults:
-      run:
-        shell: msys2 {0}
-
-    steps:
-
-      - name: '🟪 Setup MSYS2'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
-          pacboy: >
-            python-pip:p
-            python-setuptools:p
-
-      - name: '⚙ git config'
-        run: git config --global core.autocrlf input
-        shell: bash
-
-      - name: '🧰 Checkout'
-        uses: actions/checkout@v3
-
-      - name: '📥 Download artifact: package'
-        uses: actions/download-artifact@v3
-        with:
-          path: artifact
-          name: MINGW64-llvm
-
-      - name: '🛠 Install package and 🐍 Python dependencies'
-        run: |
-          pacman --noconfirm -U artifact/mingw-w64-*-ghdl-llvm-*.zst
-          pip3 install --disable-pip-version-check -r testsuite/requirements.txt
-
-      - name: '🚦 Run tests to generate coverage report'
-        run: PYTHONPATH=$(pwd) python3 -m pytest -rA --cov=.. --cov-config=.coveragerc testsuite/pyunit
-
-      - name: Generate XML coverage report
-        if: always()
-        run: coverage xml
-
-      - name: '📤 Upload artifact: coverage report'
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage
-          path: coverage.xml
-
-#
-# Coverage Publish (Ubuntu)
-#
-
-  coverage-publish:
-    name: '📮 Publish coverage report'
-    runs-on: ubuntu-latest
-
-    needs:
-      - coverage
-
-    if: always() && github.repository == 'ghdl/ghdl' && github.event_name != 'pull_request'
-
-    steps:
-
-      - name: '📥 Download artifact: coverage report'
-        uses: actions/download-artifact@v3
-        with:
-          path: .
-          name: coverage
-
-      - name: CodeCov
-        uses: codecov/codecov-action@v3
-        with:
-          file: coverage.xml
-          flags: unittests
-
-      - name: Codacy
-        uses: codacy/codacy-coverage-reporter-action@v1
-        with:
-          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
-          coverage-reports: coverage.xml
-
-#---
-
-# TODO:
-# - Re-package a MINGW/MSYS2 package to provide a 'standalone' tarball/zipfile.
-#  - https://github.com/ghdl/ghdl/issues/318#issuecomment-286246287
-#
-# - Add GNAT GPL 32-bit build job with mcode backend
+  Coverage:
+    needs: Windows-MSYS2
+    uses: ./.github/workflows/Coverage.yml
+    secrets: inherit

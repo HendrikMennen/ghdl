@@ -164,6 +164,11 @@ package Elab.Vhdl_Objtypes is
       --  unshared.
       Is_Global : Boolean;
 
+      --  True if the size of an object is known at compile time.
+      --  Used for layout of records.
+      Is_Static : Boolean;
+      Is_Bnd_Static : Boolean;
+
       --  Number of bytes (when in memory) for this type.
       Sz : Size_Type;
 
@@ -182,6 +187,8 @@ package Elab.Vhdl_Objtypes is
          when Type_Float =>
             Frange : Float_Range_Type;
          when Type_Slice =>
+            Slice_Base : Type_Acc;
+            Slice_Len : Uns32;
             Slice_El : Type_Acc;
          when Type_Array
             | Type_Array_Unbounded
@@ -196,11 +203,14 @@ package Elab.Vhdl_Objtypes is
             Uarr_Idx : Type_Acc;
          when Type_Record
             | Type_Unbounded_Record =>
+            --  The base type, used to have compatible layouts.
+            Rec_Base : Type_Acc;
             --  The first elements is in the LSBs of the net.
             Rec : Rec_El_Array_Acc;
          when Type_Access =>
             Acc_Acc : Type_Acc;
-            --  Memory size to store the type.
+            --  Memory size to store the type and its bounds.
+            Acc_Type_Sz : Size_Type;
             Acc_Bnd_Sz : Size_Type;
          when Type_File =>
             File_Typ  : Type_Acc;
@@ -216,6 +226,20 @@ package Elab.Vhdl_Objtypes is
    end record;
 
    Null_Memtyp : constant Memtyp := (null, null);
+
+   --  Representation of an access: a pointer inside the heap.
+   type Heap_Ptr is new Memory_Ptr;
+   Null_Heap_Ptr : constant Heap_Ptr := null;
+
+   Heap_Ptr_Sz : constant Size_Type := Size_Type (Heap_Ptr'Size / 8);
+
+   Heap_Ptr_Al : constant Palign_Type :=
+     2 * Boolean'Pos (Heap_Ptr_Sz = 4)
+     + 3 * Boolean'Pos (Heap_Ptr_Sz = 8);
+
+   --  Ghdl_Index_Type is a 32b unsigned type.
+   Ghdl_Index_Sz : constant Size_Type := 4;
+   Ghdl_Index_Al : constant Palign_Type := 2;
 
    --  Memory pools, which defines where the memory is allocated for data,
    --  types, values...
@@ -255,23 +279,32 @@ package Elab.Vhdl_Objtypes is
    function Create_Float_Type (Rng : Float_Range_Type) return Type_Acc;
    function Create_Vec_Type_By_Length (Len : Uns32; El : Type_Acc)
                                       return Type_Acc;
-   function Create_Vector_Type (Bnd : Bound_Type; El_Type : Type_Acc)
-                               return Type_Acc;
+   function Create_Vector_Type (Bnd : Bound_Type;
+                                Static_Bnd : Boolean;
+                                El_Type : Type_Acc) return Type_Acc;
    function Create_Unbounded_Vector (El_Type : Type_Acc; Idx : Type_Acc)
                                     return Type_Acc;
-   function Create_Slice_Type (Len : Uns32; El_Type : Type_Acc)
-                              return Type_Acc;
-   function Create_Array_Type
-     (Bnd : Bound_Type; Last : Boolean; El_Type : Type_Acc) return Type_Acc;
-   function Create_Array_Unbounded_Type
-     (Bnd : Bound_Type; Last : Boolean; El_Type : Type_Acc) return Type_Acc;
+   function Create_Slice_Type
+     (Base_Type : Type_Acc; Len : Uns32; El_Type : Type_Acc) return Type_Acc;
+   function Create_Array_Type (Bnd : Bound_Type;
+                               Static_Bnd : Boolean;
+                               Last : Boolean;
+                               El_Type : Type_Acc) return Type_Acc;
+   function Create_Array_Unbounded_Type (Bnd : Bound_Type;
+                                         Static_Bnd : Boolean;
+                                         Last : Boolean;
+                                         El_Type : Type_Acc) return Type_Acc;
    function Create_Unbounded_Array
      (Idx : Type_Acc; Last : Boolean; El_Type : Type_Acc) return Type_Acc;
 
    function Create_Rec_El_Array (Nels : Iir_Index32) return Rec_El_Array_Acc;
 
-   function Create_Record_Type (Els : Rec_El_Array_Acc) return Type_Acc;
-   function Create_Unbounded_Record (Els : Rec_El_Array_Acc) return Type_Acc;
+   --  PARENT_TYP is a parent type or null to create a base type.
+   --  Used to have the same layout.
+   function Create_Record_Type (Parent_Typ : Type_Acc;
+                                Els : Rec_El_Array_Acc) return Type_Acc;
+   function Create_Unbounded_Record (Parent_Typ : Type_Acc;
+                                     Els : Rec_El_Array_Acc) return Type_Acc;
 
    --  ACC_TYPE can be null for an incomplete type.
    function Create_Access_Type (Acc_Type : Type_Acc) return Type_Acc;
@@ -283,6 +316,7 @@ package Elab.Vhdl_Objtypes is
 
    function In_Bounds (Bnd : Bound_Type; V : Int32) return Boolean;
    function In_Range (Rng : Discrete_Range_Type; V : Int64) return Boolean;
+   function In_Float_Range (Rng : Float_Range_Type; V : Fp64) return Boolean;
 
    --  Create an Type_Array from an Type_Array_Unbounded by replacing the
    --  element type.

@@ -34,40 +34,32 @@ from typing import Iterable
 
 from pyTooling.Decorators import export
 
-from pyGHDL.dom.Concurrent import (
-    WaveformElement,
-    ParameterAssociationItem,
-)  # TODO: move out from concurrent?
-from pyGHDL.dom.Range import Range
-from pyVHDLModel.SyntaxModel import (
-    IfBranch as VHDLModel_IfBranch,
-    ElsifBranch as VHDLModel_ElsifBranch,
-    ElseBranch as VHDLModel_ElseBranch,
-    IfStatement as VHDLModel_IfStatement,
-    IndexedChoice as VHDLModel_IndexedChoice,
-    RangedChoice as VHDLModel_RangedChoice,
-    OthersCase as VHDLModel_OthersCase,
-    Case as VHDLModel_Case,
-    CaseStatement as VHDLModel_CaseStatement,
-    ForLoopStatement as VHDLModel_ForLoopStatement,
-    SequentialSimpleSignalAssignment as VHDLModel_SequentialSimpleSignalAssignment,
-    SequentialProcedureCall as VHDLModel_SequentialProcedureCall,
-    SequentialAssertStatement as VHDLModel_SequentialAssertStatement,
-    SequentialReportStatement as VHDLModel_SequentialReportStatement,
-    NullStatement as VHDLModel_NullStatement,
-    WaitStatement as VHDLModel_WaitStatement,
-    Name,
-    SequentialStatement,
-    ExpressionUnion,
-    SequentialChoice,
-    SequentialCase,
-)
-
+from pyVHDLModel.Base import ExpressionUnion
+from pyVHDLModel.Symbol import Symbol
+from pyVHDLModel.Sequential import SequentialStatement, SequentialChoice, SequentialCase
+from pyVHDLModel.Sequential import IfBranch as VHDLModel_IfBranch
+from pyVHDLModel.Sequential import ElsifBranch as VHDLModel_ElsifBranch
+from pyVHDLModel.Sequential import ElseBranch as VHDLModel_ElseBranch
+from pyVHDLModel.Sequential import IndexedChoice as VHDLModel_IndexedChoice
+from pyVHDLModel.Sequential import RangedChoice as VHDLModel_RangedChoice
+from pyVHDLModel.Sequential import Case as VHDLModel_Case
+from pyVHDLModel.Sequential import OthersCase as VHDLModel_OthersCase
+from pyVHDLModel.Sequential import IfStatement as VHDLModel_IfStatement
+from pyVHDLModel.Sequential import CaseStatement as VHDLModel_CaseStatement
+from pyVHDLModel.Sequential import ForLoopStatement as VHDLModel_ForLoopStatement
+from pyVHDLModel.Sequential import NullStatement as VHDLModel_NullStatement
+from pyVHDLModel.Sequential import WaitStatement as VHDLModel_WaitStatement
+from pyVHDLModel.Sequential import ExitStatement as VHDLModel_ExitStatement
+from pyVHDLModel.Sequential import SequentialProcedureCall as VHDLModel_SequentialProcedureCall
+from pyVHDLModel.Sequential import SequentialSimpleSignalAssignment as VHDLModel_SequentialSimpleSignalAssignment
+from pyVHDLModel.Sequential import SequentialReportStatement as VHDLModel_SequentialReportStatement
+from pyVHDLModel.Sequential import SequentialAssertStatement as VHDLModel_SequentialAssertStatement
 
 from pyGHDL.libghdl import Iir, utils
 from pyGHDL.libghdl.vhdl import nodes
 from pyGHDL.dom import DOMMixin, Position, DOMException
-from pyGHDL.dom._Utils import GetNameOfNode
+from pyGHDL.dom.Range import Range
+from pyGHDL.dom.Concurrent import WaveformElement, ParameterAssociationItem  # TODO: move out from concurrent?
 
 
 @export
@@ -254,7 +246,7 @@ class CaseStatement(VHDLModel_CaseStatement, DOMMixin):
         from pyGHDL.dom._Translate import (
             GetExpressionFromNode,
             GetRangeFromNode,
-            GetNameFromNode,
+            GetName,
         )
 
         expression = GetExpressionFromNode(nodes.Get_Expression(caseNode))
@@ -288,7 +280,7 @@ class CaseStatement(VHDLModel_CaseStatement, DOMMixin):
                     nodes.Iir_Kind.Attribute_Name,
                     nodes.Iir_Kind.Parenthesis_Name,
                 ):
-                    rng = GetNameFromNode(choiceRange)
+                    rng = GetName(choiceRange)
                 else:
                     pos = Position.parse(alternative)
                     raise DOMException(
@@ -343,11 +335,11 @@ class ForLoopStatement(VHDLModel_ForLoopStatement, DOMMixin):
 
     @classmethod
     def parse(cls, loopNode: Iir, label: str) -> "ForLoopStatement":
-        from pyGHDL.dom._Utils import GetIirKindOfNode
+        from pyGHDL.dom._Utils import GetNameOfNode, GetIirKindOfNode
         from pyGHDL.dom._Translate import (
             GetSequentialStatementsFromChainedNodes,
             GetRangeFromNode,
-            GetNameFromNode,
+            GetName,
         )
 
         spec = nodes.Get_Parameter_Specification(loopNode)
@@ -361,7 +353,7 @@ class ForLoopStatement(VHDLModel_ForLoopStatement, DOMMixin):
             nodes.Iir_Kind.Attribute_Name,
             nodes.Iir_Kind.Parenthesis_Name,
         ):
-            rng = GetNameFromNode(discreteRange)
+            rng = GetName(discreteRange)
         else:
             pos = Position.parse(loopNode)
             raise DOMException(
@@ -379,7 +371,7 @@ class SequentialSimpleSignalAssignment(VHDLModel_SequentialSimpleSignalAssignmen
     def __init__(
         self,
         assignmentNode: Iir,
-        target: Name,
+        target: Symbol,
         waveform: Iterable[WaveformElement],
         label: str = None,
     ):
@@ -388,10 +380,10 @@ class SequentialSimpleSignalAssignment(VHDLModel_SequentialSimpleSignalAssignmen
 
     @classmethod
     def parse(cls, assignmentNode: Iir, label: str = None) -> "SequentialSimpleSignalAssignment":
-        from pyGHDL.dom._Translate import GetNameFromNode
+        from pyGHDL.dom._Translate import GetName
 
         target = nodes.Get_Target(assignmentNode)
-        targetName = GetNameFromNode(target)
+        targetName = GetName(target)
 
         waveform = []
         for wave in utils.chain_iter(nodes.Get_Waveform_Chain(assignmentNode)):
@@ -405,7 +397,7 @@ class SequentialProcedureCall(VHDLModel_SequentialProcedureCall, DOMMixin):
     def __init__(
         self,
         callNode: Iir,
-        procedureName: Name,
+        procedureName: Symbol,
         parameterMappings: Iterable[ParameterAssociationItem],
         label: str = None,
     ):
@@ -414,12 +406,12 @@ class SequentialProcedureCall(VHDLModel_SequentialProcedureCall, DOMMixin):
 
     @classmethod
     def parse(cls, callNode: Iir, label: str) -> "SequentialProcedureCall":
-        from pyGHDL.dom._Translate import GetNameFromNode, GetParameterMapAspect
+        from pyGHDL.dom._Translate import GetName, GetParameterMapAspect
 
         cNode = nodes.Get_Procedure_Call(callNode)
 
         prefix = nodes.Get_Prefix(cNode)
-        procedureName = GetNameFromNode(prefix)
+        procedureName = GetName(prefix)
         parameterAssociations = GetParameterMapAspect(nodes.Get_Parameter_Association_Chain(cNode))
 
         return cls(callNode, procedureName, parameterAssociations, label)
@@ -486,11 +478,23 @@ class NullStatement(VHDLModel_NullStatement, DOMMixin):
 
 
 @export
+class ExitStatement(VHDLModel_ExitStatement, DOMMixin):
+    def __init__(
+        self,
+        exitNode: Iir,
+        label: str = None,
+    ):
+        super().__init__(condition=None, loopLabel=label)
+        DOMMixin.__init__(self, exitNode)
+        # TODO: parse condition
+
+
+@export
 class WaitStatement(VHDLModel_WaitStatement, DOMMixin):
     def __init__(
         self,
         waitNode: Iir,
-        sensitivityList: Iterable[Name] = None,
+        sensitivityList: Iterable[Symbol] = None,
         condition: ExpressionUnion = None,
         timeout: ExpressionUnion = None,
         label: str = None,

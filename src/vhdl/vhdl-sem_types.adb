@@ -150,6 +150,9 @@ package body Vhdl.Sem_Types is
          return Null_Iir;
       end if;
 
+      Left := Eval_Expr_If_Static (Left);
+      Right := Eval_Expr_If_Static (Right);
+
       --  Emit error message for overflow and replace with a value to avoid
       --  error storm.
       if Get_Kind (Left) = Iir_Kind_Overflow_Literal then
@@ -654,6 +657,8 @@ package body Vhdl.Sem_Types is
 
    procedure Sem_Protected_Type_Body (Bod : Iir)
    is
+      Prev_Unelaborated_Use_Allowed : constant Boolean :=
+        Unelaborated_Use_Allowed;
       Inter : Name_Interpretation_Type;
       Type_Decl : Iir;
       Decl : Iir;
@@ -686,6 +691,7 @@ package body Vhdl.Sem_Types is
         and then Get_Kind (Decl) = Iir_Kind_Protected_Type_Declaration
       then
          Set_Protected_Type_Declaration (Bod, Decl);
+         Set_Elaborated_Flag (Decl, True);
          if Get_Protected_Type_Body (Decl) /= Null_Iir then
             Report_Start_Group;
             Error_Msg_Sem
@@ -718,6 +724,10 @@ package body Vhdl.Sem_Types is
       --     body.
       Open_Declarative_Region;
 
+      --  The body is called when a variable is created, so possibly all
+      --  used constructs are elaborated.
+      Unelaborated_Use_Allowed := True;
+
       if Decl /= Null_Iir then
          Xref_Body (Bod, Decl);
          Add_Protected_Type_Declarations (Decl);
@@ -734,6 +744,8 @@ package body Vhdl.Sem_Types is
       if Decl /= Null_Iir then
          Sem_Decls.Check_Full_Declaration (Decl, Bod);
       end if;
+
+      Unelaborated_Use_Allowed := Prev_Unelaborated_Use_Allowed;
 
       Close_Declarative_Region;
    end Sem_Protected_Type_Body;
@@ -777,37 +789,133 @@ package body Vhdl.Sem_Types is
       end if;
    end Update_Record_Constraint;
 
-   function Get_Array_Constraint (Def : Iir) return Iir_Constraint
+   --  Get the constraint state from a subtype indication.
+   --  It cannot be directly inferred from the type, the subtype indication
+   --  must be considered in order to handle 'Subtype.
+   function Get_Subtype_Indication_Constraint (Ind : Iir) return Iir_Constraint
    is
-      El_Type : constant Iir := Get_Element_Subtype (Def);
-      Constrained_Index : constant Boolean := Get_Index_Constraint_Flag (Def);
+      Atype : Iir;
    begin
-      if Get_Kind (El_Type) in Iir_Kinds_Composite_Type_Definition then
-         case Get_Constraint_State (El_Type) is
-            when Fully_Constrained =>
-               if Constrained_Index then
-                  return Fully_Constrained;
-               else
-                  return Partially_Constrained;
-               end if;
-            when Partially_Constrained =>
-               return Partially_Constrained;
-            when Unconstrained =>
-               if not Constrained_Index then
-                  return Unconstrained;
-               else
-                  return Partially_Constrained;
-               end if;
+      case Get_Kind (Ind) is
+         when Iir_Kind_Subtype_Attribute =>
+            --  Always fully constrained.
+            return Fully_Constrained;
+         when Iir_Kinds_Denoting_Name =>
+            --  A type (or subtype) name.
+            Atype := Get_Named_Entity (Ind);
+            if Is_Error (Atype) then
+               return Fully_Constrained;
+            end if;
+            Atype := Get_Type (Atype);
+            if Get_Kind (Atype) in Iir_Kinds_Composite_Type_Definition then
+               return Get_Constraint_State (Atype);
+            else
+               return Fully_Constrained;
+            end if;
+         when Iir_Kind_Array_Subtype_Definition
+           | Iir_Kind_Record_Subtype_Definition =>
+            return Get_Constraint_State (Ind);
+         when Iir_Kinds_Scalar_Subtype_Definition
+           | Iir_Kind_Enumeration_Type_Definition =>
+            return Fully_Constrained;
+         when Iir_Kind_Error =>
+            --  Why not ?
+            return Fully_Constrained;
+         when others =>
+            Error_Kind ("get_subtype_indication_constraint", Ind);
+      end case;
+   end Get_Subtype_Indication_Constraint;
+
+   --  Return the constraint state of an array element.
+   --  Just compute it from the element subtype indication.
+   function Get_Array_Type_Element_Constraint (Def : Iir)
+                                              return Iir_Constraint
+   is
+      El_Ind : constant Iir := Get_Element_Subtype_Indication (Def);
+   begin
+      return Get_Subtype_Indication_Constraint (El_Ind);
+   end Get_Array_Type_Element_Constraint;
+
+   --  Compute the constraint state of an array type.
+   --  Cannot be fully constrained as the array is unbounded.
+   function Get_Array_Type_Constraint (Def : Iir) return Iir_Constraint
+   is
+      El_St : constant Iir := Get_Element_Subtype (Def);
+   begin
+      --  LRM08 5.1 Types
+      --  A composite subtype is said to be unconstrained if:
+      --  - It is an array subtype with no index constrained and the
+      --    element subtype either is not a composite subtype [...]
+      if Get_Kind (El_St) not in Iir_Kinds_Composite_Type_Definition then
+         return Unconstrained;
+      end if;
+
+      --  [...] or is an constrained composite type
+      if Get_Array_Type_Element_Constraint (Def) = Unconstrained then
+         return Unconstrained;
+      else
+         return Partially_Constrained;
+      end if;
+   end Get_Array_Type_Constraint;
+
+   --  Return the constraint state of the element subtype of an array subtype.
+   function Get_Array_Subtype_Element_Constraint (Def : Iir)
+                                                 return Iir_Constraint
+   is
+      El_Cons : constant Iir := Get_Array_Element_Constraint (Def);
+      Parent : Iir;
+   begin
+      if El_Cons = Null_Iir then
+         --  No element constraint, get the constraint state of the element
+         --  from the parent.
+         Parent := Get_Parent_Type (Def);
+         case Iir_Kinds_Array_Type_Definition (Get_Kind (Parent)) is
+            when Iir_Kind_Array_Type_Definition =>
+               return Get_Array_Type_Element_Constraint (Parent);
+            when Iir_Kind_Array_Subtype_Definition =>
+               return Get_Array_Subtype_Element_Constraint (Parent);
          end case;
       else
-         --  Element subtype is not a composite subtype.
-         if Constrained_Index then
+         --  The subtype constrains the element.
+         case Get_Kind (El_Cons) is
+            when Iir_Kind_Array_Subtype_Definition
+              | Iir_Kind_Record_Subtype_Definition =>
+               return Get_Constraint_State (El_Cons);
+            when others =>
+               Error_Kind ("get_array_subtype_element_constraint", El_Cons);
+         end case;
+      end if;
+   end Get_Array_Subtype_Element_Constraint;
+
+   --  Compute the constraint state of an array subtype.
+   function Get_Array_Subtype_Constraint (Def : Iir) return Iir_Constraint
+   is
+      El_St : constant Iir := Get_Element_Subtype (Def);
+      El_Constraint : Iir_Constraint;
+   begin
+      if Get_Kind (El_St) in Iir_Kinds_Composite_Type_Definition then
+         El_Constraint := Get_Array_Subtype_Element_Constraint (Def);
+         if Get_Index_Constraint_Flag (Def) then
+            if El_Constraint = Fully_Constrained then
+               return Fully_Constrained;
+            else
+               return Partially_Constrained;
+            end if;
+         else
+            if El_Constraint = Unconstrained then
+               return Unconstrained;
+            else
+               return Partially_Constrained;
+            end if;
+         end if;
+      else
+         if Get_Index_Constraint_Flag (Def) then
             return Fully_Constrained;
          else
             return Unconstrained;
          end if;
       end if;
-   end Get_Array_Constraint;
+   end Get_Array_Subtype_Constraint;
 
    function Sem_Enumeration_Type_Definition  (Def: Iir; Decl: Iir) return Iir
    is
@@ -977,7 +1085,7 @@ package body Vhdl.Sem_Types is
       Sem_Unbounded_Array_Indexes (Def);
 
       Sem_Array_Element (Def);
-      Set_Constraint_State (Def, Get_Array_Constraint (Def));
+      Set_Constraint_State (Def, Get_Array_Type_Constraint (Def));
 
       --  According to LRM93 7.4.1, an unconstrained array type is not static.
       Set_Type_Staticness (Def, None);
@@ -1110,16 +1218,17 @@ package body Vhdl.Sem_Types is
       --  According to LRM93 7.4.1, an unconstrained array type
       --  is not static.
       Set_Type_Staticness (Base_Type, None);
-      Set_Type_Staticness (Def, Min (Staticness,
-                                     Get_Type_Staticness (El_Type)));
-
       Set_Type_Declarator (Base_Type, Decl);
       Set_Resolved_Flag (Base_Type, Get_Resolved_Flag (Def));
-      Set_Index_Constraint_Flag (Def, True);
-      Set_Constraint_State (Def, Get_Array_Constraint (Def));
-      Set_Constraint_State (Base_Type, Get_Array_Constraint (Base_Type));
+      Set_Constraint_State (Base_Type, Get_Array_Type_Constraint (Base_Type));
+
+      Set_Type_Staticness (Def, Min (Staticness,
+                                     Get_Type_Staticness (El_Type)));
       Set_Parent_Type (Def, Base_Type);
+      Set_Index_Constraint_Flag (Def, True);
+      Set_Constraint_State (Def, Get_Array_Subtype_Constraint (Def));
       Set_Subtype_Type_Mark (Def, Null_Iir);
+
       return Def;
    end Sem_Constrained_Array_Type_Definition;
 
@@ -1250,7 +1359,7 @@ package body Vhdl.Sem_Types is
             declare
                Res : Iir;
             begin
-               Res := Sem_Discrete_Range (Def, Null_Iir, True);
+               Res := Sem_Discrete_Range (Def, Null_Iir);
                if Res = Null_Iir then
                   return Null_Iir;
                end if;
@@ -1287,6 +1396,7 @@ package body Vhdl.Sem_Types is
    is
       Sub_Type: Iir;
       Range_Type : Iir;
+      Rng : Iir;
    begin
       case Get_Kind (A_Range) is
          when Iir_Kind_Range_Expression
@@ -1305,6 +1415,17 @@ package body Vhdl.Sem_Types is
             return Null_Iir;
       end case;
 
+      if Get_Expr_Staticness (A_Range) = Locally then
+         Rng := Eval_Range (A_Range);
+         if Get_Kind (Range_Type) in Iir_Kinds_Range_Type_Definition
+           and then Get_Type_Staticness (Range_Type) = Locally
+         then
+            Check_Range_Compatibility (Rng, Range_Type);
+         end if;
+      else
+         Rng := A_Range;
+      end if;
+
       case Get_Kind (Range_Type) is
          when Iir_Kind_Enumeration_Type_Definition
            | Iir_Kind_Enumeration_Subtype_Definition =>
@@ -1318,11 +1439,12 @@ package body Vhdl.Sem_Types is
          when others =>
             raise Internal_Error;
       end case;
-      Location_Copy (Sub_Type, A_Range);
-      Set_Range_Constraint (Sub_Type, A_Range);
+      Location_Copy (Sub_Type, Rng);
+      Set_Range_Constraint (Sub_Type, Rng);
       Set_Parent_Type (Sub_Type, Get_Base_Type (Range_Type));
-      Set_Type_Staticness (Sub_Type, Get_Expr_Staticness (A_Range));
+      Set_Type_Staticness (Sub_Type, Get_Expr_Staticness (Rng));
       Set_Signal_Type_Flag (Sub_Type, True);
+
       return Sub_Type;
    end Range_To_Subtype_Indication;
 
@@ -1621,6 +1743,8 @@ package body Vhdl.Sem_Types is
       Type_Index_List : Iir_Flist;
       Subtype_Index_List : Iir_Flist;
       Subtype_Index_List2 : Iir_Flist;
+      Static : Iir_Staticness;
+      Parent_Type : Iir;
    begin
       Index_Staticness := Locally;
       Type_Index_List := Get_Index_Subtype_Definition_List (Base_Def);
@@ -1639,75 +1763,78 @@ package body Vhdl.Sem_Types is
          Set_Index_Constraint_Flag (Def, Get_Index_Constraint_Flag (Mark_Def));
          Set_Index_Subtype_List (Def, Get_Index_Subtype_List (Mark_Def));
          Index_Staticness := Get_Type_Staticness (Mark_Def);
-      else
-         if Get_Index_Constraint_Flag (Mark_Def) then
-            Error_Msg_Sem (+Def, "constrained array cannot be re-constrained");
-         end if;
-         Type_Nbr_Dim := Get_Nbr_Elements (Type_Index_List);
-         Subtype_Nbr_Dim := Get_Nbr_Elements (Subtype_Index_List);
+         return;
+      end if;
 
-         if Subtype_Nbr_Dim /= Type_Nbr_Dim then
-            --  Number of dimension mismatch.  Create an index with the right
-            --  length.
-            Subtype_Index_List2 := Create_Iir_Flist (Type_Nbr_Dim);
-            for I in 1 .. Natural'Min (Subtype_Nbr_Dim, Type_Nbr_Dim) loop
-               Set_Nth_Element
-                 (Subtype_Index_List2, I - 1,
-                  Get_Nth_Element (Subtype_Index_List, I - 1));
-            end loop;
+      if Get_Index_Constraint_Flag (Mark_Def) then
+         Error_Msg_Sem (+Def, "constrained array cannot be re-constrained");
+      end if;
+      Type_Nbr_Dim := Get_Nbr_Elements (Type_Index_List);
+      Subtype_Nbr_Dim := Get_Nbr_Elements (Subtype_Index_List);
 
-            if Subtype_Nbr_Dim < Type_Nbr_Dim then
-               Error_Msg_Sem
-                 (+Def,
-                  "subtype has less indexes than %n defined at %l",
-                  (+Mark_Def, +Mark_Def));
-
-               --  Clear extra indexes.
-               for I in Subtype_Nbr_Dim + 1 .. Type_Nbr_Dim loop
-                  Set_Nth_Element (Subtype_Index_List2, I - 1, Null_Iir);
-               end loop;
-            else
-               Error_Msg_Sem
-                 (+Get_Nth_Element (Subtype_Index_List, Type_Nbr_Dim),
-                  "subtype has more indexes than %n defined at %l",
-                  (+Mark_Def, +Mark_Def));
-
-               --  Forget extra indexes.
-            end if;
-            Destroy_Iir_Flist (Subtype_Index_List);
-            Subtype_Index_List := Subtype_Index_List2;
-         end if;
-
-         for I in 1 .. Type_Nbr_Dim loop
-            Type_Index := Get_Nth_Element (Type_Index_List, I - 1);
-
-            if I <= Subtype_Nbr_Dim then
-               Subtype_Index := Get_Nth_Element (Subtype_Index_List, I - 1);
-               Subtype_Index := Sem_Discrete_Range
-                 (Subtype_Index, Get_Index_Type (Type_Index), True);
-               if Subtype_Index /= Null_Iir then
-                  Subtype_Index :=
-                    Range_To_Subtype_Indication (Subtype_Index);
-                  Index_Staticness := Min
-                    (Index_Staticness,
-                     Get_Type_Staticness (Get_Type_Of_Subtype_Indication
-                                            (Subtype_Index)));
-               end if;
-            else
-               Subtype_Index := Null_Iir;
-            end if;
-            if Subtype_Index = Null_Iir then
-               --  Create a fake subtype from type_index.
-               --  FIXME: It is too fake.
-               Subtype_Index := Type_Index;
-               Index_Staticness := None;
-            end if;
-            Set_Nth_Element (Subtype_Index_List, I - 1, Subtype_Index);
+      if Subtype_Nbr_Dim /= Type_Nbr_Dim then
+         --  Number of dimension mismatch.  Create an index with the right
+         --  length.
+         Subtype_Index_List2 := Create_Iir_Flist (Type_Nbr_Dim);
+         for I in 1 .. Natural'Min (Subtype_Nbr_Dim, Type_Nbr_Dim) loop
+            Set_Nth_Element
+              (Subtype_Index_List2, I - 1,
+               Get_Nth_Element (Subtype_Index_List, I - 1));
          end loop;
 
-         Set_Index_Subtype_List (Def, Subtype_Index_List);
-         Set_Index_Constraint_Flag (Def, True);
+         if Subtype_Nbr_Dim < Type_Nbr_Dim then
+            Error_Msg_Sem (+Def,
+                           "subtype has less indexes than %n defined at %l",
+                           (+Mark_Def, +Mark_Def));
+
+            --  Clear extra indexes.
+            for I in Subtype_Nbr_Dim + 1 .. Type_Nbr_Dim loop
+               Set_Nth_Element (Subtype_Index_List2, I - 1, Null_Iir);
+            end loop;
+         else
+            Error_Msg_Sem (+Get_Nth_Element (Subtype_Index_List, Type_Nbr_Dim),
+                           "subtype has more indexes than %n defined at %l",
+                           (+Mark_Def, +Mark_Def));
+
+            --  Forget extra indexes.
+         end if;
+         Destroy_Iir_Flist (Subtype_Index_List);
+         Subtype_Index_List := Subtype_Index_List2;
       end if;
+
+      for I in 1 .. Type_Nbr_Dim loop
+         Type_Index := Get_Nth_Element (Type_Index_List, I - 1);
+
+         if I <= Subtype_Nbr_Dim then
+            Subtype_Index := Get_Nth_Element (Subtype_Index_List, I - 1);
+            Parent_Type := Get_Index_Type (Type_Index);
+            Subtype_Index := Sem_Discrete_Range (Subtype_Index, Parent_Type);
+            if Subtype_Index /= Null_Iir then
+               Subtype_Index := Range_To_Subtype_Indication (Subtype_Index);
+               Static := Get_Type_Staticness
+                 (Get_Type_Of_Subtype_Indication (Subtype_Index));
+               Index_Staticness := Min (Index_Staticness, Static);
+               if Static = Locally
+                 and then Get_Type_Staticness (Parent_Type) = Locally
+               then
+                  Check_Discrete_Range_Compatibility
+                    (Subtype_Index, Parent_Type);
+               end if;
+            end if;
+         else
+            Subtype_Index := Null_Iir;
+         end if;
+         if Subtype_Index = Null_Iir then
+            --  Create a fake subtype from type_index.
+            --  FIXME: It is too fake.
+            Subtype_Index := Type_Index;
+            Index_Staticness := None;
+         end if;
+         Set_Nth_Element (Subtype_Index_List, I - 1, Subtype_Index);
+      end loop;
+
+      Set_Index_Subtype_List (Def, Subtype_Index_List);
+      Set_Index_Constraint_Flag (Def, True);
    end Sem_Array_Constraint_Indexes;
 
    --  DEF is an array_subtype_definition.
@@ -1812,7 +1939,7 @@ package body Vhdl.Sem_Types is
                Error_Msg_Sem
                  (+Type_Mark, " (type mark is %n)", +Type_Mark);
                Report_End_Group;
-               return Type_Mark;
+               return Create_Error_Type (Def);
          end case;
       end if;
 
@@ -1827,10 +1954,17 @@ package body Vhdl.Sem_Types is
       end if;
       if El_Def = Null_Iir then
          El_Def := Get_Element_Subtype (Type_Mark);
+      else
+         if Def /= Null_Iir
+           and then Get_Kind (Def) = Iir_Kind_Array_Subtype_Definition
+         then
+            --  Update array_element_constraint.
+            Set_Array_Element_Constraint (Def, El_Def);
+         end if;
       end if;
       Set_Element_Subtype (Res, El_Def);
 
-      Set_Constraint_State (Res, Get_Array_Constraint (Res));
+      Set_Constraint_State (Res, Get_Array_Subtype_Constraint (Res));
       Set_Type_Staticness
         (Res, Min (Get_Type_Staticness (El_Def), Index_Staticness));
 
@@ -1863,135 +1997,6 @@ package body Vhdl.Sem_Types is
       return Res;
    end Sem_Array_Constraint;
 
-   function Reparse_As_Record_Element_Constraint (Name : Iir) return Iir
-   is
-      Prefix : Iir;
-      Parent : Iir;
-      El : Iir;
-   begin
-      if Get_Kind (Name) /= Iir_Kind_Parenthesis_Name then
-         Error_Msg_Sem (+Name, "record element constraint expected");
-         return Null_Iir;
-      else
-         Prefix := Get_Prefix (Name);
-         Parent := Name;
-         while Get_Kind (Prefix) = Iir_Kind_Parenthesis_Name loop
-            Parent := Prefix;
-            Prefix := Get_Prefix (Prefix);
-         end loop;
-         if Get_Kind (Prefix) /= Iir_Kind_Simple_Name then
-            Error_Msg_Sem
-              (+Prefix, "record element name must be a simple name");
-            return Null_Iir;
-         else
-            El := Create_Iir (Iir_Kind_Record_Element_Constraint);
-            Location_Copy (El, Prefix);
-            Set_Identifier (El, Get_Identifier (Prefix));
-            Set_Type (El, Name);
-            Set_Prefix (Parent, Null_Iir);
-            Free_Name (Prefix);
-            return El;
-         end if;
-      end if;
-   end Reparse_As_Record_Element_Constraint;
-
-   function Reparse_As_Record_Constraint (Def : Iir) return Iir
-   is
-      Res : Iir;
-      Chain : Iir;
-      El_List : Iir_List;
-      El : Iir;
-   begin
-      pragma Assert (Get_Prefix (Def) = Null_Iir);
-      Res := Create_Iir (Iir_Kind_Record_Subtype_Definition);
-      Set_Is_Ref (Res, True);
-      Location_Copy (Res, Def);
-      El_List := Create_Iir_List;
-      Chain := Get_Association_Chain (Def);
-      while Chain /= Null_Iir loop
-         if Get_Kind (Chain) /= Iir_Kind_Association_Element_By_Expression
-           or else Get_Formal (Chain) /= Null_Iir
-         then
-            Error_Msg_Sem (+Chain, "badly formed record constraint");
-         else
-            El := Reparse_As_Record_Element_Constraint (Get_Actual (Chain));
-            if El /= Null_Iir then
-               Append_Element (El_List, El);
-               Set_Parent (El, Res);
-               Append_Owned_Element_Constraint (Res, El);
-            end if;
-         end if;
-         Chain := Get_Chain (Chain);
-      end loop;
-      Set_Elements_Declaration_List (Res, List_To_Flist (El_List));
-      return Res;
-   end Reparse_As_Record_Constraint;
-
-   function Reparse_As_Array_Constraint (Def : Iir; Def_Type : Iir) return Iir
-   is
-      Parent : Iir;
-      Name : Iir;
-      Prefix : Iir;
-      Res : Iir;
-      Chain : Iir;
-      El_List : Iir_List;
-      Def_El_Type : Iir;
-   begin
-      Name := Def;
-      Prefix := Get_Prefix (Name);
-      Parent := Null_Iir;
-      while Prefix /= Null_Iir
-        and then Get_Kind (Prefix) = Iir_Kind_Parenthesis_Name
-      loop
-         Parent := Name;
-         Name := Prefix;
-         Prefix := Get_Prefix (Name);
-      end loop;
-      --  Detach prefix.
-      if Parent /= Null_Iir then
-         Set_Prefix (Parent, Null_Iir);
-      end if;
-
-      Res := Create_Iir (Iir_Kind_Array_Subtype_Definition);
-      Location_Copy (Res, Name);
-      Set_Has_Array_Constraint_Flag (Res, True);
-      Chain := Get_Association_Chain (Name);
-      if Get_Kind (Chain) = Iir_Kind_Association_Element_Open then
-         if Get_Chain (Chain) /= Null_Iir then
-            Error_Msg_Sem (+Chain, "'open' must be alone");
-         end if;
-      else
-         El_List := Create_Iir_List;
-         while Chain /= Null_Iir loop
-            if Get_Kind (Chain) /= Iir_Kind_Association_Element_By_Expression
-              or else Get_Formal (Chain) /= Null_Iir
-            then
-               Error_Msg_Sem (+Chain, "bad form of array constraint");
-            else
-               Append_Element (El_List, Get_Actual (Chain));
-            end if;
-            Chain := Get_Chain (Chain);
-         end loop;
-         Set_Index_Constraint_List (Res, List_To_Flist (El_List));
-      end if;
-
-      Def_El_Type := Get_Element_Subtype (Def_Type);
-      if Parent /= Null_Iir then
-         case Get_Kind (Def_El_Type) is
-            when Iir_Kinds_Array_Type_Definition =>
-               Set_Array_Element_Constraint
-                 (Res, Reparse_As_Array_Constraint (Def, Def_El_Type));
-               Set_Has_Element_Constraint_Flag (Res, True);
-            when Iir_Kind_Record_Type_Definition =>
-               Set_Array_Element_Constraint
-                 (Res, Reparse_As_Record_Constraint (Def));
-            when others =>
-               Error_Kind ("reparse_as_array_constraint", Def_El_Type);
-         end case;
-      end if;
-      return Res;
-   end Reparse_As_Array_Constraint;
-
    function Sem_Record_Constraint
      (Def : Iir; Type_Mark : Iir; Resolution : Iir) return Iir
    is
@@ -1999,53 +2004,49 @@ package body Vhdl.Sem_Types is
       El_List, Tm_El_List : Iir_Flist;
       El : Iir;
       Tm_El : Iir;
-      Tm_El_Type : Iir;
       El_Type : Iir;
       Res_List : Iir_Flist;
-
-      Index_List : Iir_Flist;
-      Index_El : Iir;
+      Cons_Chain : Iir;
    begin
-      Res := Create_Iir (Iir_Kind_Record_Subtype_Definition);
-      Set_Is_Ref (Res, True);
-      Location_Copy (Res, Def);
-      Set_Parent_Type (Res, Type_Mark);
-      if Get_Kind (Type_Mark) = Iir_Kind_Record_Subtype_Definition then
-         Set_Resolution_Indication
-           (Res, Get_Resolution_Indication (Type_Mark));
-      end if;
-
       case Get_Kind (Def) is
          when Iir_Kind_Subtype_Definition =>
+            if Get_Range_Constraint (Def) /= Null_Iir then
+               Error_Msg_Sem
+                 (+Def, "range constraints cannot be applied to a record");
+               return Create_Error_Type (Def);
+            end if;
+
             --  Just an alias, without new constraints.
-            Free_Name (Def);
+            Res := Create_Iir (Iir_Kind_Record_Subtype_Definition);
+            Location_Copy (Res, Def);
+            Set_Subtype_Type_Mark (Res, Get_Subtype_Type_Mark (Def));
+            Free_Iir (Def);
             Set_Signal_Type_Flag (Res, Get_Signal_Type_Flag (Type_Mark));
             Set_Constraint_State (Res, Get_Constraint_State (Type_Mark));
-            El_List := Null_Iir_Flist;
-
-         when Iir_Kind_Array_Subtype_Definition =>
-            --  Record constraints were parsed as array constraints.
-            --  Reparse.
-            pragma Assert (Get_Kind (Def) = Iir_Kind_Array_Subtype_Definition);
-            Index_List := Get_Index_Constraint_List (Def);
-            El_List := Create_Iir_Flist (Get_Nbr_Elements (Index_List));
-            Set_Elements_Declaration_List (Res, El_List);
-            for I in Flist_First .. Flist_Last (Index_List) loop
-               Index_El := Get_Nth_Element (Index_List, I);
-               El := Reparse_As_Record_Element_Constraint (Index_El);
-               if El = Null_Iir then
-                  return Create_Error_Type (Type_Mark);
-               end if;
-               Set_Nth_Element (El_List, I, El);
-            end loop;
+            Cons_Chain := Null_Iir;
 
          when Iir_Kind_Record_Subtype_Definition =>
-            El_List := Get_Elements_Declaration_List (Def);
-            Set_Elements_Declaration_List (Res, El_List);
+            Cons_Chain := Get_Owned_Elements_Chain (Def);
+            Res := Def;
+
+         when Iir_Kind_Array_Subtype_Definition =>
+            Error_Msg_Sem
+              (+Def, "index constraints cannot be applied to a record");
+            return Create_Error_Type (Def);
 
          when others =>
             Error_Kind ("sem_record_constraint", Def);
       end case;
+
+      --  Record elements are already owned.
+      Set_Is_Ref (Res, True);
+      Set_Parent_Type (Res, Type_Mark);
+
+      --  By default, inherit resoultion.
+      if Get_Kind (Type_Mark) = Iir_Kind_Record_Subtype_Definition then
+         Set_Resolution_Indication
+           (Res, Get_Resolution_Indication (Type_Mark));
+      end if;
 
       --  Handle resolution.
       Res_List := Null_Iir_Flist;
@@ -2068,69 +2069,44 @@ package body Vhdl.Sem_Types is
       end if;
 
       Tm_El_List := Get_Elements_Declaration_List (Type_Mark);
-      if El_List /= Null_Iir_Flist or Res_List /= Null_Iir_Flist then
+      if Cons_Chain /= Null_Iir or Res_List /= Null_Iir_Flist then
          --  Constraints (either range or resolution) have been added.
          declare
             Nbr_Els : constant Natural := Get_Nbr_Elements (Tm_El_List);
             Els : Iir_Array (0 .. Nbr_Els - 1) := (others => Null_Iir);
             Res_Els : Iir_Array (0 .. Nbr_Els - 1) := (others => Null_Iir);
             Pos : Natural;
+            El_Ntype : Iir;
             Constraint : Iir_Constraint;
             Composite_Found : Boolean;
             Staticness : Iir_Staticness;
          begin
             --  Fill ELS with record constraints.
-            if El_List /= Null_Iir_Flist then
-               for I in Flist_First .. Flist_Last (El_List) loop
-                  El := Get_Nth_Element (El_List, I);
-                  Tm_El := Find_Name_In_Flist
-                    (Tm_El_List, Get_Identifier (El));
-                  if Tm_El = Null_Iir then
-                     --  Constraint element references an element name that
-                     --  doesn't exist.
-                     Error_Msg_Sem (+El, "%n has no %n", (+Type_Mark, +El));
+            Set_Owned_Elements_Chain (Res, Cons_Chain);
+            El := Cons_Chain;
+            while El /= Null_Iir loop
+               Tm_El := Find_Name_In_Flist (Tm_El_List, Get_Identifier (El));
+               if Tm_El = Null_Iir then
+                  --  Constraint element references an element name that
+                  --  doesn't exist.
+                  Error_Msg_Sem (+El, "%n has no %n", (+Type_Mark, +El));
+               else
+                  Pos := Natural (Get_Element_Position (Tm_El));
+                  if Els (Pos) /= Null_Iir then
+                     Report_Start_Group;
+                     Error_Msg_Sem
+                       (+El, "%n was already constrained", +El);
+                     Error_Msg_Sem
+                       (+Els (Pos), " (location of previous constrained)");
+                     Report_End_Group;
                   else
-                     Pos := Natural (Get_Element_Position (Tm_El));
-                     if Els (Pos) /= Null_Iir then
-                        Report_Start_Group;
-                        Error_Msg_Sem
-                          (+El, "%n was already constrained", +El);
-                        Error_Msg_Sem
-                          (+Els (Pos), " (location of previous constrained)");
-                        Report_End_Group;
-                     else
-                        Els (Pos) := El;
-                        Set_Parent (El, Res);
-                        Append_Owned_Element_Constraint (Res, El);
-                     end if;
-                     Xref_Ref (El, Tm_El);
-                     El_Type := Get_Type (El);
-                     Tm_El_Type := Get_Type (Tm_El);
-                     if Get_Kind (El_Type) = Iir_Kind_Parenthesis_Name then
-                        --  Recurse.
-                        case Get_Kind (Tm_El_Type) is
-                           when Iir_Kinds_Array_Type_Definition =>
-                              El_Type := Reparse_As_Array_Constraint
-                                (El_Type, Tm_El_Type);
-                           when Iir_Kind_Record_Type_Definition
-                             | Iir_Kind_Record_Subtype_Definition =>
-                              El_Type := Reparse_As_Record_Constraint
-                                (El_Type);
-                           when Iir_Kind_Error =>
-                              null;
-                           when others =>
-                              Error_Msg_Sem
-                                (+El_Type,
-                                 "only composite types may be constrained");
-                        end case;
-                        Set_Subtype_Indication (El, El_Type);
-                     end if;
-                     Set_Type (El, El_Type);
+                     Els (Pos) := El;
+                     Set_Parent (El, Res);
                   end if;
-               end loop;
-               --  Record element constraints are now in Els.
-               Destroy_Iir_Flist (El_List);
-            end if;
+                  Xref_Ref (El, Tm_El);
+               end if;
+               El := Get_Chain (El);
+            end loop;
 
             --  Fill Res_Els (handle resolution constraints).
             if Res_List /= Null_Iir_Flist then
@@ -2180,14 +2156,22 @@ package body Vhdl.Sem_Types is
                      Append_Owned_Element_Constraint (Res, El);
                   else
                      El := Els (I);
-                     El_Type := Get_Type (El);
+                     El_Type := Get_Subtype_Indication (El);
                      pragma Assert
                        (Get_Kind (El) = Iir_Kind_Record_Element_Constraint);
                   end if;
-                  El_Type := Sem_Subtype_Constraint (El_Type,
-                                                     Get_Type (Tm_El),
-                                                     Res_Els (I));
-                  Set_Type (El, El_Type);
+                  El_Ntype := Sem_Subtype_Constraint (El_Type,
+                                                      Get_Type (Tm_El),
+                                                      Res_Els (I));
+                  Set_Type (El, El_Ntype);
+                  if El_Ntype /= El_Type
+                    and then Get_Subtype_Indication (El) = El_Type
+                  then
+                     --  A new subtype constraint was created to complete it,
+                     --  free the old (and uncomplete) one.
+                     Free_Iir (El_Type);
+                  end if;
+                  El_Type := El_Ntype;
                   Set_Subtype_Indication (El, El_Type);
                   Set_Element_Position (El, Get_Element_Position (Tm_El));
                end if;
@@ -2231,7 +2215,7 @@ package body Vhdl.Sem_Types is
          --  GHDL: subtype_definition may also be used just to add
          --    a resolution function.
          Report_Start_Group;
-         Error_Msg_Sem (+Def, "only scalar types may be constrained by range");
+         Error_Msg_Sem (+Def, "scalar types may only be constrained by range");
          Error_Msg_Sem (+Type_Mark, " (type mark is %n)", +Type_Mark);
          Report_End_Group;
          Res := Copy_Subtype_Indication (Type_Mark);
@@ -2256,16 +2240,22 @@ package body Vhdl.Sem_Types is
          Location_Copy (Res, Def);
          Set_Parent_Type (Res, Type_Mark);
          Set_Resolution_Indication (Res, Get_Resolution_Indication (Def));
+
          A_Range := Get_Range_Constraint (Def);
          if A_Range = Null_Iir then
             A_Range := Get_Range_Constraint (Type_Mark);
             Set_Is_Ref (Res, True);
          else
-            A_Range := Sem_Range_Expression (A_Range, Type_Mark, True);
+            A_Range := Sem_Range_Expression (A_Range, Type_Mark);
             if A_Range = Null_Iir then
                --  Avoid error propagation.
                A_Range := Get_Range_Constraint (Type_Mark);
                Set_Is_Ref (Res, True);
+            elsif Get_Expr_Staticness (A_Range) = Locally
+              and then Get_Type_Staticness (Type_Mark) = Locally
+            then
+               Check_Range_Compatibility
+                 (A_Range, Get_Range_Constraint (Type_Mark));
             end if;
          end if;
          Set_Range_Constraint (Res, A_Range);
@@ -2678,7 +2668,7 @@ package body Vhdl.Sem_Types is
          Set_Type_Declarator (Arr, Decl);
          Set_Element_Subtype (Arr, Get_Branch_Type (El_Nat, I));
          Set_Branch_Type_Definition (Def, I, Arr);
-         Set_Constraint_State (Arr, Get_Array_Constraint (Arr));
+         Set_Constraint_State (Arr, Get_Array_Type_Constraint (Arr));
       end loop;
 
       return Def;

@@ -106,280 +106,289 @@ class Iir_Kind(IntEnum):
     Array_Element_Resolution = 47
     Record_Resolution = 48
     Record_Element_Resolution = 49
-    Break_Element = 50
-    Attribute_Specification = 51
-    Disconnection_Specification = 52
-    Step_Limit_Specification = 53
-    Configuration_Specification = 54
-    Access_Type_Definition = 55
-    Incomplete_Type_Definition = 56
-    Interface_Type_Definition = 57
-    File_Type_Definition = 58
-    Protected_Type_Declaration = 59
-    Record_Type_Definition = 60
-    Array_Type_Definition = 61
-    Array_Subtype_Definition = 62
-    Record_Subtype_Definition = 63
-    Access_Subtype_Definition = 64
-    File_Subtype_Definition = 65
-    Physical_Subtype_Definition = 66
-    Floating_Subtype_Definition = 67
-    Integer_Subtype_Definition = 68
-    Enumeration_Subtype_Definition = 69
-    Enumeration_Type_Definition = 70
-    Integer_Type_Definition = 71
-    Floating_Type_Definition = 72
-    Physical_Type_Definition = 73
-    Range_Expression = 74
-    Protected_Type_Body = 75
-    Wildcard_Type_Definition = 76
-    Foreign_Vector_Type_Definition = 77
-    Subtype_Definition = 78
-    Scalar_Nature_Definition = 79
-    Record_Nature_Definition = 80
-    Array_Nature_Definition = 81
-    Array_Subnature_Definition = 82
-    Overload_List = 83
-    Foreign_Module = 84
-    Entity_Declaration = 85
-    Configuration_Declaration = 86
-    Context_Declaration = 87
-    Package_Declaration = 88
-    Package_Instantiation_Declaration = 89
-    Vmode_Declaration = 90
-    Vprop_Declaration = 91
-    Vunit_Declaration = 92
-    Package_Body = 93
-    Architecture_Body = 94
-    Type_Declaration = 95
-    Anonymous_Type_Declaration = 96
-    Subtype_Declaration = 97
-    Nature_Declaration = 98
-    Subnature_Declaration = 99
-    Package_Header = 100
-    Unit_Declaration = 101
-    Library_Declaration = 102
-    Component_Declaration = 103
-    Attribute_Declaration = 104
-    Group_Template_Declaration = 105
-    Group_Declaration = 106
-    Element_Declaration = 107
-    Nature_Element_Declaration = 108
-    Non_Object_Alias_Declaration = 109
-    Psl_Declaration = 110
-    Psl_Boolean_Parameter = 111
-    Psl_Endpoint_Declaration = 112
-    Enumeration_Literal = 113
-    Function_Declaration = 114
-    Procedure_Declaration = 115
-    Function_Body = 116
-    Procedure_Body = 117
-    Function_Instantiation_Declaration = 118
-    Procedure_Instantiation_Declaration = 119
-    Terminal_Declaration = 120
-    Object_Alias_Declaration = 121
-    Free_Quantity_Declaration = 122
-    Spectrum_Quantity_Declaration = 123
-    Noise_Quantity_Declaration = 124
-    Across_Quantity_Declaration = 125
-    Through_Quantity_Declaration = 126
-    File_Declaration = 127
-    Guard_Signal_Declaration = 128
-    Signal_Declaration = 129
-    Variable_Declaration = 130
-    Constant_Declaration = 131
-    Iterator_Declaration = 132
-    Interface_Constant_Declaration = 133
-    Interface_Variable_Declaration = 134
-    Interface_Signal_Declaration = 135
-    Interface_File_Declaration = 136
-    Interface_Quantity_Declaration = 137
-    Interface_Terminal_Declaration = 138
-    Interface_Type_Declaration = 139
-    Interface_Package_Declaration = 140
-    Interface_Function_Declaration = 141
-    Interface_Procedure_Declaration = 142
-    Attribute_Implicit_Declaration = 143
-    Suspend_State_Declaration = 144
-    Identity_Operator = 145
-    Negation_Operator = 146
-    Absolute_Operator = 147
-    Not_Operator = 148
-    Implicit_Condition_Operator = 149
-    Condition_Operator = 150
-    Reduction_And_Operator = 151
-    Reduction_Or_Operator = 152
-    Reduction_Nand_Operator = 153
-    Reduction_Nor_Operator = 154
-    Reduction_Xor_Operator = 155
-    Reduction_Xnor_Operator = 156
-    And_Operator = 157
-    Or_Operator = 158
-    Nand_Operator = 159
-    Nor_Operator = 160
-    Xor_Operator = 161
-    Xnor_Operator = 162
-    Equality_Operator = 163
-    Inequality_Operator = 164
-    Less_Than_Operator = 165
-    Less_Than_Or_Equal_Operator = 166
-    Greater_Than_Operator = 167
-    Greater_Than_Or_Equal_Operator = 168
-    Match_Equality_Operator = 169
-    Match_Inequality_Operator = 170
-    Match_Less_Than_Operator = 171
-    Match_Less_Than_Or_Equal_Operator = 172
-    Match_Greater_Than_Operator = 173
-    Match_Greater_Than_Or_Equal_Operator = 174
-    Sll_Operator = 175
-    Sla_Operator = 176
-    Srl_Operator = 177
-    Sra_Operator = 178
-    Rol_Operator = 179
-    Ror_Operator = 180
-    Addition_Operator = 181
-    Substraction_Operator = 182
-    Concatenation_Operator = 183
-    Multiplication_Operator = 184
-    Division_Operator = 185
-    Modulus_Operator = 186
-    Remainder_Operator = 187
-    Exponentiation_Operator = 188
-    Function_Call = 189
-    Aggregate = 190
-    Parenthesis_Expression = 191
-    Qualified_Expression = 192
-    Type_Conversion = 193
-    Allocator_By_Expression = 194
-    Allocator_By_Subtype = 195
-    Selected_Element = 196
-    Dereference = 197
-    Implicit_Dereference = 198
-    Slice_Name = 199
-    Indexed_Name = 200
-    Psl_Prev = 201
-    Psl_Stable = 202
-    Psl_Rose = 203
-    Psl_Fell = 204
-    Psl_Onehot = 205
-    Psl_Onehot0 = 206
-    Psl_Expression = 207
-    Sensitized_Process_Statement = 208
-    Process_Statement = 209
-    Concurrent_Simple_Signal_Assignment = 210
-    Concurrent_Conditional_Signal_Assignment = 211
-    Concurrent_Selected_Signal_Assignment = 212
-    Concurrent_Assertion_Statement = 213
-    Concurrent_Procedure_Call_Statement = 214
-    Concurrent_Break_Statement = 215
-    Psl_Assert_Directive = 216
-    Psl_Assume_Directive = 217
-    Psl_Cover_Directive = 218
-    Psl_Restrict_Directive = 219
-    Block_Statement = 220
-    If_Generate_Statement = 221
-    Case_Generate_Statement = 222
-    For_Generate_Statement = 223
-    Component_Instantiation_Statement = 224
-    Psl_Default_Clock = 225
-    Generate_Statement_Body = 226
-    If_Generate_Else_Clause = 227
-    Simple_Simultaneous_Statement = 228
-    Simultaneous_Null_Statement = 229
-    Simultaneous_Procedural_Statement = 230
-    Simultaneous_Case_Statement = 231
-    Simultaneous_If_Statement = 232
-    Simultaneous_Elsif = 233
-    Simple_Signal_Assignment_Statement = 234
-    Conditional_Signal_Assignment_Statement = 235
-    Selected_Waveform_Assignment_Statement = 236
-    Signal_Force_Assignment_Statement = 237
-    Signal_Release_Assignment_Statement = 238
-    Null_Statement = 239
-    Assertion_Statement = 240
-    Report_Statement = 241
-    Wait_Statement = 242
-    Variable_Assignment_Statement = 243
-    Conditional_Variable_Assignment_Statement = 244
-    Return_Statement = 245
-    For_Loop_Statement = 246
-    While_Loop_Statement = 247
-    Next_Statement = 248
-    Exit_Statement = 249
-    Case_Statement = 250
-    Procedure_Call_Statement = 251
-    Break_Statement = 252
-    If_Statement = 253
-    Suspend_State_Statement = 254
-    Elsif = 255
-    Character_Literal = 256
-    Simple_Name = 257
-    Selected_Name = 258
-    Operator_Symbol = 259
-    Reference_Name = 260
-    External_Constant_Name = 261
-    External_Signal_Name = 262
-    External_Variable_Name = 263
-    Selected_By_All_Name = 264
-    Parenthesis_Name = 265
-    Package_Pathname = 266
-    Absolute_Pathname = 267
-    Relative_Pathname = 268
-    Pathname_Element = 269
-    Base_Attribute = 270
-    Subtype_Attribute = 271
-    Element_Attribute = 272
-    Across_Attribute = 273
-    Through_Attribute = 274
-    Nature_Reference_Attribute = 275
-    Left_Type_Attribute = 276
-    Right_Type_Attribute = 277
-    High_Type_Attribute = 278
-    Low_Type_Attribute = 279
-    Ascending_Type_Attribute = 280
-    Image_Attribute = 281
-    Value_Attribute = 282
-    Pos_Attribute = 283
-    Val_Attribute = 284
-    Succ_Attribute = 285
-    Pred_Attribute = 286
-    Leftof_Attribute = 287
-    Rightof_Attribute = 288
-    Signal_Slew_Attribute = 289
-    Quantity_Slew_Attribute = 290
-    Ramp_Attribute = 291
-    Zoh_Attribute = 292
-    Ltf_Attribute = 293
-    Ztf_Attribute = 294
-    Dot_Attribute = 295
-    Integ_Attribute = 296
-    Quantity_Delayed_Attribute = 297
-    Above_Attribute = 298
-    Delayed_Attribute = 299
-    Stable_Attribute = 300
-    Quiet_Attribute = 301
-    Transaction_Attribute = 302
-    Event_Attribute = 303
-    Active_Attribute = 304
-    Last_Event_Attribute = 305
-    Last_Active_Attribute = 306
-    Last_Value_Attribute = 307
-    Driving_Attribute = 308
-    Driving_Value_Attribute = 309
-    Behavior_Attribute = 310
-    Structure_Attribute = 311
-    Simple_Name_Attribute = 312
-    Instance_Name_Attribute = 313
-    Path_Name_Attribute = 314
-    Left_Array_Attribute = 315
-    Right_Array_Attribute = 316
-    High_Array_Attribute = 317
-    Low_Array_Attribute = 318
-    Length_Array_Attribute = 319
-    Ascending_Array_Attribute = 320
-    Range_Array_Attribute = 321
-    Reverse_Range_Array_Attribute = 322
-    Attribute_Name = 323
+    Simple_Mode_View_Element = 50
+    Array_Mode_View_Element = 51
+    Record_Mode_View_Element = 52
+    Break_Element = 53
+    Attribute_Specification = 54
+    Disconnection_Specification = 55
+    Step_Limit_Specification = 56
+    Configuration_Specification = 57
+    Access_Type_Definition = 58
+    Incomplete_Type_Definition = 59
+    Interface_Type_Definition = 60
+    File_Type_Definition = 61
+    Protected_Type_Declaration = 62
+    Record_Type_Definition = 63
+    Array_Type_Definition = 64
+    Array_Subtype_Definition = 65
+    Record_Subtype_Definition = 66
+    Access_Subtype_Definition = 67
+    File_Subtype_Definition = 68
+    Physical_Subtype_Definition = 69
+    Floating_Subtype_Definition = 70
+    Integer_Subtype_Definition = 71
+    Enumeration_Subtype_Definition = 72
+    Enumeration_Type_Definition = 73
+    Integer_Type_Definition = 74
+    Floating_Type_Definition = 75
+    Physical_Type_Definition = 76
+    Range_Expression = 77
+    Protected_Type_Body = 78
+    Wildcard_Type_Definition = 79
+    Foreign_Vector_Type_Definition = 80
+    Subtype_Definition = 81
+    Record_Mode_View_Indication = 82
+    Array_Mode_View_Indication = 83
+    Scalar_Nature_Definition = 84
+    Record_Nature_Definition = 85
+    Array_Nature_Definition = 86
+    Array_Subnature_Definition = 87
+    Overload_List = 88
+    Foreign_Module = 89
+    Entity_Declaration = 90
+    Configuration_Declaration = 91
+    Context_Declaration = 92
+    Package_Declaration = 93
+    Package_Instantiation_Declaration = 94
+    Vmode_Declaration = 95
+    Vprop_Declaration = 96
+    Vunit_Declaration = 97
+    Package_Body = 98
+    Architecture_Body = 99
+    Package_Instantiation_Body = 100
+    Type_Declaration = 101
+    Anonymous_Type_Declaration = 102
+    Subtype_Declaration = 103
+    Nature_Declaration = 104
+    Subnature_Declaration = 105
+    Package_Header = 106
+    Unit_Declaration = 107
+    Library_Declaration = 108
+    Component_Declaration = 109
+    Attribute_Declaration = 110
+    Group_Template_Declaration = 111
+    Group_Declaration = 112
+    Element_Declaration = 113
+    Nature_Element_Declaration = 114
+    Non_Object_Alias_Declaration = 115
+    Mode_View_Declaration = 116
+    Psl_Declaration = 117
+    Psl_Boolean_Parameter = 118
+    Psl_Endpoint_Declaration = 119
+    Enumeration_Literal = 120
+    Function_Declaration = 121
+    Procedure_Declaration = 122
+    Function_Body = 123
+    Procedure_Body = 124
+    Function_Instantiation_Declaration = 125
+    Procedure_Instantiation_Declaration = 126
+    Terminal_Declaration = 127
+    Object_Alias_Declaration = 128
+    Free_Quantity_Declaration = 129
+    Spectrum_Quantity_Declaration = 130
+    Noise_Quantity_Declaration = 131
+    Across_Quantity_Declaration = 132
+    Through_Quantity_Declaration = 133
+    File_Declaration = 134
+    Guard_Signal_Declaration = 135
+    Signal_Declaration = 136
+    Variable_Declaration = 137
+    Constant_Declaration = 138
+    Iterator_Declaration = 139
+    Interface_Constant_Declaration = 140
+    Interface_Variable_Declaration = 141
+    Interface_Signal_Declaration = 142
+    Interface_View_Declaration = 143
+    Interface_File_Declaration = 144
+    Interface_Quantity_Declaration = 145
+    Interface_Terminal_Declaration = 146
+    Interface_Type_Declaration = 147
+    Interface_Package_Declaration = 148
+    Interface_Function_Declaration = 149
+    Interface_Procedure_Declaration = 150
+    Attribute_Implicit_Declaration = 151
+    Suspend_State_Declaration = 152
+    Identity_Operator = 153
+    Negation_Operator = 154
+    Absolute_Operator = 155
+    Not_Operator = 156
+    Implicit_Condition_Operator = 157
+    Condition_Operator = 158
+    Reduction_And_Operator = 159
+    Reduction_Or_Operator = 160
+    Reduction_Nand_Operator = 161
+    Reduction_Nor_Operator = 162
+    Reduction_Xor_Operator = 163
+    Reduction_Xnor_Operator = 164
+    And_Operator = 165
+    Or_Operator = 166
+    Nand_Operator = 167
+    Nor_Operator = 168
+    Xor_Operator = 169
+    Xnor_Operator = 170
+    Equality_Operator = 171
+    Inequality_Operator = 172
+    Less_Than_Operator = 173
+    Less_Than_Or_Equal_Operator = 174
+    Greater_Than_Operator = 175
+    Greater_Than_Or_Equal_Operator = 176
+    Match_Equality_Operator = 177
+    Match_Inequality_Operator = 178
+    Match_Less_Than_Operator = 179
+    Match_Less_Than_Or_Equal_Operator = 180
+    Match_Greater_Than_Operator = 181
+    Match_Greater_Than_Or_Equal_Operator = 182
+    Sll_Operator = 183
+    Sla_Operator = 184
+    Srl_Operator = 185
+    Sra_Operator = 186
+    Rol_Operator = 187
+    Ror_Operator = 188
+    Addition_Operator = 189
+    Substraction_Operator = 190
+    Concatenation_Operator = 191
+    Multiplication_Operator = 192
+    Division_Operator = 193
+    Modulus_Operator = 194
+    Remainder_Operator = 195
+    Exponentiation_Operator = 196
+    Function_Call = 197
+    Aggregate = 198
+    Parenthesis_Expression = 199
+    Qualified_Expression = 200
+    Type_Conversion = 201
+    Allocator_By_Expression = 202
+    Allocator_By_Subtype = 203
+    Selected_Element = 204
+    Dereference = 205
+    Implicit_Dereference = 206
+    Slice_Name = 207
+    Indexed_Name = 208
+    Psl_Prev = 209
+    Psl_Stable = 210
+    Psl_Rose = 211
+    Psl_Fell = 212
+    Psl_Onehot = 213
+    Psl_Onehot0 = 214
+    Psl_Expression = 215
+    Sensitized_Process_Statement = 216
+    Process_Statement = 217
+    Concurrent_Simple_Signal_Assignment = 218
+    Concurrent_Conditional_Signal_Assignment = 219
+    Concurrent_Selected_Signal_Assignment = 220
+    Concurrent_Assertion_Statement = 221
+    Concurrent_Procedure_Call_Statement = 222
+    Concurrent_Break_Statement = 223
+    Psl_Assert_Directive = 224
+    Psl_Assume_Directive = 225
+    Psl_Cover_Directive = 226
+    Psl_Restrict_Directive = 227
+    Block_Statement = 228
+    If_Generate_Statement = 229
+    Case_Generate_Statement = 230
+    For_Generate_Statement = 231
+    Component_Instantiation_Statement = 232
+    Psl_Default_Clock = 233
+    Generate_Statement_Body = 234
+    If_Generate_Else_Clause = 235
+    Simple_Simultaneous_Statement = 236
+    Simultaneous_Null_Statement = 237
+    Simultaneous_Procedural_Statement = 238
+    Simultaneous_Case_Statement = 239
+    Simultaneous_If_Statement = 240
+    Simultaneous_Elsif = 241
+    Simple_Signal_Assignment_Statement = 242
+    Conditional_Signal_Assignment_Statement = 243
+    Selected_Waveform_Assignment_Statement = 244
+    Signal_Force_Assignment_Statement = 245
+    Signal_Release_Assignment_Statement = 246
+    Variable_Assignment_Statement = 247
+    Conditional_Variable_Assignment_Statement = 248
+    Null_Statement = 249
+    Assertion_Statement = 250
+    Report_Statement = 251
+    Next_Statement = 252
+    Exit_Statement = 253
+    Return_Statement = 254
+    Procedure_Call_Statement = 255
+    Wait_Statement = 256
+    Break_Statement = 257
+    For_Loop_Statement = 258
+    While_Loop_Statement = 259
+    Case_Statement = 260
+    If_Statement = 261
+    Suspend_State_Statement = 262
+    Elsif = 263
+    Character_Literal = 264
+    Simple_Name = 265
+    Selected_Name = 266
+    Operator_Symbol = 267
+    Reference_Name = 268
+    External_Constant_Name = 269
+    External_Signal_Name = 270
+    External_Variable_Name = 271
+    Selected_By_All_Name = 272
+    Parenthesis_Name = 273
+    Package_Pathname = 274
+    Absolute_Pathname = 275
+    Relative_Pathname = 276
+    Pathname_Element = 277
+    Base_Attribute = 278
+    Subtype_Attribute = 279
+    Element_Attribute = 280
+    Across_Attribute = 281
+    Through_Attribute = 282
+    Nature_Reference_Attribute = 283
+    Left_Type_Attribute = 284
+    Right_Type_Attribute = 285
+    High_Type_Attribute = 286
+    Low_Type_Attribute = 287
+    Ascending_Type_Attribute = 288
+    Image_Attribute = 289
+    Value_Attribute = 290
+    Pos_Attribute = 291
+    Val_Attribute = 292
+    Succ_Attribute = 293
+    Pred_Attribute = 294
+    Leftof_Attribute = 295
+    Rightof_Attribute = 296
+    Signal_Slew_Attribute = 297
+    Quantity_Slew_Attribute = 298
+    Ramp_Attribute = 299
+    Zoh_Attribute = 300
+    Ltf_Attribute = 301
+    Ztf_Attribute = 302
+    Dot_Attribute = 303
+    Integ_Attribute = 304
+    Quantity_Delayed_Attribute = 305
+    Above_Attribute = 306
+    Delayed_Attribute = 307
+    Stable_Attribute = 308
+    Quiet_Attribute = 309
+    Transaction_Attribute = 310
+    Event_Attribute = 311
+    Active_Attribute = 312
+    Last_Event_Attribute = 313
+    Last_Active_Attribute = 314
+    Last_Value_Attribute = 315
+    Driving_Attribute = 316
+    Driving_Value_Attribute = 317
+    Behavior_Attribute = 318
+    Structure_Attribute = 319
+    Simple_Name_Attribute = 320
+    Instance_Name_Attribute = 321
+    Path_Name_Attribute = 322
+    Converse_Attribute = 323
+    Left_Array_Attribute = 324
+    Right_Array_Attribute = 325
+    High_Array_Attribute = 326
+    Low_Array_Attribute = 327
+    Length_Array_Attribute = 328
+    Ascending_Array_Attribute = 329
+    Range_Array_Attribute = 330
+    Reverse_Range_Array_Attribute = 331
+    Attribute_Name = 332
 
 
 @export
@@ -640,6 +649,7 @@ class Iir_Kinds:
         Iir_Kind.Interface_Constant_Declaration,
         Iir_Kind.Interface_Variable_Declaration,
         Iir_Kind.Interface_Signal_Declaration,
+        Iir_Kind.Interface_View_Declaration,
         Iir_Kind.Interface_File_Declaration,
         Iir_Kind.Interface_Quantity_Declaration,
     ]
@@ -653,6 +663,7 @@ class Iir_Kinds:
         Iir_Kind.Interface_Constant_Declaration,
         Iir_Kind.Interface_Variable_Declaration,
         Iir_Kind.Interface_Signal_Declaration,
+        Iir_Kind.Interface_View_Declaration,
         Iir_Kind.Interface_File_Declaration,
         Iir_Kind.Interface_Quantity_Declaration,
         Iir_Kind.Interface_Terminal_Declaration,
@@ -678,6 +689,7 @@ class Iir_Kinds:
         Iir_Kind.Interface_Constant_Declaration,
         Iir_Kind.Interface_Variable_Declaration,
         Iir_Kind.Interface_Signal_Declaration,
+        Iir_Kind.Interface_View_Declaration,
         Iir_Kind.Interface_File_Declaration,
         Iir_Kind.Interface_Quantity_Declaration,
     ]
@@ -710,6 +722,7 @@ class Iir_Kinds:
         Iir_Kind.Interface_Constant_Declaration,
         Iir_Kind.Interface_Variable_Declaration,
         Iir_Kind.Interface_Signal_Declaration,
+        Iir_Kind.Interface_View_Declaration,
         Iir_Kind.Interface_File_Declaration,
     ]
 
@@ -852,6 +865,7 @@ class Iir_Kinds:
         Iir_Kind.Simple_Name_Attribute,
         Iir_Kind.Instance_Name_Attribute,
         Iir_Kind.Path_Name_Attribute,
+        Iir_Kind.Converse_Attribute,
         Iir_Kind.Left_Array_Attribute,
         Iir_Kind.Right_Array_Attribute,
         Iir_Kind.High_Array_Attribute,
@@ -906,6 +920,7 @@ class Iir_Kinds:
         Iir_Kind.Simple_Name_Attribute,
         Iir_Kind.Instance_Name_Attribute,
         Iir_Kind.Path_Name_Attribute,
+        Iir_Kind.Converse_Attribute,
         Iir_Kind.Left_Array_Attribute,
         Iir_Kind.Right_Array_Attribute,
         Iir_Kind.High_Array_Attribute,
@@ -1082,21 +1097,29 @@ class Iir_Kinds:
         Iir_Kind.Selected_Waveform_Assignment_Statement,
         Iir_Kind.Signal_Force_Assignment_Statement,
         Iir_Kind.Signal_Release_Assignment_Statement,
+        Iir_Kind.Variable_Assignment_Statement,
+        Iir_Kind.Conditional_Variable_Assignment_Statement,
         Iir_Kind.Null_Statement,
         Iir_Kind.Assertion_Statement,
         Iir_Kind.Report_Statement,
-        Iir_Kind.Wait_Statement,
-        Iir_Kind.Variable_Assignment_Statement,
-        Iir_Kind.Conditional_Variable_Assignment_Statement,
-        Iir_Kind.Return_Statement,
-        Iir_Kind.For_Loop_Statement,
-        Iir_Kind.While_Loop_Statement,
         Iir_Kind.Next_Statement,
         Iir_Kind.Exit_Statement,
-        Iir_Kind.Case_Statement,
+        Iir_Kind.Return_Statement,
         Iir_Kind.Procedure_Call_Statement,
+        Iir_Kind.Wait_Statement,
         Iir_Kind.Break_Statement,
+        Iir_Kind.For_Loop_Statement,
+        Iir_Kind.While_Loop_Statement,
+        Iir_Kind.Case_Statement,
         Iir_Kind.If_Statement,
+    ]
+
+    Signal_Assignment_Statement = [
+        Iir_Kind.Simple_Signal_Assignment_Statement,
+        Iir_Kind.Conditional_Signal_Assignment_Statement,
+        Iir_Kind.Selected_Waveform_Assignment_Statement,
+        Iir_Kind.Signal_Force_Assignment_Statement,
+        Iir_Kind.Signal_Release_Assignment_Statement,
     ]
 
     Sequential_Statement_Ext = [
@@ -1105,20 +1128,20 @@ class Iir_Kinds:
         Iir_Kind.Selected_Waveform_Assignment_Statement,
         Iir_Kind.Signal_Force_Assignment_Statement,
         Iir_Kind.Signal_Release_Assignment_Statement,
+        Iir_Kind.Variable_Assignment_Statement,
+        Iir_Kind.Conditional_Variable_Assignment_Statement,
         Iir_Kind.Null_Statement,
         Iir_Kind.Assertion_Statement,
         Iir_Kind.Report_Statement,
-        Iir_Kind.Wait_Statement,
-        Iir_Kind.Variable_Assignment_Statement,
-        Iir_Kind.Conditional_Variable_Assignment_Statement,
-        Iir_Kind.Return_Statement,
-        Iir_Kind.For_Loop_Statement,
-        Iir_Kind.While_Loop_Statement,
         Iir_Kind.Next_Statement,
         Iir_Kind.Exit_Statement,
-        Iir_Kind.Case_Statement,
+        Iir_Kind.Return_Statement,
         Iir_Kind.Procedure_Call_Statement,
+        Iir_Kind.Wait_Statement,
         Iir_Kind.Break_Statement,
+        Iir_Kind.For_Loop_Statement,
+        Iir_Kind.While_Loop_Statement,
+        Iir_Kind.Case_Statement,
         Iir_Kind.If_Statement,
         Iir_Kind.Suspend_State_Statement,
     ]
@@ -1149,6 +1172,12 @@ class Iir_Kinds:
         Iir_Kind.Disconnection_Specification,
         Iir_Kind.Step_Limit_Specification,
         Iir_Kind.Configuration_Specification,
+    ]
+
+    Mode_View_Element_Definition = [
+        Iir_Kind.Simple_Mode_View_Element,
+        Iir_Kind.Array_Mode_View_Element,
+        Iir_Kind.Record_Mode_View_Element,
     ]
 
 
@@ -1835,144 +1864,148 @@ class Iir_Predefined(IntEnum):
     Ieee_Std_Logic_Arith_Conv_Unsigned_Uns = 614
     Ieee_Std_Logic_Arith_Conv_Unsigned_Sgn = 615
     Ieee_Std_Logic_Arith_Conv_Unsigned_Log = 616
-    Ieee_Std_Logic_Arith_Conv_Integer_Int = 617
-    Ieee_Std_Logic_Arith_Conv_Integer_Uns = 618
-    Ieee_Std_Logic_Arith_Conv_Integer_Sgn = 619
-    Ieee_Std_Logic_Arith_Conv_Integer_Log = 620
-    Ieee_Std_Logic_Arith_Conv_Vector_Int = 621
-    Ieee_Std_Logic_Arith_Conv_Vector_Uns = 622
-    Ieee_Std_Logic_Arith_Conv_Vector_Sgn = 623
-    Ieee_Std_Logic_Arith_Conv_Vector_Log = 624
-    Ieee_Std_Logic_Arith_Ext = 625
-    Ieee_Std_Logic_Arith_Sxt = 626
-    Ieee_Std_Logic_Arith_Id_Uns_Uns = 627
-    Ieee_Std_Logic_Arith_Id_Sgn_Sgn = 628
-    Ieee_Std_Logic_Arith_Neg_Sgn_Sgn = 629
-    Ieee_Std_Logic_Arith_Abs_Sgn_Sgn = 630
-    Ieee_Std_Logic_Arith_Shl_Uns = 631
-    Ieee_Std_Logic_Arith_Shl_Sgn = 632
-    Ieee_Std_Logic_Arith_Shr_Uns = 633
-    Ieee_Std_Logic_Arith_Shr_Sgn = 634
-    Ieee_Std_Logic_Arith_Id_Uns_Slv = 635
-    Ieee_Std_Logic_Arith_Id_Sgn_Slv = 636
-    Ieee_Std_Logic_Arith_Neg_Sgn_Slv = 637
-    Ieee_Std_Logic_Arith_Abs_Sgn_Slv = 638
-    Ieee_Std_Logic_Arith_Mul_Uns_Uns_Uns = 639
-    Ieee_Std_Logic_Arith_Mul_Sgn_Sgn_Sgn = 640
-    Ieee_Std_Logic_Arith_Mul_Sgn_Uns_Sgn = 641
-    Ieee_Std_Logic_Arith_Mul_Uns_Sgn_Sgn = 642
-    Ieee_Std_Logic_Arith_Mul_Uns_Uns_Slv = 643
-    Ieee_Std_Logic_Arith_Mul_Sgn_Sgn_Slv = 644
-    Ieee_Std_Logic_Arith_Mul_Sgn_Uns_Slv = 645
-    Ieee_Std_Logic_Arith_Mul_Uns_Sgn_Slv = 646
-    Ieee_Std_Logic_Arith_Add_Uns_Uns_Uns = 647
-    Ieee_Std_Logic_Arith_Add_Sgn_Sgn_Sgn = 648
-    Ieee_Std_Logic_Arith_Add_Uns_Sgn_Sgn = 649
-    Ieee_Std_Logic_Arith_Add_Sgn_Uns_Sgn = 650
-    Ieee_Std_Logic_Arith_Add_Uns_Int_Uns = 651
-    Ieee_Std_Logic_Arith_Add_Int_Uns_Uns = 652
-    Ieee_Std_Logic_Arith_Add_Sgn_Int_Sgn = 653
-    Ieee_Std_Logic_Arith_Add_Int_Sgn_Sgn = 654
-    Ieee_Std_Logic_Arith_Add_Uns_Log_Uns = 655
-    Ieee_Std_Logic_Arith_Add_Log_Uns_Uns = 656
-    Ieee_Std_Logic_Arith_Add_Sgn_Log_Sgn = 657
-    Ieee_Std_Logic_Arith_Add_Log_Sgn_Sgn = 658
-    Ieee_Std_Logic_Arith_Add_Uns_Uns_Slv = 659
-    Ieee_Std_Logic_Arith_Add_Sgn_Sgn_Slv = 660
-    Ieee_Std_Logic_Arith_Add_Uns_Sgn_Slv = 661
-    Ieee_Std_Logic_Arith_Add_Sgn_Uns_Slv = 662
-    Ieee_Std_Logic_Arith_Add_Uns_Int_Slv = 663
-    Ieee_Std_Logic_Arith_Add_Int_Uns_Slv = 664
-    Ieee_Std_Logic_Arith_Add_Sgn_Int_Slv = 665
-    Ieee_Std_Logic_Arith_Add_Int_Sgn_Slv = 666
-    Ieee_Std_Logic_Arith_Add_Uns_Log_Slv = 667
-    Ieee_Std_Logic_Arith_Add_Log_Uns_Slv = 668
-    Ieee_Std_Logic_Arith_Add_Sgn_Log_Slv = 669
-    Ieee_Std_Logic_Arith_Add_Log_Sgn_Slv = 670
-    Ieee_Std_Logic_Arith_Sub_Uns_Uns_Uns = 671
-    Ieee_Std_Logic_Arith_Sub_Sgn_Sgn_Sgn = 672
-    Ieee_Std_Logic_Arith_Sub_Uns_Sgn_Sgn = 673
-    Ieee_Std_Logic_Arith_Sub_Sgn_Uns_Sgn = 674
-    Ieee_Std_Logic_Arith_Sub_Uns_Int_Uns = 675
-    Ieee_Std_Logic_Arith_Sub_Int_Uns_Uns = 676
-    Ieee_Std_Logic_Arith_Sub_Sgn_Int_Sgn = 677
-    Ieee_Std_Logic_Arith_Sub_Int_Sgn_Sgn = 678
-    Ieee_Std_Logic_Arith_Sub_Uns_Log_Uns = 679
-    Ieee_Std_Logic_Arith_Sub_Log_Uns_Uns = 680
-    Ieee_Std_Logic_Arith_Sub_Sgn_Log_Sgn = 681
-    Ieee_Std_Logic_Arith_Sub_Log_Sgn_Sgn = 682
-    Ieee_Std_Logic_Arith_Sub_Uns_Uns_Slv = 683
-    Ieee_Std_Logic_Arith_Sub_Sgn_Sgn_Slv = 684
-    Ieee_Std_Logic_Arith_Sub_Uns_Sgn_Slv = 685
-    Ieee_Std_Logic_Arith_Sub_Sgn_Uns_Slv = 686
-    Ieee_Std_Logic_Arith_Sub_Uns_Int_Slv = 687
-    Ieee_Std_Logic_Arith_Sub_Int_Uns_Slv = 688
-    Ieee_Std_Logic_Arith_Sub_Sgn_Int_Slv = 689
-    Ieee_Std_Logic_Arith_Sub_Int_Sgn_Slv = 690
-    Ieee_Std_Logic_Arith_Sub_Uns_Log_Slv = 691
-    Ieee_Std_Logic_Arith_Sub_Log_Uns_Slv = 692
-    Ieee_Std_Logic_Arith_Sub_Sgn_Log_Slv = 693
-    Ieee_Std_Logic_Arith_Sub_Log_Sgn_Slv = 694
-    Ieee_Std_Logic_Arith_Lt_Uns_Uns = 695
-    Ieee_Std_Logic_Arith_Lt_Sgn_Sgn = 696
-    Ieee_Std_Logic_Arith_Lt_Uns_Sgn = 697
-    Ieee_Std_Logic_Arith_Lt_Sgn_Uns = 698
-    Ieee_Std_Logic_Arith_Lt_Uns_Int = 699
-    Ieee_Std_Logic_Arith_Lt_Int_Uns = 700
-    Ieee_Std_Logic_Arith_Lt_Sgn_Int = 701
-    Ieee_Std_Logic_Arith_Lt_Int_Sgn = 702
-    Ieee_Std_Logic_Arith_Le_Uns_Uns = 703
-    Ieee_Std_Logic_Arith_Le_Sgn_Sgn = 704
-    Ieee_Std_Logic_Arith_Le_Uns_Sgn = 705
-    Ieee_Std_Logic_Arith_Le_Sgn_Uns = 706
-    Ieee_Std_Logic_Arith_Le_Uns_Int = 707
-    Ieee_Std_Logic_Arith_Le_Int_Uns = 708
-    Ieee_Std_Logic_Arith_Le_Sgn_Int = 709
-    Ieee_Std_Logic_Arith_Le_Int_Sgn = 710
-    Ieee_Std_Logic_Arith_Gt_Uns_Uns = 711
-    Ieee_Std_Logic_Arith_Gt_Sgn_Sgn = 712
-    Ieee_Std_Logic_Arith_Gt_Uns_Sgn = 713
-    Ieee_Std_Logic_Arith_Gt_Sgn_Uns = 714
-    Ieee_Std_Logic_Arith_Gt_Uns_Int = 715
-    Ieee_Std_Logic_Arith_Gt_Int_Uns = 716
-    Ieee_Std_Logic_Arith_Gt_Sgn_Int = 717
-    Ieee_Std_Logic_Arith_Gt_Int_Sgn = 718
-    Ieee_Std_Logic_Arith_Ge_Uns_Uns = 719
-    Ieee_Std_Logic_Arith_Ge_Sgn_Sgn = 720
-    Ieee_Std_Logic_Arith_Ge_Uns_Sgn = 721
-    Ieee_Std_Logic_Arith_Ge_Sgn_Uns = 722
-    Ieee_Std_Logic_Arith_Ge_Uns_Int = 723
-    Ieee_Std_Logic_Arith_Ge_Int_Uns = 724
-    Ieee_Std_Logic_Arith_Ge_Sgn_Int = 725
-    Ieee_Std_Logic_Arith_Ge_Int_Sgn = 726
-    Ieee_Std_Logic_Arith_Eq_Uns_Uns = 727
-    Ieee_Std_Logic_Arith_Eq_Sgn_Sgn = 728
-    Ieee_Std_Logic_Arith_Eq_Uns_Sgn = 729
-    Ieee_Std_Logic_Arith_Eq_Sgn_Uns = 730
-    Ieee_Std_Logic_Arith_Eq_Uns_Int = 731
-    Ieee_Std_Logic_Arith_Eq_Int_Uns = 732
-    Ieee_Std_Logic_Arith_Eq_Sgn_Int = 733
-    Ieee_Std_Logic_Arith_Eq_Int_Sgn = 734
-    Ieee_Std_Logic_Arith_Ne_Uns_Uns = 735
-    Ieee_Std_Logic_Arith_Ne_Sgn_Sgn = 736
-    Ieee_Std_Logic_Arith_Ne_Uns_Sgn = 737
-    Ieee_Std_Logic_Arith_Ne_Sgn_Uns = 738
-    Ieee_Std_Logic_Arith_Ne_Uns_Int = 739
-    Ieee_Std_Logic_Arith_Ne_Int_Uns = 740
-    Ieee_Std_Logic_Arith_Ne_Sgn_Int = 741
-    Ieee_Std_Logic_Arith_Ne_Int_Sgn = 742
-    Ieee_Std_Logic_Misc_And_Reduce_Slv = 743
-    Ieee_Std_Logic_Misc_And_Reduce_Suv = 744
-    Ieee_Std_Logic_Misc_Nand_Reduce_Slv = 745
-    Ieee_Std_Logic_Misc_Nand_Reduce_Suv = 746
-    Ieee_Std_Logic_Misc_Or_Reduce_Slv = 747
-    Ieee_Std_Logic_Misc_Or_Reduce_Suv = 748
-    Ieee_Std_Logic_Misc_Nor_Reduce_Slv = 749
-    Ieee_Std_Logic_Misc_Nor_Reduce_Suv = 750
-    Ieee_Std_Logic_Misc_Xor_Reduce_Slv = 751
-    Ieee_Std_Logic_Misc_Xor_Reduce_Suv = 752
-    Ieee_Std_Logic_Misc_Xnor_Reduce_Slv = 753
-    Ieee_Std_Logic_Misc_Xnor_Reduce_Suv = 754
+    Ieee_Std_Logic_Arith_Conv_Signed_Int = 617
+    Ieee_Std_Logic_Arith_Conv_Signed_Uns = 618
+    Ieee_Std_Logic_Arith_Conv_Signed_Sgn = 619
+    Ieee_Std_Logic_Arith_Conv_Signed_Log = 620
+    Ieee_Std_Logic_Arith_Conv_Integer_Int = 621
+    Ieee_Std_Logic_Arith_Conv_Integer_Uns = 622
+    Ieee_Std_Logic_Arith_Conv_Integer_Sgn = 623
+    Ieee_Std_Logic_Arith_Conv_Integer_Log = 624
+    Ieee_Std_Logic_Arith_Conv_Vector_Int = 625
+    Ieee_Std_Logic_Arith_Conv_Vector_Uns = 626
+    Ieee_Std_Logic_Arith_Conv_Vector_Sgn = 627
+    Ieee_Std_Logic_Arith_Conv_Vector_Log = 628
+    Ieee_Std_Logic_Arith_Ext = 629
+    Ieee_Std_Logic_Arith_Sxt = 630
+    Ieee_Std_Logic_Arith_Id_Uns_Uns = 631
+    Ieee_Std_Logic_Arith_Id_Sgn_Sgn = 632
+    Ieee_Std_Logic_Arith_Neg_Sgn_Sgn = 633
+    Ieee_Std_Logic_Arith_Abs_Sgn_Sgn = 634
+    Ieee_Std_Logic_Arith_Shl_Uns = 635
+    Ieee_Std_Logic_Arith_Shl_Sgn = 636
+    Ieee_Std_Logic_Arith_Shr_Uns = 637
+    Ieee_Std_Logic_Arith_Shr_Sgn = 638
+    Ieee_Std_Logic_Arith_Id_Uns_Slv = 639
+    Ieee_Std_Logic_Arith_Id_Sgn_Slv = 640
+    Ieee_Std_Logic_Arith_Neg_Sgn_Slv = 641
+    Ieee_Std_Logic_Arith_Abs_Sgn_Slv = 642
+    Ieee_Std_Logic_Arith_Mul_Uns_Uns_Uns = 643
+    Ieee_Std_Logic_Arith_Mul_Sgn_Sgn_Sgn = 644
+    Ieee_Std_Logic_Arith_Mul_Sgn_Uns_Sgn = 645
+    Ieee_Std_Logic_Arith_Mul_Uns_Sgn_Sgn = 646
+    Ieee_Std_Logic_Arith_Mul_Uns_Uns_Slv = 647
+    Ieee_Std_Logic_Arith_Mul_Sgn_Sgn_Slv = 648
+    Ieee_Std_Logic_Arith_Mul_Sgn_Uns_Slv = 649
+    Ieee_Std_Logic_Arith_Mul_Uns_Sgn_Slv = 650
+    Ieee_Std_Logic_Arith_Add_Uns_Uns_Uns = 651
+    Ieee_Std_Logic_Arith_Add_Sgn_Sgn_Sgn = 652
+    Ieee_Std_Logic_Arith_Add_Uns_Sgn_Sgn = 653
+    Ieee_Std_Logic_Arith_Add_Sgn_Uns_Sgn = 654
+    Ieee_Std_Logic_Arith_Add_Uns_Int_Uns = 655
+    Ieee_Std_Logic_Arith_Add_Int_Uns_Uns = 656
+    Ieee_Std_Logic_Arith_Add_Sgn_Int_Sgn = 657
+    Ieee_Std_Logic_Arith_Add_Int_Sgn_Sgn = 658
+    Ieee_Std_Logic_Arith_Add_Uns_Log_Uns = 659
+    Ieee_Std_Logic_Arith_Add_Log_Uns_Uns = 660
+    Ieee_Std_Logic_Arith_Add_Sgn_Log_Sgn = 661
+    Ieee_Std_Logic_Arith_Add_Log_Sgn_Sgn = 662
+    Ieee_Std_Logic_Arith_Add_Uns_Uns_Slv = 663
+    Ieee_Std_Logic_Arith_Add_Sgn_Sgn_Slv = 664
+    Ieee_Std_Logic_Arith_Add_Uns_Sgn_Slv = 665
+    Ieee_Std_Logic_Arith_Add_Sgn_Uns_Slv = 666
+    Ieee_Std_Logic_Arith_Add_Uns_Int_Slv = 667
+    Ieee_Std_Logic_Arith_Add_Int_Uns_Slv = 668
+    Ieee_Std_Logic_Arith_Add_Sgn_Int_Slv = 669
+    Ieee_Std_Logic_Arith_Add_Int_Sgn_Slv = 670
+    Ieee_Std_Logic_Arith_Add_Uns_Log_Slv = 671
+    Ieee_Std_Logic_Arith_Add_Log_Uns_Slv = 672
+    Ieee_Std_Logic_Arith_Add_Sgn_Log_Slv = 673
+    Ieee_Std_Logic_Arith_Add_Log_Sgn_Slv = 674
+    Ieee_Std_Logic_Arith_Sub_Uns_Uns_Uns = 675
+    Ieee_Std_Logic_Arith_Sub_Sgn_Sgn_Sgn = 676
+    Ieee_Std_Logic_Arith_Sub_Uns_Sgn_Sgn = 677
+    Ieee_Std_Logic_Arith_Sub_Sgn_Uns_Sgn = 678
+    Ieee_Std_Logic_Arith_Sub_Uns_Int_Uns = 679
+    Ieee_Std_Logic_Arith_Sub_Int_Uns_Uns = 680
+    Ieee_Std_Logic_Arith_Sub_Sgn_Int_Sgn = 681
+    Ieee_Std_Logic_Arith_Sub_Int_Sgn_Sgn = 682
+    Ieee_Std_Logic_Arith_Sub_Uns_Log_Uns = 683
+    Ieee_Std_Logic_Arith_Sub_Log_Uns_Uns = 684
+    Ieee_Std_Logic_Arith_Sub_Sgn_Log_Sgn = 685
+    Ieee_Std_Logic_Arith_Sub_Log_Sgn_Sgn = 686
+    Ieee_Std_Logic_Arith_Sub_Uns_Uns_Slv = 687
+    Ieee_Std_Logic_Arith_Sub_Sgn_Sgn_Slv = 688
+    Ieee_Std_Logic_Arith_Sub_Uns_Sgn_Slv = 689
+    Ieee_Std_Logic_Arith_Sub_Sgn_Uns_Slv = 690
+    Ieee_Std_Logic_Arith_Sub_Uns_Int_Slv = 691
+    Ieee_Std_Logic_Arith_Sub_Int_Uns_Slv = 692
+    Ieee_Std_Logic_Arith_Sub_Sgn_Int_Slv = 693
+    Ieee_Std_Logic_Arith_Sub_Int_Sgn_Slv = 694
+    Ieee_Std_Logic_Arith_Sub_Uns_Log_Slv = 695
+    Ieee_Std_Logic_Arith_Sub_Log_Uns_Slv = 696
+    Ieee_Std_Logic_Arith_Sub_Sgn_Log_Slv = 697
+    Ieee_Std_Logic_Arith_Sub_Log_Sgn_Slv = 698
+    Ieee_Std_Logic_Arith_Lt_Uns_Uns = 699
+    Ieee_Std_Logic_Arith_Lt_Sgn_Sgn = 700
+    Ieee_Std_Logic_Arith_Lt_Uns_Sgn = 701
+    Ieee_Std_Logic_Arith_Lt_Sgn_Uns = 702
+    Ieee_Std_Logic_Arith_Lt_Uns_Int = 703
+    Ieee_Std_Logic_Arith_Lt_Int_Uns = 704
+    Ieee_Std_Logic_Arith_Lt_Sgn_Int = 705
+    Ieee_Std_Logic_Arith_Lt_Int_Sgn = 706
+    Ieee_Std_Logic_Arith_Le_Uns_Uns = 707
+    Ieee_Std_Logic_Arith_Le_Sgn_Sgn = 708
+    Ieee_Std_Logic_Arith_Le_Uns_Sgn = 709
+    Ieee_Std_Logic_Arith_Le_Sgn_Uns = 710
+    Ieee_Std_Logic_Arith_Le_Uns_Int = 711
+    Ieee_Std_Logic_Arith_Le_Int_Uns = 712
+    Ieee_Std_Logic_Arith_Le_Sgn_Int = 713
+    Ieee_Std_Logic_Arith_Le_Int_Sgn = 714
+    Ieee_Std_Logic_Arith_Gt_Uns_Uns = 715
+    Ieee_Std_Logic_Arith_Gt_Sgn_Sgn = 716
+    Ieee_Std_Logic_Arith_Gt_Uns_Sgn = 717
+    Ieee_Std_Logic_Arith_Gt_Sgn_Uns = 718
+    Ieee_Std_Logic_Arith_Gt_Uns_Int = 719
+    Ieee_Std_Logic_Arith_Gt_Int_Uns = 720
+    Ieee_Std_Logic_Arith_Gt_Sgn_Int = 721
+    Ieee_Std_Logic_Arith_Gt_Int_Sgn = 722
+    Ieee_Std_Logic_Arith_Ge_Uns_Uns = 723
+    Ieee_Std_Logic_Arith_Ge_Sgn_Sgn = 724
+    Ieee_Std_Logic_Arith_Ge_Uns_Sgn = 725
+    Ieee_Std_Logic_Arith_Ge_Sgn_Uns = 726
+    Ieee_Std_Logic_Arith_Ge_Uns_Int = 727
+    Ieee_Std_Logic_Arith_Ge_Int_Uns = 728
+    Ieee_Std_Logic_Arith_Ge_Sgn_Int = 729
+    Ieee_Std_Logic_Arith_Ge_Int_Sgn = 730
+    Ieee_Std_Logic_Arith_Eq_Uns_Uns = 731
+    Ieee_Std_Logic_Arith_Eq_Sgn_Sgn = 732
+    Ieee_Std_Logic_Arith_Eq_Uns_Sgn = 733
+    Ieee_Std_Logic_Arith_Eq_Sgn_Uns = 734
+    Ieee_Std_Logic_Arith_Eq_Uns_Int = 735
+    Ieee_Std_Logic_Arith_Eq_Int_Uns = 736
+    Ieee_Std_Logic_Arith_Eq_Sgn_Int = 737
+    Ieee_Std_Logic_Arith_Eq_Int_Sgn = 738
+    Ieee_Std_Logic_Arith_Ne_Uns_Uns = 739
+    Ieee_Std_Logic_Arith_Ne_Sgn_Sgn = 740
+    Ieee_Std_Logic_Arith_Ne_Uns_Sgn = 741
+    Ieee_Std_Logic_Arith_Ne_Sgn_Uns = 742
+    Ieee_Std_Logic_Arith_Ne_Uns_Int = 743
+    Ieee_Std_Logic_Arith_Ne_Int_Uns = 744
+    Ieee_Std_Logic_Arith_Ne_Sgn_Int = 745
+    Ieee_Std_Logic_Arith_Ne_Int_Sgn = 746
+    Ieee_Std_Logic_Misc_And_Reduce_Slv = 747
+    Ieee_Std_Logic_Misc_And_Reduce_Suv = 748
+    Ieee_Std_Logic_Misc_Nand_Reduce_Slv = 749
+    Ieee_Std_Logic_Misc_Nand_Reduce_Suv = 750
+    Ieee_Std_Logic_Misc_Or_Reduce_Slv = 751
+    Ieee_Std_Logic_Misc_Or_Reduce_Suv = 752
+    Ieee_Std_Logic_Misc_Nor_Reduce_Slv = 753
+    Ieee_Std_Logic_Misc_Nor_Reduce_Suv = 754
+    Ieee_Std_Logic_Misc_Xor_Reduce_Slv = 755
+    Ieee_Std_Logic_Misc_Xor_Reduce_Suv = 756
+    Ieee_Std_Logic_Misc_Xnor_Reduce_Slv = 757
+    Ieee_Std_Logic_Misc_Xnor_Reduce_Suv = 758
 
 
 @export
@@ -2077,19 +2110,6 @@ def Get_Library(obj: Iir) -> Iir:
 @export
 @BindToLibGHDL("vhdl__nodes__set_library")
 def Set_Library(obj: Iir, value: Iir) -> None:
-    """"""
-
-
-@export
-@BindToLibGHDL("vhdl__nodes__get_file_dependence_list")
-def Get_File_Dependence_List(obj: Iir) -> Iir:
-    """"""
-    return 0
-
-
-@export
-@BindToLibGHDL("vhdl__nodes__set_file_dependence_list")
-def Set_File_Dependence_List(obj: Iir, value: Iir) -> None:
     """"""
 
 
@@ -3043,6 +3063,19 @@ def Set_Instance_Package_Body(obj: Iir, value: Iir) -> None:
 
 
 @export
+@BindToLibGHDL("vhdl__nodes__get_owned_instance_package_body")
+def Get_Owned_Instance_Package_Body(obj: Iir) -> Iir:
+    """"""
+    return 0
+
+
+@export
+@BindToLibGHDL("vhdl__nodes__set_owned_instance_package_body")
+def Set_Owned_Instance_Package_Body(obj: Iir, value: Iir) -> None:
+    """"""
+
+
+@export
 @BindToLibGHDL("vhdl__nodes__get_need_body")
 def Get_Need_Body(obj: Iir) -> Boolean:
     """"""
@@ -3052,6 +3085,19 @@ def Get_Need_Body(obj: Iir) -> Boolean:
 @export
 @BindToLibGHDL("vhdl__nodes__set_need_body")
 def Set_Need_Body(obj: Iir, value: Boolean) -> None:
+    """"""
+
+
+@export
+@BindToLibGHDL("vhdl__nodes__get_immediate_body_flag")
+def Get_Immediate_Body_Flag(obj: Iir) -> Boolean:
+    """"""
+    return 0
+
+
+@export
+@BindToLibGHDL("vhdl__nodes__set_immediate_body_flag")
+def Set_Immediate_Body_Flag(obj: Iir, value: Boolean) -> None:
     """"""
 
 
@@ -3602,6 +3648,19 @@ def Set_Default_Value(obj: Iir, value: Iir) -> None:
 
 
 @export
+@BindToLibGHDL("vhdl__nodes__get_mode_view_indication")
+def Get_Mode_View_Indication(obj: Iir) -> Iir:
+    """"""
+    return 0
+
+
+@export
+@BindToLibGHDL("vhdl__nodes__set_mode_view_indication")
+def Set_Mode_View_Indication(obj: Iir, value: Iir) -> None:
+    """"""
+
+
+@export
 @BindToLibGHDL("vhdl__nodes__get_deferred_declaration")
 def Get_Deferred_Declaration(obj: Iir) -> Iir:
     """"""
@@ -3780,6 +3839,19 @@ def Get_Selected_Name(obj: Iir) -> Iir:
 @export
 @BindToLibGHDL("vhdl__nodes__set_selected_name")
 def Set_Selected_Name(obj: Iir, value: Iir) -> None:
+    """"""
+
+
+@export
+@BindToLibGHDL("vhdl__nodes__get_mode_view_name")
+def Get_Mode_View_Name(obj: Iir) -> Iir:
+    """"""
+    return 0
+
+
+@export
+@BindToLibGHDL("vhdl__nodes__set_mode_view_name")
+def Set_Mode_View_Name(obj: Iir, value: Iir) -> None:
     """"""
 
 
@@ -4443,6 +4515,32 @@ def Get_Elements_Declaration_List(obj: Iir) -> Iir:
 @export
 @BindToLibGHDL("vhdl__nodes__set_elements_declaration_list")
 def Set_Elements_Declaration_List(obj: Iir, value: Iir) -> None:
+    """"""
+
+
+@export
+@BindToLibGHDL("vhdl__nodes__get_elements_definition_chain")
+def Get_Elements_Definition_Chain(obj: Iir) -> Iir:
+    """"""
+    return 0
+
+
+@export
+@BindToLibGHDL("vhdl__nodes__set_elements_definition_chain")
+def Set_Elements_Definition_Chain(obj: Iir, value: Iir) -> None:
+    """"""
+
+
+@export
+@BindToLibGHDL("vhdl__nodes__get_elements_definition_list")
+def Get_Elements_Definition_List(obj: Iir) -> Iir:
+    """"""
+    return 0
+
+
+@export
+@BindToLibGHDL("vhdl__nodes__set_elements_definition_list")
+def Set_Elements_Definition_List(obj: Iir, value: Iir) -> None:
     """"""
 
 
@@ -6523,6 +6621,19 @@ def Get_Use_Flag(obj: Iir) -> Boolean:
 @export
 @BindToLibGHDL("vhdl__nodes__set_use_flag")
 def Set_Use_Flag(obj: Iir, value: Boolean) -> None:
+    """"""
+
+
+@export
+@BindToLibGHDL("vhdl__nodes__get_elaborated_flag")
+def Get_Elaborated_Flag(obj: Iir) -> Boolean:
+    """"""
+    return 0
+
+
+@export
+@BindToLibGHDL("vhdl__nodes__set_elaborated_flag")
+def Set_Elaborated_Flag(obj: Iir, value: Boolean) -> None:
     """"""
 
 

@@ -24,7 +24,14 @@ package Vhdl.Sem_Expr is
    --  Set type to nodes,
    --  Resolve overloading
 
+   --  If set, use of deferred constants is allowed.
+   --  Set during analysis of default value of subprogram parameters.
    Deferred_Constant_Allowed : Boolean := False;
+
+   --  If set, use of unelaborated constructs is allowed.
+   --  This is set while analyzing subprograms body (and default parameters
+   --  values), as a subprogram may be called way after elaboration.
+   Unelaborated_Use_Allowed : Boolean := False;
 
    --  Analyze an expression (other than a range) with a possible overloading.
    --  Sem_expression_ov (and therefore sem_expression) must be called *once*
@@ -107,19 +114,15 @@ package Vhdl.Sem_Expr is
    --  handled in this package.
    procedure Sem_Procedure_Call (Call : Iir_Procedure_Call; Stmt : Iir);
 
-   --  Analyze a range (ie a range attribute or a range expression).  If
-   --  ANY_DIR is true, the range can't be a null range (slice vs subtype,
-   --  used in static evaluation). A_TYPE may be Null_Iir.
+   --  Analyze a range (ie a range attribute or a range expression).
+   --  A_TYPE may be Null_Iir.
    --  Return Null_Iir in case of error, or EXPR analyzed (and evaluated if
    --  possible).
-   function Sem_Range_Expression (Expr: Iir; A_Type: Iir; Any_Dir : Boolean)
-     return Iir;
+   function Sem_Range_Expression (Expr: Iir; A_Type: Iir) return Iir;
 
-   --  Analyze a discrete range.  If ANY_DIR is true, the range can't be a
-   --  null range (slice vs subtype -- used in static evaluation). A_TYPE may
-   --  be Null_Iir. Return Null_Iir in case of error.
-   function Sem_Discrete_Range (Expr: Iir; A_Type: Iir; Any_Dir: Boolean)
-                               return Iir;
+   --  Analyze a discrete range. A_TYPE may be Null_Iir.
+   --  Return Null_Iir in case of error.
+   function Sem_Discrete_Range (Expr: Iir; A_Type: Iir) return Iir;
 
    --  Analyze a discrete range and convert to integer if both bounds are
    --  universal integer types, according to rules of LRM 3.2.1.1
@@ -202,9 +205,8 @@ package Vhdl.Sem_Expr is
    --  Check that the values of CHOICE_CHAIN are a continuous range, and
    --  extract the lower LOW and upper HIGH bound (useful to create the
    --  corresponding subtype).  The values must be of type SUB_TYPE, and if
-   --  IS_SUB_RANGE True, they must be within SUB_TYPE.
+   --  IS_SUB_RANGE is False, they must be within SUB_TYPE.
    --  The choices must be locally static.
-   --  If REORDER_CHOICES is true, CHOICE_CHAIN is ordered.
    procedure Sem_Check_Continuous_Choices (Choice_Chain : Iir;
                                            Choice_Type : Iir;
                                            Low : out Iir;

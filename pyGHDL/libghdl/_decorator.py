@@ -35,6 +35,7 @@ from ctypes import (
     c_int32,
     c_uint32,
     c_char_p,
+    c_void_p,
     c_bool,
     c_double,
     Structure,
@@ -99,7 +100,7 @@ def BindToLibGHDL(subprogramName):
             return c_bool
         elif typ is bytes:
             return c_char_p
-        elif typ in (c_char, c_char_p, c_uint32):
+        elif typ in (c_char, c_char_p, c_uint32, c_void_p):
             return typ
         elif isinstance(typ, TypeVar):
             # Humm, recurse ?
@@ -158,7 +159,7 @@ def BindToLibGHDL(subprogramName):
             raise TypeError(f"Unsupported return type '{returnType!s}' in function '{func.__name__}'.")
 
         functionPointer = getattr(libghdl, subprogramName)
-        functionPointer.parameterTypes = parameterTypes
+        functionPointer.argtypes = parameterTypes
         functionPointer.restype = resultType
 
         if isinstance(returnType, type) and issubclass(returnType, IntEnum):

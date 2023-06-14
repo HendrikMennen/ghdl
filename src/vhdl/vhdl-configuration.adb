@@ -35,7 +35,6 @@ package body Vhdl.Configuration is
    procedure Add_Design_Block_Configuration (Blk : Iir_Block_Configuration);
    procedure Add_Design_Aspect (Aspect : Iir; Add_Default : Boolean);
 
-   Current_File_Dependence : Iir_List := Null_Iir_List;
    Current_Configuration : Iir_Configuration_Declaration := Null_Iir;
 
    --  UNIT is a design unit of a configuration declaration.
@@ -48,18 +47,7 @@ package body Vhdl.Configuration is
       It : List_Iterator;
       El : Iir;
       Lib_Unit : Iir;
-      File : Iir_Design_File;
-      Prev_File_Dependence : Iir_List;
    begin
-      if Flag_Build_File_Dependence then
-         --  The current file depends on unit.
-         File := Get_Design_File (Unit);
-         if Current_File_Dependence /= Null_Iir_List then
-            --  (There is no dependency for default configuration).
-            Add_Element (Current_File_Dependence, File);
-         end if;
-      end if;
-
       --  If already in the table, then nothing to do.
       if Get_Configuration_Mark_Flag (Unit) then
          --  There might be some direct recursions:
@@ -81,26 +69,6 @@ package body Vhdl.Configuration is
       end if;
 
       Lib_Unit := Get_Library_Unit (Unit);
-
-      if Flag_Build_File_Dependence then
-         --  Switch current_file_dependence to the design file of Unit.
-         Prev_File_Dependence := Current_File_Dependence;
-
-         if Get_Kind (Lib_Unit) = Iir_Kind_Configuration_Declaration
-           and then Get_Identifier (Lib_Unit) = Null_Identifier
-         then
-            --  Do not add dependence for default configuration.
-            Current_File_Dependence := Null_Iir_List;
-         else
-            File := Get_Design_File (Unit);
-            Current_File_Dependence := Get_File_Dependence_List (File);
-            --  Create a list if not yet created.
-            if Current_File_Dependence = Null_Iir_List then
-               Current_File_Dependence := Create_Iir_List;
-               Set_File_Dependence_List (File, Current_File_Dependence);
-            end if;
-         end if;
-      end if;
 
       if Flag_Load_All_Design_Units then
          --  Load and analyze UNIT.
@@ -198,15 +166,6 @@ package body Vhdl.Configuration is
 
       Set_Configuration_Done_Flag (Unit, True);
 
-      --  Restore now the file dependence.
-      --  Indeed, we may add a package body when we are in a package
-      --  declaration.  However, the later does not depend on the former.
-      --  The file which depends on the package declaration also depends on
-      --  the package body.
-      if Flag_Build_File_Dependence then
-         Current_File_Dependence := Prev_File_Dependence;
-      end if;
-
       if Get_Kind (Lib_Unit) = Iir_Kind_Package_Declaration then
          --  Add body (if any).
          declare
@@ -236,7 +195,6 @@ package body Vhdl.Configuration is
                end if;
             end if;
             if Bod /= Null_Iir then
-               Set_Package (Get_Library_Unit (Bod), Lib_Unit);
                Add_Design_Unit (Bod, Loc);
             end if;
          end;
@@ -888,10 +846,11 @@ package body Vhdl.Configuration is
       while El /= Null_Iir loop
          case Iir_Kinds_Interface_Declaration (Get_Kind (El)) is
             when Iir_Kinds_Interface_Object_Declaration =>
-               if Get_Default_Value (El) = Null_Iir then
-                  if not (Enable_Override and Allow_Generic_Override (El)) then
-                     Error (El, "(%n has no default value)", +El);
-                  end if;
+               if Get_Default_Value (El) = Null_Iir
+                 and then not Is_Fully_Constrained_Type (Get_Type (El))
+                 and then not (Enable_Override and Allow_Generic_Override (El))
+               then
+                  Error (El, "(%n has no default value)", +El);
                end if;
             when Iir_Kinds_Interface_Subprogram_Declaration =>
                Error (El, "(%n is a subprogram generic)", +El);
@@ -963,6 +922,10 @@ package body Vhdl.Configuration is
               | Iir_Kind_Context_Declaration =>
                null;
          end case;
+
+         if Nbr_Errors /= 0 then
+            return Walk_Abort;
+         end if;
 
          return Walk_Continue;
       end Add_Entity_Cb;
@@ -1102,6 +1065,9 @@ package body Vhdl.Configuration is
 
          --  1. Add all design entities in the name table.
          Status := Walk_Design_Units (Lib, Add_Entity_Cb'Access);
+         if Status = Walk_Abort then
+            return;
+         end if;
          pragma Assert (Status = Walk_Continue);
 
          --  2. Walk architecture and configurations, and mark instantiated
@@ -1158,6 +1124,10 @@ package body Vhdl.Configuration is
    begin
       --  FROM is a library or a design file.
       Top.Mark_Instantiated_Units (From, Loc);
+      if Nbr_Errors > 0 then
+         return Null_Iir;
+      end if;
+
       Top.Find_First_Top_Entity (From);
 
       if Top.Nbr_Top_Entities = 1 then

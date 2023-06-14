@@ -114,6 +114,8 @@ package body Vhdl.Std_Package is
                         Wildcard_Psl_Bitvector_Type);
       Create_Known_Iir (Iir_Kind_Wildcard_Type_Definition,
                         Wildcard_Psl_Boolean_Type);
+      --  NOTE: if a wildcard type definition is added, it should also be
+      --  declared below.
    end Create_First_Nodes;
 
    procedure Create_Std_Standard_Package (Parent : Iir_Library_Declaration)
@@ -346,6 +348,7 @@ package body Vhdl.Std_Package is
          Set_Std_Identifier (Decl, Name);
          Set_Return_Type (Decl, String_Type_Definition);
          Set_Pure_Flag (Decl, True);
+         Set_Elaborated_Flag (Decl, True);
          Set_Implicit_Definition (Decl, Imp);
 
          Inter := Create_Iir (Iir_Kind_Interface_Constant_Declaration);
@@ -380,6 +383,7 @@ package body Vhdl.Std_Package is
          Set_Std_Identifier (Decl, Name);
          Set_Return_Type (Decl, Boolean_Type_Definition);
          Set_Pure_Flag (Decl, True);
+         Set_Elaborated_Flag (Decl, True);
          Set_Implicit_Definition (Decl, Func);
 
          Inter := Create_Iir (Iir_Kind_Interface_Signal_Declaration);
@@ -1066,6 +1070,7 @@ package body Vhdl.Std_Package is
          end case;
          Set_Pure_Flag (Function_Now, Pure);
          Set_Implicit_Definition (Function_Now, Iir_Predefined_Now_Function);
+         Set_Elaborated_Flag (Function_Now, True);
          Vhdl.Sem_Utils.Compute_Subprogram_Hash (Function_Now);
          Add_Decl (Function_Now);
       end;
@@ -1080,6 +1085,7 @@ package body Vhdl.Std_Package is
             Set_Std_Identifier (Function_Now, Std_Names.Name_Now);
             Set_Return_Type (Function_Now, Real_Subtype_Definition);
             Set_Pure_Flag (Function_Now, False);
+            Set_Elaborated_Flag (Function_Now, True);
             Set_Implicit_Definition
               (Function_Now, Iir_Predefined_Real_Now_Function);
             Vhdl.Sem_Utils.Compute_Subprogram_Hash (Function_Now);
@@ -1095,6 +1101,7 @@ package body Vhdl.Std_Package is
             Set_Std_Identifier (Function_Freq, Std_Names.Name_Frequency);
             Set_Return_Type (Function_Freq, Real_Subtype_Definition);
             Set_Pure_Flag (Function_Freq, False);
+            Set_Elaborated_Flag (Function_Freq, True);
             Set_Implicit_Definition
               (Function_Freq, Iir_Predefined_Frequency_Function);
             Vhdl.Sem_Utils.Compute_Subprogram_Hash (Function_Freq);
@@ -1384,6 +1391,11 @@ package body Vhdl.Std_Package is
       Create_Wildcard_Type (Wildcard_Any_Aggregate_Type, "any aggregate type");
       Create_Wildcard_Type (Wildcard_Any_String_Type, "any string type");
       Create_Wildcard_Type (Wildcard_Any_Access_Type, "any access type");
+      Create_Wildcard_Type (Wildcard_Any_Integer_Type, "any integer type");
+      Create_Wildcard_Type (Wildcard_Psl_Bit_Type, "a PSL bit type");
+      Create_Wildcard_Type (Wildcard_Psl_Bitvector_Type,
+                            "a PSL bitvector type");
+      Create_Wildcard_Type (Wildcard_Psl_Boolean_Type, "a PSL boolean type");
 
       Error_Type := Utils.Create_Error_Type (Wildcard_Any_Type);
       Set_Error_Origin (Error_Type, Null_Iir);

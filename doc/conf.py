@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
+from os import environ
 from os.path import abspath
 from pathlib import Path
 from json import loads as json_loads
@@ -45,8 +46,6 @@ master_doc = 'index'
 # The suffix(es) of source filenames.
 source_suffix = {
     '.rst': 'restructuredtext',
-#    '.txt': 'markdown',
-#    '.md': 'markdown',
 }
 
 # Add any paths that contain templates here, relative to this directory.
@@ -56,10 +55,10 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = [
-	"_build",
-	"_theme",
-	"Thumbs.db",
-	".DS_Store"
+    "_build",
+    "_theme",
+    "Thumbs.db",
+    ".DS_Store"
 ]
 
 # The name of the Pygments (syntax highlighting) style to use.
@@ -79,7 +78,6 @@ except Exception as ex:
     rst_prolog = ""
 
 
-
 # ==============================================================================
 # Options for HTML output
 # ==============================================================================
@@ -88,19 +86,29 @@ ctx = ROOT / "context.json"
 if ctx.is_file():
     html_context.update(json_loads(ctx.open("r").read()))
 
-if (ROOT / "_theme").is_dir():
-    html_theme_path = ["."]
-    html_theme = "_theme"
-    html_theme_options = {
-        "logo_only": True,
-        "home_breadcrumbs": False,
-        "vcs_pageview_mode": "blob",
-    }
-    html_css_files = [
-        "theme_overrides.css",
-    ]
-else:
-    html_theme = "alabaster"
+html_theme = "furo"
+
+html_css_files = [
+      "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/fontawesome.min.css",
+      "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/solid.min.css",
+      "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/brands.min.css",
+]
+
+html_theme_options = {
+    "source_repository": "https://github.com/ghdl/ghdl",
+    "source_branch": environ.get("GITHUB_REF_NAME", "main"),
+    "source_directory": "doc",
+    "footer_icons": [
+        {
+            "name": "GitHub ghdl/ghdl",
+            "url": "https://github.com/ghdl/ghdl",
+            "html": "",
+            "class": "fa-solid fa-brands fa-github",
+        },
+    ],
+}
+
+html_title = release
 
 html_static_path = ['_static']
 # '/public' will contain the output from gnatdoc
@@ -140,31 +148,31 @@ texinfo_documents = [(
 from textwrap import dedent
 
 latex_elements = {
-	# The paper size ('letterpaper' or 'a4paper').
-	'papersize': 'a4paper',
+    # The paper size ('letterpaper' or 'a4paper').
+    'papersize': 'a4paper',
 
-	# The font size ('10pt', '11pt' or '12pt').
-	#'pointsize': '10pt',
+    # The font size ('10pt', '11pt' or '12pt').
+    #'pointsize': '10pt',
 
-	# Additional stuff for the LaTeX preamble.
-	'preamble': dedent(r"""
-		% ================================================================================
-		% User defined additional preamble code
-		% ================================================================================
-		% Add more Unicode characters for pdfLaTeX.
-		% - Alternatively, compile with XeLaTeX or LuaLaTeX.
-		% - https://github.com/sphinx-doc/sphinx/issues/3511
-		%
-		\ifdefined\DeclareUnicodeCharacter
-			\DeclareUnicodeCharacter{2265}{$\geq$}
-			\DeclareUnicodeCharacter{21D2}{$\Rightarrow$}
-		\fi
+    # Additional stuff for the LaTeX preamble.
+    'preamble': dedent(r"""
+        % ================================================================================
+        % User defined additional preamble code
+        % ================================================================================
+        % Add more Unicode characters for pdfLaTeX.
+        % - Alternatively, compile with XeLaTeX or LuaLaTeX.
+        % - https://github.com/sphinx-doc/sphinx/issues/3511
+        %
+        \ifdefined\DeclareUnicodeCharacter
+            \DeclareUnicodeCharacter{2265}{$\geq$}
+            \DeclareUnicodeCharacter{21D2}{$\Rightarrow$}
+        \fi
 
-		% ================================================================================
-		"""),
+        % ================================================================================
+        """),
 
-	# Latex figure (float) alignment
-	#'figure_align': 'htbp',
+    # Latex figure (float) alignment
+    #'figure_align': 'htbp',
 }
 
 # ==============================================================================
@@ -174,22 +182,18 @@ extensions = [
     # Standard Sphinx extensions
     'sphinx.ext.autodoc',
     'sphinx.ext.extlinks',
-	  'sphinx.ext.inheritance_diagram',
+    'sphinx.ext.inheritance_diagram',
     'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
     'sphinx.ext.graphviz',
     'sphinx.ext.mathjax',
     'sphinx.ext.ifconfig',
     'sphinx.ext.viewcode',
-
     # BuildTheDocs extensions
     'btd.sphinx.autoprogram',
-#    'btd.sphinx.graphviz',
-#    'btd.sphinx.inheritance_diagram',
-
     # Other extensions
-#    'recommonmark',
     'exec',
+    'myst_parser',
     'sphinx_fontawesome',
     'sphinx_autodoc_typehints',
     'autoapi.sphinx',
@@ -226,11 +230,11 @@ graphviz_output_format = "svg"
 # Sphinx.Ext.Inheritance_Diagram
 # ==============================================================================
 inheritance_node_attrs = {
-#	"shape": "ellipse",
-#	"fontsize": 14,
-#	"height": 0.75,
-	"color": "dodgerblue1",
-	"style": "filled"
+#    "shape": "ellipse",
+#    "fontsize": 14,
+#    "height": 0.75,
+    "color": "dodgerblue1",
+    "style": "filled"
 }
 
 # ==============================================================================
@@ -251,11 +255,11 @@ coverage_show_missing_items = True
 # Sphinx.Ext.ExtLinks
 # ==============================================================================
 extlinks = {
-   'wikipedia': ('https://en.wikipedia.org/wiki/%s', ''),
-   'ghdlsharp': ('https://github.com/ghdl/ghdl/issues/%s', '#'),
-   'ghdlissue': ('https://github.com/ghdl/ghdl/issues/%s', 'issue #'),
-   'ghdlpull':  ('https://github.com/ghdl/ghdl/pull/%s', 'pull request #'),
-   'ghdlsrc':   ('https://github.com/ghdl/ghdl/blob/master/src/%s', '')
+   'wikipedia': ('https://en.wikipedia.org/wiki/%s', 'w:%s'),
+   'ghdlsharp': ('https://github.com/ghdl/ghdl/issues/%s', '#%s'),
+   'ghdlissue': ('https://github.com/ghdl/ghdl/issues/%s', 'issue #%s'),
+   'ghdlpull':  ('https://github.com/ghdl/ghdl/pull/%s', 'pull request #%s'),
+   'ghdlsrc':   ('https://github.com/ghdl/ghdl/blob/master/src/%s', '%s')
 }
 
 

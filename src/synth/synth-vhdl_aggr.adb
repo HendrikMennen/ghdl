@@ -24,6 +24,7 @@ with Netlists.Utils; use Netlists.Utils;
 with Netlists.Builders; use Netlists.Builders;
 
 with Vhdl.Utils; use Vhdl.Utils;
+with Vhdl.Nodes_Utils;
 
 with Elab.Memtype; use Elab.Memtype;
 with Elab.Vhdl_Types; use Elab.Vhdl_Types;
@@ -114,6 +115,7 @@ package body Synth.Vhdl_Aggr is
       end case;
    end Fill_Stride;
 
+   --  VEC1_P is true iff RES(1) is a vector (and not an element).
    procedure Fill_Array_Aggregate (Syn_Inst : Synth_Instance_Acc;
                                    Aggr : Node;
                                    Res : Valtyp_Array_Acc;
@@ -122,7 +124,8 @@ package body Synth.Vhdl_Aggr is
                                    Strides : Stride_Array;
                                    Dim : Dim_Type;
                                    Const_P : out Boolean;
-                                   Err_P : out boolean)
+                                   Err_P : out Boolean;
+                                   Vec1_P : out Boolean)
    is
       Bound : constant Bound_Type := Get_Array_Bound (Typ);
       El_Typ : constant Type_Acc := Get_Array_Element (Typ);
@@ -132,34 +135,44 @@ package body Synth.Vhdl_Aggr is
       Nbr_Els : Nat32;
       Sub_Err : Boolean;
 
+      function Synth_Single_Value return Valtyp
+      is
+         Val : Valtyp;
+      begin
+         Val := Synth_Expression_With_Type (Syn_Inst, Value, El_Typ);
+         Val := Synth_Subtype_Conversion
+           (Syn_Inst, Val, El_Typ, False, Value);
+         if Val = No_Valtyp then
+            Err_P := True;
+         else
+            if Const_P and then not Is_Static (Val.Val) then
+               Const_P := False;
+            end if;
+         end if;
+         return Val;
+      end Synth_Single_Value;
+
       procedure Set_Elem (Pos : Nat32)
       is
          Sub_Const : Boolean;
          Sub_Err : Boolean;
+         Sub_Vec1 : Boolean;
          Val : Valtyp;
       begin
          Nbr_Els := Nbr_Els + 1;
 
          if Typ.Alast then
             pragma Assert (Dim = Strides'Last);
-            Val := Synth_Expression_With_Type (Syn_Inst, Value, El_Typ);
-            Val := Synth_Subtype_Conversion
-              (Syn_Inst, Val, El_Typ, False, Value);
+            Val := Synth_Single_Value;
             pragma Assert (Res (Pos) = No_Valtyp);
             Res (Pos) := Val;
-            if Val = No_Valtyp then
-               Err_P := True;
-            else
-               if Const_P and then not Is_Static (Val.Val) then
-                  Const_P := False;
-               end if;
-            end if;
          else
             Fill_Array_Aggregate
               (Syn_Inst, Value, Res, El_Typ, Pos, Strides, Dim + 1,
-               Sub_Const, Sub_Err);
+               Sub_Const, Sub_Err, Sub_Vec1);
             Const_P := Const_P and Sub_Const;
             Err_P := Err_P or Sub_Err;
+            Vec1_P := Vec1_P or Sub_Vec1;
          end if;
       end Set_Elem;
 
@@ -182,6 +195,9 @@ package body Synth.Vhdl_Aggr is
          if Const_P and then not Is_Static (Val.Val) then
             Const_P := False;
          end if;
+         if Pos = 1 then
+            Vec1_P := True;
+         end if;
       end Set_Vector;
 
       Pos : Nat32;
@@ -190,6 +206,7 @@ package body Synth.Vhdl_Aggr is
       Nbr_Els := 0;
       Const_P := True;
       Err_P := False;
+      Vec1_P := False;
 
       if Get_Kind (Aggr) = Iir_Kind_String_Literal8 then
          declare
@@ -252,12 +269,23 @@ package body Synth.Vhdl_Aggr is
                   declare
                      Last_Pos : constant Nat32 :=
                        First_Pos + Nat32 (Bound.Len) * Stride;
+                     Is_Static : constant Boolean := Typ.Alast
+                       and then Get_Expr_Staticness (Value) >= Globally;
+                     Val : Valtyp;
                   begin
+                     if Is_Static then
+                        Val := Synth_Single_Value;
+                     end if;
                      while Pos < Last_Pos loop
                         if Res (Pos) = No_Valtyp then
                            --  FIXME: the check is not correct if there is
                            --   an array.
-                           Set_Elem (Pos);
+                           if Is_Static then
+                              Nbr_Els := Nbr_Els + 1;
+                              Res (Pos) := Val;
+                           else
+                              Set_Elem (Pos);
+                           end if;
                         end if;
                         Pos := Pos + Stride;
                      end loop;
@@ -435,41 +463,13 @@ package body Synth.Vhdl_Aggr is
       return Res;
    end Valtyp_Array_To_Net;
 
-   function Synth_Aggregate_Array (Syn_Inst : Synth_Instance_Acc;
-                                   Aggr : Node;
-                                   Aggr_Typ : Type_Acc) return Valtyp
+   function Valtyp_Array_To_Valtyp (Ctxt : Context_Acc;
+                                    Tab_Res : Valtyp_Array;
+                                    Res_Typ : Type_Acc;
+                                    Const_P : Boolean) return Valtyp
    is
-      Ctxt : constant Context_Acc := Get_Build (Syn_Inst);
-      Strides : constant Stride_Array := Fill_Stride (Aggr_Typ);
-      Flen : constant Iir_Index32 := Get_Array_Flat_Length (Aggr_Typ);
-      Tab_Res : Valtyp_Array_Acc;
-      Const_P : Boolean;
-      Err_P : Boolean;
-      Res_Typ : Type_Acc;
       Res : Valtyp;
    begin
-      Tab_Res := new Valtyp_Array'(1 .. Nat32 (Flen) => No_Valtyp);
-
-      Fill_Array_Aggregate (Syn_Inst, Aggr, Tab_Res,
-                            Aggr_Typ, 1, Strides, 1, Const_P, Err_P);
-      if Err_P then
-         return No_Valtyp;
-      end if;
-
-
-      case Type_Vectors_Arrays (Aggr_Typ.Kind) is
-         when Type_Array
-           | Type_Vector =>
-            Res_Typ := Aggr_Typ;
-         when Type_Array_Unbounded =>
-            --  TODO: check all element types have the same bounds ?
-            Res_Typ := Create_Array_From_Array_Unbounded
-              (Aggr_Typ, Tab_Res (1).Typ);
-         when Type_Unbounded_Vector
-           | Type_Unbounded_Array =>
-            raise Internal_Error;
-      end case;
-
       if Const_P then
          declare
             Off : Size_Type;
@@ -487,13 +487,146 @@ package body Synth.Vhdl_Aggr is
          end;
       else
          Res := Create_Value_Net
-           (Valtyp_Array_To_Net (Ctxt, Tab_Res.all), Res_Typ);
+           (Valtyp_Array_To_Net (Ctxt, Tab_Res), Res_Typ);
       end if;
+      return Res;
+   end Valtyp_Array_To_Valtyp;
+
+   function Synth_Aggregate_Array (Syn_Inst : Synth_Instance_Acc;
+                                   Aggr : Node;
+                                   Aggr_Typ : Type_Acc) return Valtyp
+   is
+      Ctxt : constant Context_Acc := Get_Build (Syn_Inst);
+      Strides : constant Stride_Array := Fill_Stride (Aggr_Typ);
+      Flen : constant Iir_Index32 := Get_Array_Flat_Length (Aggr_Typ);
+      Tab_Res : Valtyp_Array_Acc;
+      Const_P : Boolean;
+      Err_P : Boolean;
+      Vec1_P : Boolean;
+      Res_Typ : Type_Acc;
+      El_Typ : Type_Acc;
+      Res : Valtyp;
+   begin
+      Tab_Res := new Valtyp_Array(1 .. Nat32 (Flen));
+      Tab_Res.all := (others => No_Valtyp);
+
+      Fill_Array_Aggregate (Syn_Inst, Aggr, Tab_Res,
+                            Aggr_Typ, 1, Strides, 1, Const_P, Err_P, Vec1_P);
+      if Err_P then
+         return No_Valtyp;
+      end if;
+
+      case Type_Vectors_Arrays (Aggr_Typ.Kind) is
+         when Type_Array
+           | Type_Vector =>
+            Res_Typ := Aggr_Typ;
+         when Type_Array_Unbounded =>
+            --  TODO: check all element types have the same bounds ?
+            if Flen = 0 then
+               --  No bounds for the elements...
+               Res_Typ := Create_Array_From_Array_Unbounded
+                 (Aggr_Typ, Aggr_Typ.Arr_El);
+            else
+               --  Humm, is it a vector or an element ?
+               El_Typ := Tab_Res (1).Typ;
+               if Vec1_P then
+                  El_Typ := El_Typ.Arr_El;
+               end if;
+               Res_Typ := Create_Array_From_Array_Unbounded (Aggr_Typ, El_Typ);
+            end if;
+         when Type_Unbounded_Vector
+           | Type_Unbounded_Array =>
+            raise Internal_Error;
+      end case;
+
+      Res := Valtyp_Array_To_Valtyp (Ctxt, Tab_Res.all, Res_Typ, Const_P);
 
       Free_Valtyp_Array (Tab_Res);
 
       return Res;
    end Synth_Aggregate_Array;
+
+   function Synth_Aggregate_Array_Concat (Syn_Inst : Synth_Instance_Acc;
+                                          Aggr : Node;
+                                          Aggr_Typ : Type_Acc) return Valtyp
+   is
+      Ctxt : constant Context_Acc := Get_Build (Syn_Inst);
+      Assoc_Chain : constant Node := Get_Association_Choices_Chain (Aggr);
+      Flen : constant Natural :=
+        Vhdl.Nodes_Utils.Get_Chain_Length (Assoc_Chain);
+      El_Typ : constant Type_Acc := Aggr_Typ.Uarr_El;
+      Assoc : Node;
+      Value : Node;
+      Val : Valtyp;
+      Len : Uns32;
+      Tab_Res : Valtyp_Array_Acc;
+      Const_P : Boolean;
+      Err_P : Boolean;
+      Res_Typ : Type_Acc;
+      Res : Valtyp;
+      Pos : Nat32;
+      Bnd: Bound_Type;
+   begin
+      Tab_Res := new Valtyp_Array(1 .. Nat32 (Flen));
+      Tab_Res.all := (others => No_Valtyp);
+
+      Len := 0;
+      Pos := Tab_Res'First;
+      Const_P := True;
+      Assoc := Assoc_Chain;
+      while Is_Valid (Assoc) loop
+         --  If there is a choice expression/range, then the array is
+         --  bounded.
+         pragma Assert (Get_Kind (Assoc) = Iir_Kind_Choice_By_None);
+         Value := Get_Associated_Expr (Assoc);
+         if Get_Element_Type_Flag (Assoc) then
+            Val := Synth_Expression_With_Type (Syn_Inst, Value, El_Typ);
+            Val := Synth_Subtype_Conversion
+              (Syn_Inst, Val, El_Typ, False, Value);
+            Len := Len + 1;
+         else
+            Val := Synth_Expression_With_Basetype (Syn_Inst, Value);
+            if Val.Typ /= null then
+               Len := Len + Get_Bound_Length (Val.Typ);
+            end if;
+         end if;
+
+         Tab_Res (Pos) := Val;
+         Pos := Pos + 1;
+
+         if Val = No_Valtyp then
+            Err_P := True;
+         else
+            if Const_P and then not Is_Static (Val.Val) then
+               Const_P := False;
+            end if;
+         end if;
+
+         Assoc := Get_Chain (Assoc);
+      end loop;
+
+      if Err_P then
+         return No_Valtyp;
+      end if;
+
+      --  Create the result type.
+      Bnd := Create_Bounds_From_Length
+        (Aggr_Typ.Uarr_Idx.Drange, Iir_Index32 (Len));
+      case Aggr_Typ.Kind is
+         when Type_Unbounded_Vector =>
+            Res_Typ := Create_Vector_Type (Bnd, False, El_Typ);
+         when Type_Unbounded_Array =>
+            Res_Typ := Create_Array_Type (Bnd, False, True, El_Typ);
+         when others =>
+            raise Internal_Error;
+      end case;
+
+      Res := Valtyp_Array_To_Valtyp (Ctxt, Tab_Res.all, Res_Typ, Const_P);
+
+      Free_Valtyp_Array (Tab_Res);
+
+      return Res;
+   end Synth_Aggregate_Array_Concat;
 
    function Synth_Aggregate_Record (Syn_Inst : Synth_Instance_Acc;
                                     Aggr : Node;
@@ -528,7 +661,7 @@ package body Synth.Vhdl_Aggr is
                      Els_Typ.E (I).Typ :=
                        Tab_Res (Tab_Res'Last - Nat32 (I) + 1).Typ;
                   end loop;
-                  Res_Typ := Create_Record_Type (Els_Typ);
+                  Res_Typ := Create_Record_Type (Aggr_Type, Els_Typ);
                end;
             when Type_Record =>
                Res_Typ := Aggr_Type;
@@ -560,7 +693,8 @@ package body Synth.Vhdl_Aggr is
    begin
       case Aggr_Type.Kind is
          when Type_Unbounded_Array
-            | Type_Unbounded_Vector =>
+           | Type_Unbounded_Vector
+           | Type_Array_Unbounded =>
             declare
                Res_Type : Type_Acc;
             begin
@@ -575,7 +709,8 @@ package body Synth.Vhdl_Aggr is
                     | Type_Unbounded_Array =>
                      --  The only possibility is vector elements.
                      pragma Assert (Res_Type.Ulast);
-                     raise Internal_Error;
+                     return Synth_Aggregate_Array_Concat (Syn_Inst, Aggr,
+                                                          Res_Type);
                   when others =>
                      raise Internal_Error;
                end case;
@@ -583,6 +718,9 @@ package body Synth.Vhdl_Aggr is
          when Type_Vector
            | Type_Array =>
             return Synth_Aggregate_Array (Syn_Inst, Aggr, Aggr_Type);
+         when Type_Slice =>
+            return Synth_Aggregate_Array
+              (Syn_Inst, Aggr, Aggr_Type.Slice_Base);
          when Type_Record
            |  Type_Unbounded_Record =>
             return Synth_Aggregate_Record (Syn_Inst, Aggr, Aggr_Type);

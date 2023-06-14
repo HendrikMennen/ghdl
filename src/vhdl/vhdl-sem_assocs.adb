@@ -76,6 +76,7 @@ package body Vhdl.Sem_Assocs is
                   Free_Iir (Old);
                   Set_Index_Constraint_List
                     (N_Actual, List_To_Flist (Indexes));
+                  Set_Has_Array_Constraint_Flag (N_Actual, True);
                   Actual := N_Actual;
                end;
             end if;
@@ -2138,7 +2139,11 @@ package body Vhdl.Sem_Assocs is
       end if;
 
       if Match = Not_Compatible then
-         if Finish and then not Is_Error (Actual) then
+         if Finish
+           and then not (Is_Error (Actual)
+                           or else Get_Type (Actual) = Null_Iir
+                           or else Is_Error (Get_Type (Actual)))
+         then
             Report_Start_Group;
             Error_Msg_Sem
               (+Assoc, "can't associate %n with %n", (+Actual, +Inter));
@@ -2274,15 +2279,31 @@ package body Vhdl.Sem_Assocs is
            and then not Is_Fully_Constrained_Type (Get_Type (In_Conv))
          then
             Error_Msg_Sem
-              (+Assoc, "type of actual conversion must be fully constrained");
+              (+In_Conv,
+               "type of actual conversion must be fully constrained");
          end if;
          if (Get_Mode (Inter) in Iir_Out_Modes
                or else Get_Mode (Inter) = Iir_Linkage_Mode)
            and then Out_Conv /= Null_Iir
            and then not Is_Fully_Constrained_Type (Get_Type (Out_Conv))
          then
-            Error_Msg_Sem
-              (+Assoc, "type of formal conversion must be fully constrained");
+            declare
+               Msgid : Msgid_Type;
+            begin
+               if Flag_Relaxed_Rules
+                 and then Get_Kind (Out_Conv) = Iir_Kind_Type_Conversion
+               then
+                  --  With -frelaxed, the bounds of the formal could be
+                  --  computed using an implicit type conversion from the
+                  --  actual bounds.
+                  Msgid := Warnid_Port;
+               else
+                  Msgid := Msgid_Error;
+               end if;
+               Report_Msg
+                 (Msgid, Semantic, +Out_Conv,
+                  "type of formal conversion must be fully constrained");
+            end;
          end if;
       end if;
 
@@ -2385,15 +2406,6 @@ package body Vhdl.Sem_Assocs is
       First_Named_Assoc := Null_Iir;
       Has_Individual := False;
       Last_Assoc := Null_Iir;
-
-      --  Clear associated type of interface type.
-      Inter := Interface_Chain;
-      while Inter /= Null_Iir loop
-         if Get_Kind (Inter) = Iir_Kind_Interface_Type_Declaration then
-            Set_Associated_Type (Get_Type (Inter), Null_Iir);
-         end if;
-         Inter := Get_Chain (Inter);
-      end loop;
 
       --  Loop on every assoc element, try to match it.
       Inter := Interface_Chain;

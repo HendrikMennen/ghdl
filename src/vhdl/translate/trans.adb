@@ -302,6 +302,11 @@ package body Trans is
          Set_Scope_Via_Field (Child, Field, Inst_Build.Scope);
       end Add_Scope_Field;
 
+      function Get_Scope_Field (Child : Var_Scope_Type) return O_Fnode is
+      begin
+         return Child.Field;
+      end Get_Scope_Field;
+
       function Get_Scope_Offset (Child : Var_Scope_Type; Otype : O_Tnode)
                                  return O_Cnode is
       begin
@@ -680,6 +685,11 @@ package body Trans is
          return New_Offsetof (Get_Scope_Type (Var.I_Scope.all),
                               Var.I_Field, Otype);
       end Get_Var_Offset;
+
+      function Get_Var_Field (Var : Var_Type) return O_Fnode is
+      begin
+         return Var.I_Field;
+      end Get_Var_Field;
 
       function Get_Var_Label (Var : Var_Type) return O_Dnode is
       begin

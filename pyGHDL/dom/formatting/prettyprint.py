@@ -34,6 +34,15 @@ from typing import List, Union
 
 from pyTooling.Decorators import export
 
+from pyVHDLModel.Base import NamedEntityMixin
+from pyVHDLModel.Interface import GenericInterfaceItem, PortInterfaceItem
+from pyVHDLModel.Subprogram import Function
+from pyVHDLModel.Object import BaseConstant, WithDefaultExpressionMixin
+from pyVHDLModel.Type import BaseType, FullType
+from pyVHDLModel.Concurrent import ConcurrentStatement
+
+from pyGHDL import GHDLBaseException
+from pyGHDL.dom.NonStandard import Document, Design, Library
 from pyGHDL.dom.Concurrent import (
     ConcurrentBlockStatement,
     ProcessStatement,
@@ -45,20 +54,6 @@ from pyGHDL.dom.Concurrent import (
     EntityInstantiation,
     ConcurrentProcedureCall,
 )
-from pyVHDLModel.SyntaxModel import (
-    GenericInterfaceItem,
-    NamedEntityMixin,
-    PortInterfaceItem,
-    WithDefaultExpressionMixin,
-    Function,
-    BaseType,
-    FullType,
-    BaseConstant,
-    ConcurrentStatement,
-)
-
-from pyGHDL import GHDLBaseException
-from pyGHDL.dom.NonStandard import Document, Design, Library
 from pyGHDL.dom.DesignUnit import (
     Entity,
     Architecture,
@@ -70,10 +65,7 @@ from pyGHDL.dom.DesignUnit import (
     UseClause,
     PackageInstantiation,
 )
-from pyGHDL.dom.Symbol import (
-    SimpleSubtypeSymbol,
-    ConstrainedCompositeSubtypeSymbol,
-)
+from pyGHDL.dom.Symbol import SimpleSubtypeSymbol, ConstrainedCompositeSubtypeSymbol
 from pyGHDL.dom.Type import (
     IntegerType,
     Subtype,
@@ -152,7 +144,9 @@ class PrettyPrint:
                 buffer.append(f"{prefix}  - {package.Identifier} instantiate from {package.PackageReference}")
         buffer.append(f"{prefix}Entities ({len(library.Entities)}):")
         for entity in library.Entities.values():
-            buffer.append(f"{prefix}  - {entity.Identifier}({', '.join([a.Identifier for a in entity.Architectures])})")
+            buffer.append(
+                f"{prefix}  - {entity.Identifier}({', '.join([a.Identifier for a in entity.Architectures.values()])})"
+            )
         buffer.append(f"{prefix}Configurations ({len(library.Configurations)}):")
         for configuration in library.Configurations.values():
             buffer.append(f"{prefix}  - {configuration.Identifier}")
@@ -221,7 +215,7 @@ class PrettyPrint:
         for item in entity.Statements:
             buffer.append(f"{prefix}    ...")
         buffer.append(f"{prefix}  Architectures:")
-        for item in entity.Architectures:
+        for item in entity.Architectures.values():
             buffer.append(f"{prefix}  - {item.Identifier}")
 
         return buffer
@@ -450,13 +444,14 @@ class PrettyPrint:
 
     def formatSubtypeIndication(self, subtypeIndication, entity: str, name: str) -> str:
         if isinstance(subtypeIndication, SimpleSubtypeSymbol):
-            return f"{subtypeIndication.SymbolName}"
+            return f"{subtypeIndication.Identifier}"
         elif isinstance(subtypeIndication, ConstrainedCompositeSubtypeSymbol):
             constraints = []
-            for constraint in subtypeIndication.Constraints:
-                constraints.append(str(constraint))
+            # FIXME: disabled due to problems with symbols
+            # for constraint in subtypeIndication.Constraints:
+            #     constraints.append(str(constraint))
 
-            return f"{subtypeIndication.SymbolName}({', '.join(constraints)})"
+            return f"{subtypeIndication.Identifier}({', '.join(constraints)})"
         else:
             raise PrettyPrintException(
                 f"Unhandled subtype kind '{subtypeIndication.__class__.__name__}' for {entity} '{name}'."

@@ -258,6 +258,8 @@ package Trans.Chap3 is
    procedure Copy_Bounds (Dest : O_Enode; Src : O_Enode; Obj_Type : Iir);
    procedure Copy_Bounds (Dest : Mnode; Src : Mnode; Obj_Type : Iir);
 
+   procedure Copy_Range_No_Length (Dest : Mnode; Src : Mnode);
+
    --  Allocate an object of type OBJ_TYPE and set RES.
    --  RES must be a stable access of type ortho_ptr_type.
    --  For an unconstrained array, BOUNDS is a pointer to the boundaries of
@@ -286,7 +288,7 @@ package Trans.Chap3 is
 
    --  Allocate the base of an unbounded composite, whose length is
    --  determined from the bounds (already set).
-   --  RES_PTR is a pointer to the fat pointer (must be a stable variable: it
+   --  RES is the fat pointer (must be a stable variable: it
    --  can be referenced several times).
    --  ARR_TYPE is the type of the composite.
    procedure Allocate_Unbounded_Composite_Base (Alloc_Kind : Allocation_Kind;

@@ -64,7 +64,6 @@ package Vhdl.Utils is
    function Get_Object_Prefix (Name: Iir; With_Alias : Boolean := True)
                               return Iir;
 
-
    --  Return TRUE if NAME is a name that designate an object (ie a constant,
    --  a variable, a signal or a file).
    function Is_Object_Name (Name : Iir) return Boolean;
@@ -85,6 +84,10 @@ package Vhdl.Utils is
    --  Return TRUE iff EXPR is a quantity name.
    function Is_Quantity_Name (Expr : Iir) return Boolean;
 
+   --  Return TRUE iff OBJ is a signal parameter (an interface signal of a
+   --  subprogram).  Works only for base names.
+   function Is_Signal_Parameter (Obj : Iir) return Boolean;
+
    --  Get the interface corresponding to the formal name FORMAL.  This is
    --  always an interface, even if the formal is a name.
    function Get_Interface_Of_Formal (Formal : Iir) return Iir;
@@ -94,6 +97,18 @@ package Vhdl.Utils is
    --  interface (initialized to the association chain and interface chain).
    --  The function Get_Association_Interface return the interface associated
    --  to ASSOC,and Next_Association_Interface updates ASSOC and INTER.
+   --
+   --  Usage:
+   --    Assoc := Get_xxx_Association_Chain (X);
+   --    Assoc_Inter := Get_xxx_Declaration_Chain (Y);
+   --    while Assoc /= Null_Iir loop
+   --       Inter := Get_Association_Interface (Assoc, Assoc_Inter);
+   --       ...
+   --       Next_Association_Interface (Assoc, Assoc_Inter);
+   --    end loop;
+   --
+   --  Note: This iterates over association, so unassociated interfaces are
+   --   not iterated.
    function Get_Association_Interface (Assoc : Iir; Inter : Iir) return Iir;
    procedure Next_Association_Interface
      (Assoc : in out Iir; Inter : in out Iir);
@@ -115,6 +130,12 @@ package Vhdl.Utils is
    --  Return True iff parameter INTER should be copied back (for out/inout
    --  variable).
    function Is_Copyback_Parameter (Inter : Iir) return Boolean;
+
+   --  Set/clear the Associated_XXX fields of type, package and subprogram
+   --  interfaces.
+   --  For set, check they were previously cleared.
+   procedure Set_Interface_Associated (Inter_Chain : Iir; Assoc_Chain : Iir);
+   procedure Clear_Interface_Associated (Inter_Chain : Iir);
 
    --  Duplicate enumeration literal LIT.
    function Copy_Enumeration_Literal (Lit : Iir) return Iir;
@@ -172,15 +193,14 @@ package Vhdl.Utils is
    function Is_Anonymous_Type_Definition (Def : Iir) return Boolean;
    pragma Inline (Is_Anonymous_Type_Definition);
 
-   --  Likewise but for natures.
-   function Is_Anonymous_Nature_Definition (Def : Iir) return Boolean;
-   pragma Inline (Is_Anonymous_Nature_Definition);
-
    --  Return TRUE iff DEF is a fully constrained type (or subtype) definition.
    function Is_Fully_Constrained_Type (Def : Iir) return Boolean;
 
    --  Return TRUE iff DEF is an array type (or subtype) definition.
    function Is_Array_Type (Def : Iir) return Boolean;
+
+   --  Return TRUE iff DEF is a record type (or subtype) definition.
+   function Is_Record_Type (Def : Iir) return Boolean;
 
    --  Return True iff OBJ can be the target of an aggregate with an others
    --  choice (cf LRM08 9.3.3.3).
@@ -239,6 +259,15 @@ package Vhdl.Utils is
    --  Get the type of any node representing a subtype indication.  This simply
    --  skip over denoting names.
    function Get_Type_Of_Subtype_Indication (Ind : Iir) return Iir;
+
+   --  Return True iff DEF defines a new subtype indication, not just an
+   --  existing name (like a name).
+   function Is_Proper_Subtype_Indication (Def : Iir) return Boolean;
+   function Is_Proper_Subnature_Indication (Def : Iir) return Boolean;
+
+   --  Return True iff the subtype indication of DECL is defined/owned by
+   --  DECL.
+   function Has_Owned_Subtype_Indication (Decl : Iir) return Boolean;
 
    --  Get the type of an index_subtype_definition or of a discrete_range from
    --  an index_constraint.
@@ -424,6 +453,34 @@ package Vhdl.Utils is
    procedure Get_File_Signature (Def : Iir;
                                  Res : in out String;
                                  Off : in out Natural);
+
+   --  Apply the 'Converse attribute on MODE.
+   --  Follow able of LRM19 16.2.8 Predefined attributes of named mode views
+   function Get_Converse_Mode (Mode : Iir_Mode) return Iir_Mode;
+
+   --  Return the mode_view_declaration for NAME.
+   --  Also handle 'Converse attributes.
+   procedure Extract_Mode_View_Name
+     (Name : Iir; View : out Iir; Reversed : out Boolean);
+
+   --  Adjust VIEW using EL.
+   --  At the call, VIEW is a mode_view_declaration; at the output VIEW
+   --  is either a simple_mode_view_element or a mode_view_declaration.
+   procedure Update_Mode_View_Selected_Name
+     (View : in out Iir; Reversed : in out Boolean; El : Iir);
+
+   --  Likewise, but using element indexed by POS.
+   procedure Update_Mode_View_By_Pos (Sub_View : out Iir;
+                                      Sub_Reversed : out Boolean;
+                                      View : Iir;
+                                      Reversed : Boolean;
+                                      Pos : Natural);
+
+   --  Set VIEW to a simple_mode_view_element or a mode_view_declaration that
+   --  applies to NAME.  The base name of NAME must be a view interface.
+   --  Reversed is set if the view is reversed (due to 'Converse).
+   procedure Get_Mode_View_From_Name
+     (Name : Iir; View : out Iir; Reversed : out Boolean);
 
    --  Like Get_Identifier but return a Name_Id for the same casing as it
    --  appears in the source file.

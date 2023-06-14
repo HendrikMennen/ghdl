@@ -41,6 +41,8 @@ package body Vhdl.Sem_Stmts is
    procedure Sem_Sequential_Statements_Internal (First_Stmt : Iir);
 
    procedure Sem_Simultaneous_Statements (First : Iir);
+   procedure Sem_Case_Choices
+     (Choice : Iir; Chain : in out Iir; Loc : Location_Type);
 
    -- Access to the current subprogram or process.
    Current_Subprogram: Iir := Null_Iir;
@@ -242,6 +244,15 @@ package body Vhdl.Sem_Stmts is
       Iir_Buffer_Mode => True,
       Iir_Linkage_Mode => False);
 
+   --  LRM19 16.2.8 Predefined attributes of named mode views
+   Iir_Mode_Writable_Converse : constant Boolean_Array_Of_Iir_Mode :=
+     (Iir_Unknown_Mode => False,
+      Iir_In_Mode => True,        --  IN -> OUT
+      Iir_Out_Mode => False,      --  OUT -> IN
+      Iir_Inout_Mode => True,     --  INOUT -> INOUT
+      Iir_Buffer_Mode => False,   --  BUFFER -> IN
+      Iir_Linkage_Mode => True);  --  Not allowed
+
    --  Return True iff signal interface INTER is readable.
    function Is_Interface_Signal_Readable (Inter : Iir) return Boolean
    is
@@ -331,6 +342,127 @@ package body Vhdl.Sem_Stmts is
       return Target_Object;
    end Check_Simple_Signal_Target_Object;
 
+   --  Set MODE_IND to the last view declaration or a simple mode view element
+   --  for PFX.
+   --  MODE_IND can be NULL_IIR in case of error.
+   procedure Extract_View_Target_Prefix
+     (Name : Iir; Mode_Ind : out Iir; Reversed : out Boolean) is
+   begin
+      case Get_Kind (Name) is
+         when Iir_Kind_Interface_View_Declaration =>
+            --  Extract the mode view from a mode view indication
+            Extract_Mode_View_Name
+              (Get_Mode_View_Indication (Name), Mode_Ind, Reversed);
+         when Iir_Kinds_Denoting_Name =>
+            Extract_View_Target_Prefix
+              (Get_Named_Entity (Name), Mode_Ind, Reversed);
+         when Iir_Kind_Slice_Name
+           | Iir_Kind_Indexed_Name =>
+            Extract_View_Target_Prefix (Get_Prefix (Name), Mode_Ind, Reversed);
+            return;
+         when Iir_Kind_Selected_Element =>
+            Extract_View_Target_Prefix (Get_Prefix (Name), Mode_Ind, Reversed);
+            if Mode_Ind = Null_Iir then
+               return;
+            end if;
+            -- Extract the view element.
+            if Get_Kind (Mode_Ind) = Iir_Kind_Simple_Mode_View_Element then
+               return;
+            end if;
+            pragma Assert
+              (Get_Kind (Mode_Ind) = Iir_Kind_Mode_View_Declaration);
+
+            declare
+               El : constant Iir := Get_Named_Entity (Name);
+               Def_List : Iir_Flist;
+               Pos : Natural;
+            begin
+               Pos := Natural (Get_Element_Position (El));
+               Def_List := Get_Elements_Definition_List (Mode_Ind);
+               Mode_Ind := Get_Nth_Element (Def_List, Pos);
+            end;
+            case Get_Kind (Mode_Ind) is
+               when Iir_Kind_Simple_Mode_View_Element =>
+                  --  End of view.
+                  return;
+               when Iir_Kind_Record_Mode_View_Element
+                 | Iir_Kind_Array_Mode_View_Element =>
+                  --  Extract mode view declaration.
+                  declare
+                     Name : Iir;
+                  begin
+                     Name := Get_Mode_View_Name (Mode_Ind);
+                     if Get_Kind (Name) = Iir_Kind_Converse_Attribute then
+                        Name := Get_Prefix (Name);
+                        Reversed := not Reversed;
+                     end if;
+                     Mode_Ind := Get_Named_Entity (Name);
+                  end;
+               when others =>
+                  raise Internal_Error;
+            end case;
+         when others =>
+            Error_Kind ("extract_view_target_prefix", Name);
+      end case;
+   end Extract_View_Target_Prefix;
+
+   function Is_Mode_View_Writable (Mode_Ind : Iir; Reversed : Boolean)
+                                  return Boolean is
+   begin
+      case Get_Kind (Mode_Ind) is
+         when Iir_Kind_Simple_Mode_View_Element =>
+            if Reversed then
+               return Iir_Mode_Writable_Converse (Get_Mode (Mode_Ind));
+            else
+               return Iir_Mode_Writable (Get_Mode (Mode_Ind));
+            end if;
+         when Iir_Kind_Mode_View_Declaration =>
+            declare
+               Els : constant Iir := Get_Elements_Definition_Chain (Mode_Ind);
+               El : Iir;
+            begin
+               --  First, try the simple elements.
+               El := Els;
+               while El /= Null_Iir loop
+                  if Get_Kind (El) = Iir_Kind_Simple_Mode_View_Element
+                    and then not Is_Mode_View_Writable (El, Reversed)
+                  then
+                     return False;
+                  end if;
+                  El := Get_Chain (El);
+               end loop;
+               --  Then the non-simple one.
+               El := Els;
+               while El /= Null_Iir loop
+                  if Get_Kind (El) /= Iir_Kind_Simple_Mode_View_Element
+                    and then not Is_Mode_View_Writable (El, Reversed)
+                  then
+                     return False;
+                  end if;
+                  El := Get_Chain (El);
+               end loop;
+               --  No errors, so it is writable.
+               return True;
+            end;
+         when others =>
+            Error_Kind ("is_mode_view_writable", Mode_Ind);
+      end case;
+   end Is_Mode_View_Writable;
+
+   procedure Check_View_Signal_Target (Target : Iir)
+   is
+      Mode_Ind : Iir;
+      Reversed : Boolean;
+   begin
+      Extract_View_Target_Prefix (Target, Mode_Ind, Reversed);
+      if Mode_Ind = Null_Iir then
+         return;
+      end if;
+      if not Is_Mode_View_Writable (Mode_Ind, Reversed) then
+         Error_Msg_Sem (+Target, "mode view element can't be assigned");
+      end if;
+   end Check_View_Signal_Target;
+
    procedure Check_Simple_Signal_Target
      (Stmt : Iir; Target : Iir; Staticness : Iir_Staticness)
    is
@@ -354,6 +486,9 @@ package body Vhdl.Sem_Stmts is
             else
                Sem_Add_Driver (Target_Object, Stmt);
             end if;
+         when Iir_Kind_Interface_View_Declaration =>
+            Check_View_Signal_Target (Target);
+            Sem_Add_Driver (Target_Object, Stmt);
          when Iir_Kind_Signal_Declaration =>
             Sem_Add_Driver (Target_Object, Stmt);
             Set_Use_Flag (Target_Prefix, True);
@@ -385,6 +520,9 @@ package body Vhdl.Sem_Stmts is
          Guarded_Target := Unknown;
       elsif Targ_Obj_Kind = Iir_Kind_External_Signal_Name then
          Guarded_Target := Unknown;
+      elsif Targ_Obj_Kind = Iir_Kind_Interface_View_Declaration then
+         --  TODO: Can it be guarded ?
+         return;
       else
          if Get_Guarded_Signal_Flag (Target_Prefix) then
             Guarded_Target := True;
@@ -688,6 +826,32 @@ package body Vhdl.Sem_Stmts is
       end loop;
    end Sem_Check_Waveform_Chain;
 
+   procedure Sem_Selected_Signal_Assignment_Expression (Stmt : Iir)
+   is
+      Expr: Iir;
+      Chain : Iir;
+   begin
+      --  LRM 9.5  Concurrent Signal Assignment Statements.
+      --  The process statement equivalent to a concurrent signal assignment
+      --  statement [...] is constructed as follows: [...]
+      --
+      --  LRM 9.5.2  Selected Signal Assignment
+      --  The characteristics of the selected expression, the waveforms and
+      --  the choices in the selected assignment statement must be such that
+      --  the case statement in the equivalent statement is a legal
+      --  statement
+
+      --  The choices.
+      Chain := Get_Selected_Waveform_Chain (Stmt);
+      Expr := Sem_Case_Expression (Get_Expression (Stmt));
+      if Expr /= Null_Iir then
+         Check_Read (Expr);
+         Set_Expression (Stmt, Expr);
+         Sem_Case_Choices (Expr, Chain, Get_Location (Stmt));
+         Set_Selected_Waveform_Chain (Stmt, Chain);
+      end if;
+   end Sem_Selected_Signal_Assignment_Expression;
+
    procedure Sem_Guard (Stmt: Iir)
    is
       Guard: Iir;
@@ -782,7 +946,7 @@ package body Vhdl.Sem_Stmts is
 
          case Get_Kind (Stmt) is
             when Iir_Kind_Concurrent_Simple_Signal_Assignment
-              | Iir_Kind_Simple_Signal_Assignment_Statement =>
+               | Iir_Kind_Simple_Signal_Assignment_Statement =>
                Wf_Chain := Get_Waveform_Chain (Stmt);
                Sem_Waveform_Chain (Wf_Chain, Constrained, Target_Type);
                if Done then
@@ -790,7 +954,7 @@ package body Vhdl.Sem_Stmts is
                end if;
 
             when Iir_Kind_Concurrent_Conditional_Signal_Assignment
-              | Iir_Kind_Conditional_Signal_Assignment_Statement =>
+               | Iir_Kind_Conditional_Signal_Assignment_Statement =>
                Cond_Wf := Get_Conditional_Waveform_Chain (Stmt);
                while Cond_Wf /= Null_Iir loop
                   Wf_Chain := Get_Waveform_Chain (Cond_Wf);
@@ -805,7 +969,8 @@ package body Vhdl.Sem_Stmts is
                   Cond_Wf := Get_Chain (Cond_Wf);
                end loop;
 
-            when Iir_Kind_Concurrent_Selected_Signal_Assignment =>
+            when Iir_Kind_Concurrent_Selected_Signal_Assignment
+               | Iir_Kind_Selected_Waveform_Assignment_Statement =>
                declare
                   El : Iir;
                begin
@@ -836,8 +1001,18 @@ package body Vhdl.Sem_Stmts is
       end loop;
 
       case Get_Kind (Stmt) is
+         when Iir_Kind_Concurrent_Selected_Signal_Assignment
+            | Iir_Kind_Selected_Waveform_Assignment_Statement =>
+            --  The choices.
+            Sem_Selected_Signal_Assignment_Expression (Stmt);
+         when others =>
+            null;
+      end case;
+
+      case Get_Kind (Stmt) is
          when Iir_Kind_Concurrent_Simple_Signal_Assignment
-           | Iir_Kind_Concurrent_Conditional_Signal_Assignment =>
+           | Iir_Kind_Concurrent_Conditional_Signal_Assignment
+           | Iir_Kind_Concurrent_Selected_Signal_Assignment =>
             Sem_Guard (Stmt);
          when others =>
             null;
@@ -1841,7 +2016,8 @@ package body Vhdl.Sem_Stmts is
                Sem_Sequential_Statements_Internal
                  (Get_Sequential_Statement_Chain (Stmt));
             when Iir_Kind_Simple_Signal_Assignment_Statement
-               | Iir_Kind_Conditional_Signal_Assignment_Statement =>
+               | Iir_Kind_Conditional_Signal_Assignment_Statement
+               | Iir_Kind_Selected_Waveform_Assignment_Statement =>
                Sem_Passive_Statement (Stmt);
                Sem_Signal_Assignment (Stmt);
             when Iir_Kind_Signal_Force_Assignment_Statement
@@ -2383,37 +2559,6 @@ package body Vhdl.Sem_Stmts is
       Sem_Process_Statement (Proc);
    end Sem_Sensitized_Process_Statement;
 
-   procedure Sem_Concurrent_Selected_Signal_Assignment (Stmt: Iir)
-   is
-      Expr: Iir;
-      Chain : Iir;
-   begin
-      --  LRM 9.5  Concurrent Signal Assgnment Statements.
-      --  The process statement equivalent to a concurrent signal assignment
-      --  statement [...] is constructed as follows: [...]
-      --
-      --  LRM 9.5.2  Selected Signal Assignment
-      --  The characteristics of the selected expression, the waveforms and
-      --  the choices in the selected assignment statement must be such that
-      --  the case statement in the equivalent statement is a legal
-      --  statement
-
-      --  Target and waveforms.
-      Sem_Signal_Assignment (Stmt);
-
-      --  The choices.
-      Chain := Get_Selected_Waveform_Chain (Stmt);
-      Expr := Sem_Case_Expression (Get_Expression (Stmt));
-      if Expr /= Null_Iir then
-         Check_Read (Expr);
-         Set_Expression (Stmt, Expr);
-         Sem_Case_Choices (Expr, Chain, Get_Location (Stmt));
-         Set_Selected_Waveform_Chain (Stmt, Chain);
-      end if;
-
-      Sem_Guard (Stmt);
-   end Sem_Concurrent_Selected_Signal_Assignment;
-
    procedure Sem_Concurrent_Break_Statement (Stmt : Iir)
    is
       Sensitivity_List : Iir_List;
@@ -2571,16 +2716,12 @@ package body Vhdl.Sem_Stmts is
 
       case Get_Kind (Stmt) is
          when Iir_Kind_Concurrent_Simple_Signal_Assignment
-           | Iir_Kind_Concurrent_Conditional_Signal_Assignment =>
+            | Iir_Kind_Concurrent_Conditional_Signal_Assignment
+            | Iir_Kind_Concurrent_Selected_Signal_Assignment =>
             if Is_Passive then
                Error_Msg_Sem (+Stmt, "signal assignment forbidden in entity");
             end if;
             Sem_Signal_Assignment (Stmt);
-         when Iir_Kind_Concurrent_Selected_Signal_Assignment =>
-            if Is_Passive then
-               Error_Msg_Sem (+Stmt, "signal assignment forbidden in entity");
-            end if;
-            Sem_Concurrent_Selected_Signal_Assignment (Stmt);
          when Iir_Kind_Sensitized_Process_Statement =>
             Set_Passive_Flag (Stmt, Is_Passive);
             Sem_Sensitized_Process_Statement (Stmt);

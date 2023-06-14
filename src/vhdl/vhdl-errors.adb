@@ -341,6 +341,10 @@ package body Vhdl.Errors is
          when Iir_Kind_Foreign_Vector_Type_Definition =>
             return "foreign vector type definition";
 
+         when Iir_Kind_Record_Mode_View_Indication
+            | Iir_Kind_Array_Mode_View_Indication =>
+            return "mode view indication";
+
          when Iir_Kind_Scalar_Nature_Definition =>
             return Disp_Nature (Node, "scalar nature");
          when Iir_Kind_Array_Nature_Definition =>
@@ -461,6 +465,8 @@ package body Vhdl.Errors is
                when others =>
                   return Disp_Identifier (Node, "signal interface");
             end case;
+         when Iir_Kind_Interface_View_Declaration =>
+            return Disp_Identifier (Node, "port");
          when Iir_Kind_Interface_Variable_Declaration =>
             return Disp_Identifier (Node, "variable interface");
          when Iir_Kind_Interface_File_Declaration =>
@@ -528,6 +534,8 @@ package body Vhdl.Errors is
             return Disp_Identifier (Node, "package");
          when Iir_Kind_Package_Body =>
             return Disp_Identifier (Node, "package body");
+         when Iir_Kind_Package_Instantiation_Body =>
+            return "package instantiation body";
          when Iir_Kind_Entity_Declaration =>
             return Disp_Identifier (Node, "entity");
          when Iir_Kind_Architecture_Body =>
@@ -644,6 +652,13 @@ package body Vhdl.Errors is
            | Iir_Kind_Noise_Quantity_Declaration =>
             return Disp_Identifier (Node, "quantity declaration");
 
+         when Iir_Kind_Mode_View_Declaration =>
+            return Disp_Identifier (Node, "mode view declaration");
+         when Iir_Kind_Simple_Mode_View_Element
+           | Iir_Kind_Array_Mode_View_Element
+           | Iir_Kind_Record_Mode_View_Element =>
+            return "mode view element";
+
          when Iir_Kind_Attribute_Declaration =>
             return Disp_Identifier (Node, "attribute");
          when Iir_Kind_Attribute_Specification =>
@@ -754,6 +769,9 @@ package body Vhdl.Errors is
             return "'instance_name attribute";
          when Iir_Kind_Simple_Name_Attribute =>
             return "'simple_name attribute";
+
+         when Iir_Kind_Converse_Attribute =>
+            return "'converse attribute";
 
          when Iir_Kind_For_Loop_Statement =>
             return Disp_Label (Node, "for loop statement");

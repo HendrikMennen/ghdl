@@ -21,6 +21,7 @@ with Ada.Unchecked_Conversion;
 
 with Simple_IO;
 with Utils_IO;
+with Flags;
 
 with Vhdl.Types;
 with Vhdl.Errors;
@@ -35,12 +36,12 @@ with PSL.Nodes;
 with PSL.NFAs;
 with PSL.NFAs.Utils;
 with PSL.Errors;
+with PSL.Subsets;
 
 with Elab.Debugger;
-with Elab.Vhdl_Objtypes; use Elab.Vhdl_Objtypes;
-with Elab.Vhdl_Values; use Elab.Vhdl_Values;
 with Elab.Vhdl_Types;
 with Elab.Vhdl_Debug;
+with Elab.Vhdl_Objtypes; use Elab.Vhdl_Objtypes;
 
 with Synth.Errors;
 with Synth.Vhdl_Stmts; use Synth.Vhdl_Stmts;
@@ -51,12 +52,12 @@ with Synth.Vhdl_Static_Proc;
 with Synth.Flags;
 with Synth.Ieee.Std_Logic_1164; use Synth.Ieee.Std_Logic_1164;
 
+with Simul.Main;
+
 with Grt.Types; use Grt.Types;
-with Grt.Signals; use Grt.Signals;
+with Grt.Vhdl_Types; use Grt.Vhdl_Types;
 with Grt.Options;
-with Grt.Stdio;
 with Grt.Processes;
-with Grt.Main;
 with Grt.Errors;
 with Grt.Severity;
 with Grt.Lib;
@@ -76,8 +77,6 @@ package body Simul.Vhdl_Simul is
    function To_Ghdl_Signal_Ptr_Ptr is
       new Ada.Unchecked_Conversion (Memory_Ptr, Ghdl_Signal_Ptr_Ptr);
 
-   Sig_Size : constant Size_Type := Ghdl_Signal_Ptr'Size / 8;
-
    subtype F64_C_Arr_Ptr is Grt.Analog_Solver.F64_C_Arr_Ptr;
 
    procedure Residues (T : Ghdl_F64;
@@ -88,6 +87,13 @@ package body Simul.Vhdl_Simul is
 
    procedure Set_Quantities_Values (Y : F64_C_Arr_Ptr; Yp: F64_C_Arr_Ptr);
    pragma Export (C, Set_Quantities_Values, "grt__analog_solver__set_values");
+
+   --  Mapping.
+   type Iir_Kind_To_Kind_Signal_Type is
+     array (Iir_Signal_Kind) of Kind_Signal_Type;
+   Iir_Kind_To_Kind_Signal : constant Iir_Kind_To_Kind_Signal_Type :=
+     (Iir_Register_Kind  => Kind_Signal_Register,
+      Iir_Bus_Kind       => Kind_Signal_Bus);
 
    function Sig_Index (Base : Memory_Ptr; Idx : Uns32) return Memory_Ptr is
    begin
@@ -272,7 +278,7 @@ package body Simul.Vhdl_Simul is
                      Smem := Val.Mem + Size_Type (I - 1) * El.Sz;
                   end if;
                   Assign_Value_To_Signal
-                    ((El, Sig_Index (Target.Mem, (Len - I) * El.W)),
+                    ((El, Sig_Index (Target.Mem, (I - 1) * El.W)),
                      Is_Start, Rej, After, (Val.Typ.Arr_El, Smem));
                end loop;
             end;
@@ -345,7 +351,7 @@ package body Simul.Vhdl_Simul is
                      Smem := Val.Mem + Size_Type (I - 1) * El.Sz;
                   end if;
                   Force_Signal_Value
-                    ((El, Sig_Index (Target.Mem, (Len - I) * El.W)),
+                    ((El, Sig_Index (Target.Mem, (I - 1) * El.W)),
                      Kind, Mode, (Val.Typ.Arr_El, Smem));
                end loop;
             end;
@@ -386,7 +392,7 @@ package body Simul.Vhdl_Simul is
             begin
                for I in 1 .. Len loop
                   Add_Source (Typ.Arr_El,
-                              Sig_Index (Sig, (Len - I) * Typ.Arr_El.W),
+                              Sig_Index (Sig, (I - 1) * Typ.Arr_El.W),
                               Val + Size_Type (I - 1) * Typ.Arr_El.Sz);
                end loop;
             end;
@@ -479,7 +485,7 @@ package body Simul.Vhdl_Simul is
                Sub : Memory_Ptr;
             begin
                for I in 1 .. Len loop
-                  Sub := Sig_Index (Sig.Mem, (Len - I) * Sig.Typ.Arr_El.W);
+                  Sub := Sig_Index (Sig.Mem, (I - 1) * Sig.Typ.Arr_El.W);
                   if Read_Signal_Flag ((Sig.Typ.Arr_El, Sub), Kind) then
                      return True;
                   end if;
@@ -558,6 +564,12 @@ package body Simul.Vhdl_Simul is
       return Hook_Quantity_Expr (Pfx.Obj);
    end Exec_Dot_Attribute;
 
+   function Exec_Endpoint (Inst : Synth_Instance_Acc;
+                           Expr : Node) return Valtyp is
+   begin
+      return Get_Value (Inst, Expr);
+   end Exec_Endpoint;
+
    procedure Execute_Sequential_Statements (Process : Process_State_Acc);
 
    function Execute_Condition (Inst : Synth_Instance_Acc;
@@ -573,7 +585,12 @@ package body Simul.Vhdl_Simul is
 
       Mark_Expr_Pool (Mark);
       Cond_Val := Synth.Vhdl_Expr.Synth_Expression (Inst, Cond);
-      Res := Read_Discrete (Cond_Val) = 1;
+      if Cond_Val /= No_Valtyp then
+         Res := Read_Discrete (Cond_Val) = 1;
+      else
+         --  What could we do ?
+         Res := False;
+      end if;
       Release_Expr_Pool (Mark);
 
       return Res;
@@ -753,7 +770,7 @@ package body Simul.Vhdl_Simul is
             begin
                for I in 1 .. Len loop
                   Add_Wait_Sensitivity
-                    (Typ.Arr_El, Sig_Index (Sig, (Len - I) * Typ.Arr_El.W));
+                    (Typ.Arr_El, Sig_Index (Sig, (I - 1) * Typ.Arr_El.W));
                end loop;
             end;
          when Type_Record =>
@@ -904,7 +921,7 @@ package body Simul.Vhdl_Simul is
             Sub_Inst := Synth_Subprogram_Call_Instance (Inst, Imp, Imp);
 
             Synth_Subprogram_Associations
-              (Sub_Inst, Inst, Inter_Chain, Assoc_Chain);
+              (Sub_Inst, Inst, Inter_Chain, Assoc_Chain, Call);
 
             Synth.Vhdl_Static_Proc.Synth_Static_Procedure
               (Sub_Inst, Imp, Call);
@@ -937,7 +954,7 @@ package body Simul.Vhdl_Simul is
             --  one!
             Set_Uninstantiated_Scope (Sub_Inst, Imp);
             Synth_Subprogram_Associations
-              (Sub_Inst, Inst, Inter_Chain, Assoc_Chain);
+              (Sub_Inst, Inst, Inter_Chain, Assoc_Chain, Call);
 
             Process.Instance := Sub_Inst;
             Synth.Vhdl_Decls.Synth_Declarations
@@ -976,6 +993,7 @@ package body Simul.Vhdl_Simul is
    is
       use Synth.Vhdl_Expr;
       V_Aft : Std_Time;
+      V_Rej : Std_Time;
       Start : Boolean;
 
       procedure Execute_Signal_Assignment (Inst : Synth_Instance_Acc;
@@ -985,6 +1003,22 @@ package body Simul.Vhdl_Simul is
 
       procedure Execute_Aggregate_Signal_Assignment is
          new Assign_Aggregate (Execute_Signal_Assignment);
+
+      function Value_To_Sig (Val : Value_Acc) return Memory_Ptr is
+      begin
+         case Val.Kind is
+            when Value_Signal =>
+               declare
+                  E : Signal_Entry renames Signals_Table.Table (Val.S);
+               begin
+                  return E.Sig;
+               end;
+            when Value_Sig_Val =>
+               return Val.I_Sigs;
+            when others =>
+               raise Internal_Error;
+         end case;
+      end Value_To_Sig;
 
       procedure Execute_Signal_Assignment (Inst : Synth_Instance_Acc;
                                            Target : Target_Info;
@@ -1000,20 +1034,15 @@ package body Simul.Vhdl_Simul is
                  (Inst, Target.Aggr, Target.Targ_Type, Val, Loc);
 
             when Target_Simple =>
-               declare
-                  E : Signal_Entry renames
-                    Signals_Table.Table (Target.Obj.Val.S);
-               begin
-                  Sig := (Target.Targ_Type,
-                          Sig_Index (E.Sig, Target.Off.Net_Off));
-               end;
-
+               Sig := (Target.Targ_Type,
+                       Sig_Index (Value_To_Sig (Target.Obj.Val),
+                                  Target.Off.Net_Off));
                if Val /= No_Valtyp then
                   Mem := Get_Value_Memtyp (Val);
                else
                   Mem := Null_Memtyp;
                end if;
-               Assign_Value_To_Signal (Sig, Start, V_Aft, V_Aft, Mem);
+               Assign_Value_To_Signal (Sig, Start, V_Rej, V_Aft, Mem);
 
             when Target_Memory =>
                raise Internal_Error;
@@ -1033,7 +1062,10 @@ package body Simul.Vhdl_Simul is
 
       Rej := Get_Reject_Time_Expression (Stmt);
       if Rej /= Null_Node then
-         raise Internal_Error;
+         Val := Synth_Expression (Inst, Rej);
+         V_Rej := Std_Time (Read_I64 (Val.Val.Mem));
+      else
+         V_Rej := 0;
       end if;
 
       Wf := Waveform;
@@ -1043,6 +1075,14 @@ package body Simul.Vhdl_Simul is
          if Aft /= Null_Node then
             Val := Synth_Expression (Inst, Aft);
             V_Aft := Std_Time (Read_I64 (Val.Val.Mem));
+            if Rej = Null_Node then
+               case Get_Delay_Mechanism (Stmt) is
+                  when Iir_Inertial_Delay =>
+                     V_Rej := V_Aft;
+                  when Iir_Transport_Delay =>
+                     V_Rej := 0;
+               end case;
+            end if;
          else
             V_Aft := 0;
          end if;
@@ -1148,7 +1188,7 @@ package body Simul.Vhdl_Simul is
             begin
                for I in 1 .. Len loop
                   Disconnect_Signal
-                    ((El, Sig_Index (Sig.Mem, (Len - I) * El.W)));
+                    ((El, Sig_Index (Sig.Mem, (I - 1) * El.W)));
                end loop;
             end;
          when Type_Record =>
@@ -1377,11 +1417,21 @@ package body Simul.Vhdl_Simul is
       Diag_C (":@");
       Diag_C_Now;
       Diag_C (":(");
-      if Get_Kind (Stmt) = Iir_Kind_Report_Statement then
-         Diag_C ("report");
-      else
-         Diag_C ("assert");
-      end if;
+      case Get_Kind (Stmt) is
+         when Iir_Kind_Report_Statement =>
+            Diag_C ("report");
+         when Iir_Kind_Assertion_Statement
+           | Iir_Kind_Concurrent_Assertion_Statement =>
+            Diag_C ("assert");
+         when Iir_Kind_Psl_Assert_Directive =>
+            Diag_C ("psl assertion");
+         when Iir_Kind_Psl_Assume_Directive =>
+            Diag_C ("psl assumption");
+         when Iir_Kind_Psl_Cover_Directive =>
+            Diag_C ("psl cover");
+         when others =>
+            raise Types.Internal_Error;
+      end case;
       Diag_C (' ');
       case Severity is
          when Note_Severity =>
@@ -1896,7 +1946,7 @@ package body Simul.Vhdl_Simul is
             begin
                for I in 1 .. Len loop
                   Add_Sensitivity
-                    (Typ.Arr_El, Sig_Index (Sig, (Len - I) * Typ.Arr_El.W));
+                    (Typ.Arr_El, Sig_Index (Sig, (I - 1) * Typ.Arr_El.W));
                end loop;
             end;
          when Type_Record =>
@@ -1999,11 +2049,34 @@ package body Simul.Vhdl_Simul is
       end case;
    end Execute_Psl_Expr;
 
+   --  Execute the boolean condition of PROP.
+   function Execute_Psl_Abort_Condition (Inst : Synth_Instance_Acc;
+                                         Prop : PSL_Node) return Boolean
+   is
+      Marker : Mark_Type;
+      V : Boolean;
+   begin
+      Mark_Expr_Pool (Marker);
+      V := Execute_Psl_Expr (Inst, PSL.Nodes.Get_Boolean (Prop), False);
+      Release_Expr_Pool (Marker);
+      return V;
+   end Execute_Psl_Abort_Condition;
+
+   procedure Reset_PSL_State (E : Process_State_Acc) is
+   begin
+      E.States.all := (others => False);
+      E.States (0) := True;
+   end Reset_PSL_State;
+
    procedure PSL_Process_Executer (Self : Grt.Processes.Instance_Acc)
    is
       use PSL.NFAs;
 
       E : constant Process_State_Acc := To_Process_State_Acc (Self);
+      Has_Abort : constant Boolean :=
+        Get_Kind (E.Proc) in Iir_Kinds_Psl_Property_Directive
+        and then Get_PSL_Abort_Flag (E.Proc);
+      Prop : PSL_Node;
       Nvec : Boolean_Vector (E.States.all'Range);
       Marker : Mark_Type;
       V : Boolean;
@@ -2023,10 +2096,31 @@ package body Simul.Vhdl_Simul is
       Instance_Pool := Process_Pool'Access;
 --      Current_Process := No_Process;
 
+      if Has_Abort then
+         Prop := Get_Psl_Property (E.Proc);
+         if PSL.Subsets.Is_Async_Abort (Prop) then
+            if Execute_Psl_Abort_Condition (E.Instance, Prop) then
+               Reset_PSL_State (E);
+
+               Instance_Pool := null;
+               return;
+            end if;
+         end if;
+      end if;
+
       Mark_Expr_Pool (Marker);
       V := Execute_Psl_Expr (E.Instance, Get_PSL_Clock (E.Proc), False);
       Release_Expr_Pool (Marker);
       if V then
+         if Has_Abort and then not PSL.Subsets.Is_Async_Abort (Prop) then
+            if Execute_Psl_Abort_Condition (E.Instance, Prop) then
+               Reset_PSL_State (E);
+
+               Instance_Pool := null;
+               return;
+            end if;
+         end if;
+
          Nvec := (others => False);
          case Get_Kind (E.Proc) is
             when Iir_Kind_Psl_Cover_Directive
@@ -2085,12 +2179,13 @@ package body Simul.Vhdl_Simul is
                   end if;
                   E.Done := True;
                end if;
---            when Iir_Kind_Psl_Endpoint_Declaration =>
---               declare
---                  Info : constant Sim_Info_Acc := Get_Info (E.Stmt);
---               begin
---                E.Instance.Objects (Info.Slot).B1 := Ghdl_B1 (Nvec (S_Num));
---               end;
+            when Iir_Kind_Psl_Endpoint_Declaration =>
+               declare
+                  Var : Valtyp;
+               begin
+                  Var := Get_Value (E.Instance, E.Proc);
+                  Write_U8 (Var.Val.Mem, Boolean'Pos (Nvec (S_Num)));
+               end;
             when others =>
                Vhdl.Errors.Error_Kind ("PSL_Process_Executer", E.Proc);
          end case;
@@ -2145,10 +2240,7 @@ package body Simul.Vhdl_Simul is
         (0 .. Get_PSL_Nbr_States (Stmt) - 1 => False);
       Proc.States (0) := True;
 
-      Grt.Processes.Ghdl_Process_Register
-        (To_Instance_Acc (Inst), PSL_Process_Executer'Access,
-         null, System.Null_Address);
-
+      --  First the finalizers.
       case Get_Kind (Proc.Proc) is
          when Iir_Kind_Psl_Assert_Directive
            | Iir_Kind_Psl_Assume_Directive =>
@@ -2159,9 +2251,16 @@ package body Simul.Vhdl_Simul is
          when Iir_Kind_Psl_Cover_Directive =>
             --  TODO
             null;
+         when Iir_Kind_Psl_Endpoint_Declaration =>
+            null;
          when others =>
             null;
       end case;
+
+      --  Then the process, so that sensitivity can be added.
+      Grt.Processes.Ghdl_Process_Register
+        (To_Instance_Acc (Inst), PSL_Process_Executer'Access,
+         null, System.Null_Address);
    end Create_PSL;
 
    procedure Create_Processes
@@ -2229,7 +2328,9 @@ package body Simul.Vhdl_Simul is
                end if;
                Create_Process_Drivers (I);
 
-            when Iir_Kind_Psl_Assert_Directive =>
+            when Iir_Kind_Psl_Assert_Directive
+               | Iir_Kind_Psl_Cover_Directive
+               | Iir_Kind_Psl_Endpoint_Declaration =>
                Processes_State (I) := (Kind => Kind_PSL,
                                        Has_State => False,
                                        Top_Instance => Instance,
@@ -2239,6 +2340,7 @@ package body Simul.Vhdl_Simul is
                                        Done => False,
                                        States => null);
                Create_PSL (Processes_State (I), Processes_State (I)'Address);
+               Register_Sensitivity (I);
 
             when others =>
                Vhdl.Errors.Error_Kind ("create_processes", Proc);
@@ -2281,7 +2383,7 @@ package body Simul.Vhdl_Simul is
                for I in 1 .. Len loop
                   Resolver_Read_Value
                     ((Typ.Arr_El, Dst.Mem + Size_Type (I - 1) * Typ.Arr_El.Sz),
-                     Sig_Index (Sig, (Len - I) * Typ.Arr_El.W),
+                     Sig_Index (Sig, (I - 1) * Typ.Arr_El.W),
                      Mode, Index);
                end loop;
             end;
@@ -2300,9 +2402,105 @@ package body Simul.Vhdl_Simul is
       end case;
    end Resolver_Read_Value;
 
+   type Read_Signal_Last_Enum is
+     (
+      Read_Signal_Last_Event,
+      Read_Signal_Last_Active
+     );
+
+   function Exec_Read_Signal_Last (Sig: Memory_Ptr;
+                                   Typ : Type_Acc;
+                                   Attr : Read_Signal_Last_Enum)
+                                  return Std_Time
+   is
+      Res, T : Std_Time;
+      S : Ghdl_Signal_Ptr;
+   begin
+      case Typ.Kind is
+         when Type_Scalars =>
+            S := Read_Sig (Sig);
+            case Attr is
+               when Read_Signal_Last_Event =>
+                  return S.Last_Event;
+               when Read_Signal_Last_Active =>
+                  return S.Last_Active;
+            end case;
+         when Type_Vector
+           | Type_Array =>
+            declare
+               Len : constant Uns32 := Typ.Abound.Len;
+               Sigel : Memory_Ptr;
+            begin
+               Res := Std_Time'First;
+               for I in 1 .. Len loop
+                  Sigel := Sig_Index (Sig, (I - 1) * Typ.Arr_El.W);
+                  T := Exec_Read_Signal_Last (Sigel, Typ.Arr_El, Attr);
+                  Res := Std_Time'Max (Res, T);
+               end loop;
+               return Res;
+            end;
+         when Type_Record =>
+            Res := Std_Time'First;
+            for I in Typ.Rec.E'Range loop
+               declare
+                  E : Rec_El_Type renames Typ.Rec.E (I);
+                  Sigel : Memory_Ptr;
+               begin
+                  Sigel := Sig_Index (Sig, E.Offs.Net_Off);
+                  T := Exec_Read_Signal_Last (Sigel, E.Typ, Attr);
+                  Res := Std_Time'Max (Res, T);
+               end;
+            end loop;
+            return Res;
+         when others =>
+            raise Internal_Error;
+      end case;
+   end Exec_Read_Signal_Last;
+
+   function Exec_Signal_Last_Attribute (Inst : Synth_Instance_Acc;
+                                        Expr : Node;
+                                        Attr : Read_Signal_Last_Enum)
+                                       return Valtyp
+   is
+      Pfx : Target_Info;
+      Res : Valtyp;
+      T : Std_Time;
+      S : Memory_Ptr;
+   begin
+      Pfx := Synth_Target (Inst, Get_Prefix (Expr));
+
+      S := Sig_Index (Signals_Table.Table (Pfx.Obj.Val.S).Sig,
+                      Pfx.Off.Net_Off);
+
+      T := Exec_Read_Signal_Last (S, Pfx.Targ_Type, Attr);
+      if T < 0 then
+         T := Std_Time'Last;
+      else
+         T := Current_Time - T;
+      end if;
+
+      Res := Create_Value_Memory (Get_Subtype_Object (Inst, Get_Type (Expr)),
+                                  Expr_Pool'Access);
+      Write_I64 (Res.Val.Mem, Ghdl_I64 (T));
+      return Res;
+   end Exec_Signal_Last_Attribute;
+
+   function Exec_Last_Event_Attribute (Inst : Synth_Instance_Acc;
+                                       Expr : Node) return Valtyp is
+   begin
+      return Exec_Signal_Last_Attribute (Inst, Expr, Read_Signal_Last_Event);
+   end Exec_Last_Event_Attribute;
+
+   function Exec_Last_Active_Attribute (Inst : Synth_Instance_Acc;
+                                        Expr : Node) return Valtyp is
+   begin
+      return Exec_Signal_Last_Attribute (Inst, Expr, Read_Signal_Last_Active);
+   end Exec_Last_Active_Attribute;
+
    type Read_Signal_Enum is
      (
       Read_Signal_Last_Value,
+      Read_Signal_Last_Value_87,
 
       --  For conversion functions.
       Read_Signal_Driving_Value,
@@ -2312,25 +2510,38 @@ package body Simul.Vhdl_Simul is
       Read_Signal_Driver_Value
      );
 
+   --  T is used only for last_value.
    procedure Exec_Read_Signal (Sig: Memory_Ptr;
                                Val : Memtyp;
-                               Attr : Read_Signal_Enum)
+                               Attr : Read_Signal_Enum;
+                               T : Std_Time)
    is
-      S : Ghdl_Signal_Ptr;
    begin
       case Val.Typ.Kind is
          when Type_Scalars =>
-            S := Read_Sig (Sig);
-            case Attr is
-               when Read_Signal_Driving_Value =>
-                  Write_Ghdl_Value (Val, S.Driving_Value);
-               when Read_Signal_Effective_Value =>
-                  Write_Ghdl_Value (Val, S.Value_Ptr.all);
-               when Read_Signal_Last_Value =>
-                  Write_Ghdl_Value (Val, S.Last_Value);
-               when Read_Signal_Driver_Value =>
-                  Write_Ghdl_Value (Val, Ghdl_Signal_Driving_Value (S));
-            end case;
+            declare
+               S : Ghdl_Signal_Ptr;
+               V : Value_Union;
+            begin
+               S := Read_Sig (Sig);
+               case Attr is
+                  when Read_Signal_Driving_Value =>
+                     V := S.Driving_Value;
+                  when Read_Signal_Effective_Value =>
+                     V := S.Value_Ptr.all;
+                  when Read_Signal_Last_Value_87 =>
+                     V := S.Last_Value;
+                  when Read_Signal_Last_Value =>
+                     if S.Last_Event < T then
+                        V := S.Value_Ptr.all;
+                     else
+                        V := S.Last_Value;
+                     end if;
+                  when Read_Signal_Driver_Value =>
+                     V := Ghdl_Signal_Driving_Value (S);
+               end case;
+               Write_Ghdl_Value (Val, V);
+            end;
          when Type_Vector
            | Type_Array =>
             declare
@@ -2339,9 +2550,9 @@ package body Simul.Vhdl_Simul is
             begin
                for I in 1 .. Len loop
                   Exec_Read_Signal
-                    (Sig_Index (Sig, (Len - I) * Typ.Arr_El.W),
+                    (Sig_Index (Sig, (I - 1) * Typ.Arr_El.W),
                      (Typ.Arr_El, Val.Mem + Size_Type (I - 1) * Typ.Arr_El.Sz),
-                     Attr);
+                     Attr, T);
                end loop;
             end;
          when Type_Record =>
@@ -2351,7 +2562,7 @@ package body Simul.Vhdl_Simul is
                begin
                   Exec_Read_Signal (Sig_Index (Sig, E.Offs.Net_Off),
                                     (E.Typ, Val.Mem + E.Offs.Mem_Off),
-                                    Attr);
+                                    Attr, T);
                end;
             end loop;
          when others =>
@@ -2374,14 +2585,40 @@ package body Simul.Vhdl_Simul is
       S := Sig_Index (Signals_Table.Table (Pfx.Obj.Val.S).Sig,
                       Pfx.Off.Net_Off);
 
-      Exec_Read_Signal (S, Get_Memtyp (Res), Kind);
+      Exec_Read_Signal (S, Get_Memtyp (Res), Kind, 0);
       return Res;
    end Exec_Signal_Value_Attribute;
 
    function Exec_Last_Value_Attribute (Inst : Synth_Instance_Acc;
-                                       Expr : Node) return Valtyp is
+                                       Expr : Node) return Valtyp
+   is
+      use Flags;
+      T : Std_Time;
    begin
-      return Exec_Signal_Value_Attribute (Inst, Expr, Read_Signal_Last_Value);
+      if Vhdl_Std >= Vhdl_93 then
+         declare
+            Pfx : Target_Info;
+            Res : Valtyp;
+            S : Memory_Ptr;
+         begin
+            Pfx := Synth_Target (Inst, Get_Prefix (Expr));
+
+            S := Sig_Index (Signals_Table.Table (Pfx.Obj.Val.S).Sig,
+                            Pfx.Off.Net_Off);
+
+            T := Exec_Read_Signal_Last
+              (S, Pfx.Targ_Type, Read_Signal_Last_Event);
+
+            Res := Create_Value_Memory (Pfx.Targ_Type, Expr_Pool'Access);
+
+            Exec_Read_Signal
+              (S, Get_Memtyp (Res), Read_Signal_Last_Value, T);
+            return Res;
+         end;
+      else
+         return Exec_Signal_Value_Attribute
+           (Inst, Expr, Read_Signal_Last_Value_87);
+      end if;
    end Exec_Last_Value_Attribute;
 
    function Exec_Driving_Value_Attribute (Inst : Synth_Instance_Acc;
@@ -2390,104 +2627,6 @@ package body Simul.Vhdl_Simul is
       return Exec_Signal_Value_Attribute
         (Inst, Expr, Read_Signal_Driver_Value);
    end Exec_Driving_Value_Attribute;
-
-   type Read_Signal_Last_Enum is
-     (
-      Read_Signal_Last_Event,
-      Read_Signal_Last_Active
-     );
-
-   function Exec_Read_Signal_Last (Sig: Memory_Ptr;
-                                   Val : Memtyp;
-                                   Attr : Read_Signal_Last_Enum)
-                                  return Std_Time
-   is
-      Res, T : Std_Time;
-      S : Ghdl_Signal_Ptr;
-   begin
-      case Val.Typ.Kind is
-         when Type_Scalars =>
-            S := Read_Sig (Sig);
-            case Attr is
-               when Read_Signal_Last_Event =>
-                  return S.Last_Event;
-               when Read_Signal_Last_Active =>
-                  return S.Last_Active;
-            end case;
-         when Type_Vector
-           | Type_Array =>
-            declare
-               Typ : constant Type_Acc := Val.Typ;
-               Len : constant Uns32 := Typ.Abound.Len;
-            begin
-               Res := Std_Time'First;
-               for I in 1 .. Len loop
-                  T := Exec_Read_Signal_Last
-                    (Sig_Index (Sig, (Len - I) * Typ.Arr_El.W),
-                     (Typ.Arr_El, Val.Mem + Size_Type (I - 1) * Typ.Arr_El.Sz),
-                     Attr);
-                  Res := Std_Time'Max (Res, T);
-               end loop;
-               return Res;
-            end;
-         when Type_Record =>
-            Res := Std_Time'First;
-            for I in Val.Typ.Rec.E'Range loop
-               declare
-                  E : Rec_El_Type renames Val.Typ.Rec.E (I);
-               begin
-                  T := Exec_Read_Signal_Last
-                    (Sig_Index (Sig, E.Offs.Net_Off),
-                     (E.Typ, Val.Mem + E.Offs.Mem_Off),
-                     Attr);
-                  Res := Std_Time'Max (Res, T);
-               end;
-            end loop;
-            return Res;
-         when others =>
-            raise Internal_Error;
-      end case;
-   end Exec_Read_Signal_Last;
-
-   function Exec_Signal_Last_Attribute (Inst : Synth_Instance_Acc;
-                                        Expr : Node;
-                                        Attr : Read_Signal_Last_Enum)
-                                       return Valtyp
-   is
-      Pfx : Target_Info;
-      Res : Valtyp;
-      T : Std_Time;
-      S : Memory_Ptr;
-   begin
-      Pfx := Synth_Target (Inst, Get_Prefix (Expr));
-
-      Res := Create_Value_Memory (Get_Subtype_Object (Inst, Get_Type (Expr)),
-                                  Expr_Pool'Access);
-
-      S := Sig_Index (Signals_Table.Table (Pfx.Obj.Val.S).Sig,
-                      Pfx.Off.Net_Off);
-
-      T := Exec_Read_Signal_Last (S, Get_Memtyp (Res), Attr);
-      if T < 0 then
-         T := Std_Time'Last;
-      else
-         T := Current_Time - T;
-      end if;
-      Write_I64 (Res.Val.Mem, Ghdl_I64 (T));
-      return Res;
-   end Exec_Signal_Last_Attribute;
-
-   function Exec_Last_Event_Attribute (Inst : Synth_Instance_Acc;
-                                       Expr : Node) return Valtyp is
-   begin
-      return Exec_Signal_Last_Attribute (Inst, Expr, Read_Signal_Last_Event);
-   end Exec_Last_Event_Attribute;
-
-   function Exec_Last_Active_Attribute (Inst : Synth_Instance_Acc;
-                                        Expr : Node) return Valtyp is
-   begin
-      return Exec_Signal_Last_Attribute (Inst, Expr, Read_Signal_Last_Active);
-   end Exec_Last_Active_Attribute;
 
    type Write_Signal_Enum is
      (Write_Signal_Driving_Value,
@@ -2509,7 +2648,26 @@ package body Simul.Vhdl_Simul is
                when Write_Signal_Driving_Value =>
                   S.Driving_Value := To_Ghdl_Value (Val);
                when Write_Signal_Effective_Value =>
-                  S.Value_Ptr.all := To_Ghdl_Value (Val);
+                  case Val.Typ.Kind is
+                     when Type_Bit =>
+                        S.Value_Ptr.B1 := Ghdl_B1'Val (Read_U8 (Val.Mem));
+                     when Type_Logic =>
+                        S.Value_Ptr.E8 := Read_U8 (Val.Mem);
+                     when Type_Discrete =>
+                        if Val.Typ.Sz = 1 then
+                           S.Value_Ptr.E8 := Read_U8 (Val.Mem);
+                        elsif Val.Typ.Sz = 4 then
+                           S.Value_Ptr.I32 := Read_I32 (Val.Mem);
+                        elsif Val.Typ.Sz = 8 then
+                           S.Value_Ptr.I64 := Read_I64 (Val.Mem);
+                        else
+                           raise Internal_Error;
+                        end if;
+                     when Type_Float =>
+                        S.Value_Ptr.F64 := Ghdl_F64 (Read_Fp64 (Val.Mem));
+                     when others =>
+                        raise Internal_Error;
+                  end case;
             end case;
          when Type_Vector
            | Type_Array =>
@@ -2519,7 +2677,7 @@ package body Simul.Vhdl_Simul is
             begin
                for I in 1 .. Len loop
                   Exec_Write_Signal
-                    (Sig_Index (Sig, (Len - I) * Typ.Arr_El.W),
+                    (Sig_Index (Sig, (I - 1) * Typ.Arr_El.W),
                      (Typ.Arr_El, Val.Mem + Size_Type (I - 1) * Typ.Arr_El.Sz),
                      Attr);
                end loop;
@@ -2595,7 +2753,7 @@ package body Simul.Vhdl_Simul is
 
       --  Create the type.
       Bnd := Elab.Vhdl_Types.Create_Bounds_From_Length (R.Idx_Typ.Drange, Len);
-      Arr_Typ := Create_Array_Type (Bnd, True, El_Typ);
+      Arr_Typ := Create_Array_Type (Bnd, False, True, El_Typ);
 
       --  Allocate the array.
       Arr := Create_Memory (Arr_Typ);
@@ -2618,7 +2776,8 @@ package body Simul.Vhdl_Simul is
       end loop;
 
       --  Call resolution function
-      Res := Exec_Resolution_Call (R.Inst, R.Func, Create_Value_Memtyp (Arr));
+      Res := Exec_Resolution_Call
+        (R.Inst, R.Func, Null_Node, Create_Value_Memtyp (Arr));
 
       --  Set driving value.
       Exec_Write_Signal (R.Sig, (Res.Typ, Res.Val.Mem),
@@ -2662,10 +2821,50 @@ package body Simul.Vhdl_Simul is
       end case;
    end Create_Scalar_Signal;
 
-   procedure Create_User_Signal (Idx : Signal_Index_Type)
-   is
-      E : Signal_Entry renames Signals_Table.Table (Idx);
+   function Get_Signal_Mode (E : Signal_Entry) return Mode_Signal_Type is
+   begin
+      case E.Kind is
+         when Signal_User =>
+            case Get_Kind (E.Decl) is
+               when Iir_Kind_Signal_Declaration =>
+                  return Mode_Signal;
+               when Iir_Kind_Interface_Signal_Declaration =>
+                  case Get_Mode (E.Decl) is
+                     when Iir_In_Mode =>
+                        return Mode_In;
+                     when Iir_Out_Mode =>
+                        return Mode_Out;
+                     when Iir_Linkage_Mode =>
+                        return Mode_Linkage;
+                     when Iir_Inout_Mode =>
+                        return Mode_Inout;
+                     when Iir_Buffer_Mode =>
+                        return Mode_Buffer;
+                     when Iir_Unknown_Mode =>
+                        raise Internal_Error;
+                  end case;
+               when others =>
+                  raise Internal_Error;
+            end case;
+         when Signal_Quiet =>
+            return Mode_Quiet;
+         when Signal_Stable =>
+            return Mode_Stable;
+         when Signal_Transaction =>
+            return Mode_Transaction;
+         when Signal_Delayed =>
+            return Mode_Delayed;
+         when Signal_Above =>
+            return Mode_Above;
+         when Signal_Guard =>
+            return Mode_Guard;
+         when Signal_None =>
+            raise Internal_Error;
+      end case;
+   end Get_Signal_Mode;
 
+   procedure Create_User_Signal (E : Signal_Entry)
+   is
       procedure Create_Signal (Val : Memory_Ptr;
                                Sig_Off : Uns32;
                                Sig_Type: Iir;
@@ -2684,8 +2883,13 @@ package body Simul.Vhdl_Simul is
            and then Get_Kind (Sig_Type) in Iir_Kinds_Subtype_Definition
          then
             Resolv_Func := Get_Resolution_Indication (Sig_Type);
-            if Resolv_Func /= Null_Node then
+            if Resolv_Func /= Null_Node
+              and then
+              Get_Kind (Resolv_Func) /= Iir_Kind_Array_Element_Resolution
+            then
                Resolv_Func := Get_Named_Entity (Resolv_Func);
+            else
+               Resolv_Func := Null_Node;
             end if;
             if Resolv_Func /= Null_Node
               and then
@@ -2727,7 +2931,7 @@ package body Simul.Vhdl_Simul is
                   end if;
                   for I in 1 .. Len loop
                      Create_Signal (Val + Size_Type (I - 1) * Typ.Arr_El.Sz,
-                                    Sig_Off + (Len - I) * Typ.Arr_El.W,
+                                    Sig_Off + (I - 1) * Typ.Arr_El.W,
                                     El_Type, Typ.Arr_El,
                                     Vec, Sub_Resolved);
                   end loop;
@@ -2762,20 +2966,16 @@ package body Simul.Vhdl_Simul is
 
       Sig_Type: constant Iir := Get_Type (E.Decl);
       Kind : Kind_Signal_Type;
-
-      type Iir_Kind_To_Kind_Signal_Type is
-        array (Iir_Signal_Kind) of Kind_Signal_Type;
-      Iir_Kind_To_Kind_Signal : constant Iir_Kind_To_Kind_Signal_Type :=
-        (Iir_Register_Kind  => Kind_Signal_Register,
-         Iir_Bus_Kind       => Kind_Signal_Bus);
    begin
-      if Get_Guarded_Signal_Flag (E.Decl) then
+      if Get_Kind (E.Decl) /= Iir_Kind_Interface_View_Declaration
+        and then Get_Guarded_Signal_Flag (E.Decl)
+      then
          Kind := Iir_Kind_To_Kind_Signal (Get_Signal_Kind (E.Decl));
       else
          Kind := Kind_Signal_No;
       end if;
 
-      Grt.Signals.Ghdl_Signal_Set_Mode (E.Kind, Kind, True);
+      Grt.Signals.Ghdl_Signal_Set_Mode_Kind (Get_Signal_Mode (E), Kind, True);
 
       Create_Signal (E.Val, 0, Sig_Type, E.Typ, E.Nbr_Sources.all, False);
    end Create_User_Signal;
@@ -2893,9 +3093,9 @@ package body Simul.Vhdl_Simul is
             begin
                for I in 1 .. Len loop
                   Create_Delayed_Signal
-                    (Sig_Index (Sig,  (Len - I) * Typ.Arr_El.W),
+                    (Sig_Index (Sig,  (I - 1) * Typ.Arr_El.W),
                      Val + Size_Type (I - 1) * Typ.Arr_El.Sz,
-                     Sig_Index (Pfx, (Len - I) * Typ.Arr_El.W),
+                     Sig_Index (Pfx, (I - 1) * Typ.Arr_El.W),
                      Typ.Arr_El, Time);
                end loop;
             end;
@@ -2936,7 +3136,7 @@ package body Simul.Vhdl_Simul is
             begin
                for I in 1 .. Len loop
                   Register_Prefix
-                    (Typ.Arr_El, Sig_Index (Sig, (Len - I) * Typ.Arr_El.W));
+                    (Typ.Arr_El, Sig_Index (Sig, (I - 1) * Typ.Arr_El.W));
                end loop;
             end;
          when Type_Record =>
@@ -2979,31 +3179,31 @@ package body Simul.Vhdl_Simul is
    begin
       E.Sig := Alloc_Signal_Memory (E.Typ, Global_Pool'Access);
       case E.Kind is
-         when Mode_Guard =>
+         when Signal_Guard =>
             Create_Guard_Signal (Idx);
-         when Mode_Quiet =>
+         when Signal_Quiet =>
             S := Grt.Signals.Ghdl_Create_Quiet_Signal
               (To_Ghdl_Value_Ptr (To_Address (E.Val)), E.Time);
             Write_Sig (E.Sig, S);
             Register_Prefix (E.Pfx.Typ, To_Memory_Ptr (E.Pfx));
-         when Mode_Stable =>
+         when Signal_Stable =>
             S := Grt.Signals.Ghdl_Create_Stable_Signal
               (To_Ghdl_Value_Ptr (To_Address (E.Val)), E.Time);
             Write_Sig (E.Sig, S);
             Register_Prefix (E.Pfx.Typ, To_Memory_Ptr (E.Pfx));
-         when Mode_Transaction =>
+         when Signal_Transaction =>
             S := Grt.Signals.Ghdl_Create_Transaction_Signal
               (To_Ghdl_Value_Ptr (To_Address (E.Val)));
             Write_Sig (E.Sig, S);
             Register_Prefix (E.Pfx.Typ, To_Memory_Ptr (E.Pfx));
-         when Mode_Delayed =>
+         when Signal_Delayed =>
             Create_Delayed_Signal (E.Sig, E.Val, To_Memory_Ptr (E.Pfx),
                                    E.Typ, E.Time);
-         when Mode_Above =>
+         when Signal_Above =>
             raise Internal_Error;
-         when Mode_Signal_User =>
-            Create_User_Signal (Idx);
-         when Mode_Conv_In | Mode_Conv_Out | Mode_End =>
+         when Signal_User =>
+            Create_User_Signal (Signals_Table.Table (Idx));
+         when Signal_None =>
             raise Internal_Error;
       end case;
    end Create_Signal;
@@ -3038,7 +3238,7 @@ package body Simul.Vhdl_Simul is
             begin
                for I in 1 .. Len loop
                   Set_Disconnect (Typ.Arr_El,
-                                  Sig_Index (Sig, (Len - I) * Typ.Arr_El.W),
+                                  Sig_Index (Sig, (I - 1) * Typ.Arr_El.W),
                                   Val);
                end loop;
             end;
@@ -3089,9 +3289,9 @@ package body Simul.Vhdl_Simul is
             begin
                for I in 1 .. Len loop
                   Add_Extra_Driver_To_Signal
-                    (Sig_Index (Sig, (Len - I) * El.W), El,
+                    (Sig_Index (Sig, (I - 1) * El.W), El,
                      Init + Size_Type (I - 1) * El.Sz,
-                     Off + (Len - I) * El.W, Vec);
+                     Off + (I - 1) * El.W, Vec);
                end loop;
             end;
          when Type_Record =>
@@ -3109,6 +3309,29 @@ package body Simul.Vhdl_Simul is
       end case;
    end Add_Extra_Driver_To_Signal;
 
+   procedure Collapse_Signal (E : in out Signal_Entry)
+   is
+      Ec : Signal_Entry renames Signals_Table.Table (E.Collapsed_By);
+   begin
+      if Get_Mode (E.Decl) in Iir_Out_Modes then
+         --  As an out connection creates a source, if a signal is
+         --  collapsed and has no source, an extra source needs to be
+         --  created.
+         Add_Extra_Driver_To_Signal
+           (Ec.Sig, E.Typ, E.Val, 0, E.Nbr_Sources.all);
+
+         --  The signal value is the value of the collapsed signal.
+         --  Keep default value.
+         Copy_Memory (Ec.Val, E.Val, E.Typ.Sz);
+         Exec_Write_Signal
+           (Ec.Sig, (E.Typ, E.Val), Write_Signal_Driving_Value);
+      end if;
+
+      E.Val := Ec.Val;
+      --  Already done for simulation but not for compilation.
+      E.Sig := Ec.Sig;
+   end Collapse_Signal;
+
    procedure Collapse_Signals is
    begin
       for I in Signals_Table.First .. Signals_Table.Last loop
@@ -3116,25 +3339,7 @@ package body Simul.Vhdl_Simul is
             E : Signal_Entry renames Signals_Table.Table (I);
          begin
             if E.Collapsed_By /= No_Signal_Index then
-               if Get_Mode (E.Decl) in Iir_Out_Modes then
-                  --  As an out connection creates a source, if a signal is
-                  --  collapsed and has no source, an extra source needs to be
-                  --  created.
-                  Add_Extra_Driver_To_Signal
-                    (E.Sig, E.Typ, E.Val, 0, E.Nbr_Sources.all);
-               end if;
-               --  The signal value is the value of the collapsed signal.
-               if Get_Mode (E.Decl) in Iir_Out_Modes then
-                  --  Keep default value.
-                  Copy_Memory (Signals_Table.Table (E.Collapsed_By).Val,
-                               E.Val,
-                               E.Typ.Sz);
-                  Exec_Write_Signal
-                    (Signals_Table.Table (E.Collapsed_By).Sig,
-                     (E.Typ, E.Val), Write_Signal_Driving_Value);
-               end if;
-
-               E.Val := Signals_Table.Table (E.Collapsed_By).Val;
+               Collapse_Signal (E);
             end if;
          end;
       end loop;
@@ -3162,9 +3367,9 @@ package body Simul.Vhdl_Simul is
                   raise Internal_Error;
                end if;
                for I in 1 .. Len loop
-                  Connect ((Etyp, Sig_Index (Dst.Mem, (Len - I) * Etyp.W)),
+                  Connect ((Etyp, Sig_Index (Dst.Mem, (I - 1) * Etyp.W)),
                            (Src.Typ.Arr_El,
-                            Sig_Index (Src.Mem, (Len - I) * Etyp.W)),
+                            Sig_Index (Src.Mem, (I - 1) * Etyp.W)),
                            Mode);
                end loop;
             end;
@@ -3222,7 +3427,7 @@ package body Simul.Vhdl_Simul is
             begin
                for I in 1 .. Len loop
                   Create_Shadow_Signal
-                    (Sig_Index (Sig, (Len - I) * Typ.Arr_El.W),
+                    (Sig_Index (Sig, (I - 1) * Typ.Arr_El.W),
                      Val + Size_Type (I - 1) * Typ.Arr_El.Sz,
                      Typ.Arr_El);
                end loop;
@@ -3275,9 +3480,11 @@ package body Simul.Vhdl_Simul is
       Val := Create_Memory (Conv.Src_Typ);
       case Conv.Mode is
          when Convert_In =>
-            Exec_Read_Signal (Conv.Src_Sig, Val, Read_Signal_Effective_Value);
+            Exec_Read_Signal
+              (Conv.Src_Sig, Val, Read_Signal_Effective_Value, 0);
          when Convert_Out =>
-            Exec_Read_Signal (Conv.Src_Sig, Val, Read_Signal_Driving_Value);
+            Exec_Read_Signal
+              (Conv.Src_Sig, Val, Read_Signal_Driving_Value, 0);
       end case;
 
       Dst_Val := Create_Value_Memory (Val, Current_Pool);
@@ -3316,9 +3523,7 @@ package body Simul.Vhdl_Simul is
             return Read_Sig (Sig);
          when Type_Vector
            | Type_Array =>
-            return Get_Leftest_Signal
-              (Sig_Index (Sig, (Typ.Abound.Len - 1) * Typ.Arr_El.W),
-               Typ.Arr_El);
+            return Get_Leftest_Signal (Sig, Typ.Arr_El);
          when Type_Record =>
             declare
                E : Rec_El_Type renames Typ.Rec.E (1);
@@ -3358,9 +3563,28 @@ package body Simul.Vhdl_Simul is
       end case;
    end Add_Conversion;
 
-   procedure Create_Connect (C : Connect_Entry) is
+   procedure Create_Connect (C : Connect_Entry; Mode : Iir_Mode)
+   is
+      Drive_Actual : Boolean;
+      Drive_Formal : Boolean;
    begin
-      if C.Drive_Actual then
+      case Mode is
+         when Iir_In_Mode =>
+            Drive_Formal := True;
+            Drive_Actual := False;
+         when Iir_Out_Mode
+           | Iir_Buffer_Mode =>
+            Drive_Formal := False;
+            Drive_Actual := True;
+         when Iir_Inout_Mode
+           | Iir_Linkage_Mode =>
+            Drive_Formal := True;
+            Drive_Actual := True;
+         when Iir_Unknown_Mode =>
+            raise Internal_Error;
+      end case;
+
+      if Drive_Actual then
          declare
             Out_Conv : constant Node := Get_Formal_Conversion (C.Assoc);
             Csig : Memory_Ptr;
@@ -3396,7 +3620,7 @@ package body Simul.Vhdl_Simul is
          end;
       end if;
 
-      if C.Drive_Formal then
+      if Drive_Formal then
          declare
             In_Conv : constant Node := Get_Actual_Conversion (C.Assoc);
             Csig : Memory_Ptr;
@@ -3427,6 +3651,48 @@ package body Simul.Vhdl_Simul is
          end;
       end if;
    end Create_Connect;
+
+   procedure Create_View_Connect
+     (View : Iir; Reversed : Boolean; C : Connect_Entry) is
+   begin
+      if Get_Kind (View) = Iir_Kind_Simple_Mode_View_Element then
+         declare
+            Sub_Mode : Iir_Mode;
+         begin
+            Sub_Mode := Get_Mode (View);
+            if Reversed then
+               Sub_Mode := Get_Converse_Mode (Sub_Mode);
+            end if;
+            Create_Connect (C, Sub_Mode);
+         end;
+      else
+         declare
+            Typ : constant Type_Acc :=
+              Signals_Table.Table (C.Formal.Base).Typ;
+            Sub_View : Iir;
+            Sub_Reversed : Boolean;
+            Sub_Connect : Connect_Entry;
+         begin
+            for I in 1 .. Typ.Rec.Len loop
+               Update_Mode_View_By_Pos
+                 (Sub_View, Sub_Reversed, View, Reversed, Natural (I - 1));
+               Sub_Connect :=
+                 (Formal => (Base => C.Formal.Base,
+                             Offs => C.Formal.Offs + Typ.Rec.E (I).Offs,
+                             Typ => Typ.Rec.E (I).Typ),
+                  Formal_Link => C.Formal_Link,
+                  Actual => (Base => C.Actual.Base,
+                             Offs => C.Actual.Offs + Typ.Rec.E (I).Offs,
+                             Typ => Typ.Rec.E (I).Typ),
+                  Actual_Link => C.Actual_Link,
+                  Collapsed => C.Collapsed,
+                  Assoc => C.Assoc,
+                  Assoc_Inst => C.Assoc_Inst);
+               Create_View_Connect (Sub_View, Sub_Reversed, Sub_Connect);
+            end loop;
+         end;
+      end if;
+   end Create_View_Connect;
 
    procedure Signal_Associate_Cst (Sig : Memory_Ptr;
                                    Typ : Type_Acc;
@@ -3468,7 +3734,7 @@ package body Simul.Vhdl_Simul is
             begin
                for I in 1 .. Len loop
                   Signal_Associate_Cst
-                    (Sig_Index (Sig, (Len - I) * Typ.Arr_El.W),
+                    (Sig_Index (Sig, (I - 1) * Typ.Arr_El.W),
                      Typ.Arr_El,
                      Val + Size_Type (I - 1) * Typ.Arr_El.Sz);
                end loop;
@@ -3488,10 +3754,29 @@ package body Simul.Vhdl_Simul is
          begin
             if not C.Collapsed then
                if C.Actual.Base /= No_Signal_Index then
-                  Create_Connect (C);
+                  declare
+                     Inter : constant Iir :=
+                       Signals_Table.Table (C.Formal.Base).Decl;
+                     View : Iir;
+                     Reversed : Boolean;
+                  begin
+                     if Get_Kind (Inter) = Iir_Kind_Interface_View_Declaration
+                     then
+                        pragma Assert
+                          (Get_Formal_Conversion (C.Assoc) = Null_Iir);
+                        pragma Assert
+                          (Get_Actual_Conversion (C.Assoc) = Null_Iir);
+                        Get_Mode_View_From_Name
+                          (Get_Formal (C.Assoc), View, Reversed);
+                        Create_View_Connect (View, Reversed, C);
+                     else
+                        Create_Connect (C, Get_Mode (Inter));
+                     end if;
+                  end;
                elsif Get_Expr_Staticness (Get_Actual (C.Assoc)) >= Globally
                then
                   Mark_Expr_Pool (Marker);
+                  Instance_Pool := Process_Pool'Access;
                   Val := Synth.Vhdl_Expr.Synth_Expression_With_Type
                     (C.Assoc_Inst, Get_Actual (C.Assoc), C.Formal.Typ);
                   Val := Strip_Alias_Const (Val);
@@ -3500,6 +3785,7 @@ package body Simul.Vhdl_Simul is
                                 C.Formal.Offs.Net_Off),
                      C.Formal.Typ,
                      Val.Val.Mem);
+                  Instance_Pool := null;
                   Release_Expr_Pool (Marker);
                end if;
             end if;
@@ -3528,7 +3814,7 @@ package body Simul.Vhdl_Simul is
             begin
                for I in 1 .. Len loop
                   Update_Sig_Val (El,
-                                  Sig_Index (Sigs, (Len - I) * El.W),
+                                  Sig_Index (Sigs, (I - 1) * El.W),
                                   Vals + Size_Type (I - 1) * El.Sz);
                end loop;
             end;
@@ -3623,7 +3909,6 @@ package body Simul.Vhdl_Simul is
    --  Compute solver variables, allocate memory for quantities.
    procedure Create_Quantities
    is
-      use Grt.Analog_Solver;
       Num : Natural;
       Idx : Integer;
       Vec : F64_C_Arr_Ptr;
@@ -3966,6 +4251,7 @@ package body Simul.Vhdl_Simul is
         Exec_Last_Event_Attribute'Access;
       Synth.Vhdl_Expr.Hook_Last_Active_Attribute :=
         Exec_Last_Active_Attribute'Access;
+      Synth.Vhdl_Expr.Hook_Endpoint := Exec_Endpoint'Access;
 
       Synth.Vhdl_Oper.Hook_Bit_Rising_Edge := Exec_Bit_Rising_Edge'Access;
       Synth.Vhdl_Oper.Hook_Bit_Falling_Edge := Exec_Bit_Falling_Edge'Access;
@@ -3981,95 +4267,18 @@ package body Simul.Vhdl_Simul is
       Synth.Vhdl_Stmts.Hook_Create_Value_For_Signal_Individual_Assocs :=
         Hook_Create_Value_For_Signal_Individual_Assocs'Access;
 
+      Assertion_Report_Handler := Assertion_Report_Msg'Access;
+
       -- if Flag_Interractive then
       --    Debug (Reason_Elab);
       -- end if;
    end Runtime_Elaborate;
 
-   procedure Ghdl_Elaborate;
-   pragma Export (C, Ghdl_Elaborate, "__ghdl_ELABORATE");
-
-   procedure Ghdl_Elaborate is
+   procedure Simulation is
    begin
-      Runtime_Elaborate;
-   end Ghdl_Elaborate;
+      Simul.Main.Elaborate_Proc := Runtime_Elaborate'Access;
 
-   Ghdl_Progname : constant String := "ghdl" & ASCII.Nul;
-
-   procedure Simulation
-   is
-      Ok : C_Boolean;
-      Status : Integer;
-   begin
-      Break_Time := Std_Time'Last;
-
-      Grt.Options.Progname := To_Ghdl_C_String (Ghdl_Progname'Address);
-      Grt.Errors.Set_Error_Stream (Grt.Stdio.stdout);
-
-      Elab.Debugger.Error_Hook := Grt.Errors.Fatal_Error'Access;
-
-      pragma Assert (Areapools.Is_Empty (Expr_Pool));
-
-      if Flag_Debug_Elab then
-         Elab.Debugger.Debug_Elab (Vhdl_Elab.Top_Instance);
-      end if;
-
-      Ok := Grt.Main.Run_Elab;
-      if not Ok then
-         return;
-      end if;
-
-      pragma Assert (Areapools.Is_Empty (Expr_Pool));
-      pragma Assert (Areapools.Is_Empty (Process_Pool));
-
-      Synth.Flags.Severity_Level := Grt.Options.Severity_Level;
-
-      if Flag_Interractive then
-         Elab.Debugger.Debug_Elab (Vhdl_Elab.Top_Instance);
-      end if;
-
-      Status := Grt.Main.Run_Through_Longjump
-        (Grt.Processes.Simulation_Init'Access);
-
-      if Status = 0 then
-         if Grt.Processes.Flag_AMS then
-            Grt.Analog_Solver.Start;
-         end if;
-
-         Grt.Errors.Set_Error_Stream (Grt.Stdio.stdout);
-         Assertion_Report_Handler := Assertion_Report_Msg'Access;
-
-         pragma Assert (Areapools.Is_Empty (Expr_Pool));
-         pragma Assert (Areapools.Is_Empty (Process_Pool));
-
-         loop
-            if Break_Time < Grt.Processes.Next_Time then
-               Grt.Processes.Next_Time := Break_Time;
-            end if;
-
-            Status := Grt.Main.Run_Through_Longjump
-              (Grt.Processes.Simulation_Cycle'Access);
-            exit when Status < 0
-              or Status = Grt.Errors.Run_Stop
-              or Status = Grt.Errors.Run_Finished;
-
-            if Current_Time >= Break_Time
-              and then Break_Time /= Std_Time'Last
-            then
-               --  No not break anymore on time,
-               Break_Time := Std_Time'Last;
-               Elab.Debugger.Debug_Time;
-            end if;
-
-            exit when Grt.Processes.Has_Simulation_Timeout;
-         end loop;
-      end if;
-
-      Grt.Main.Run_Finish (Status);
-   exception
---      when Debugger_Quit =>
---         null;
-      when Simulation_Finished =>
-         null;
+      Simul.Main.Simulation;
    end Simulation;
+
 end Simul.Vhdl_Simul;
